@@ -13,7 +13,7 @@ import { formatStockPrice, getProductRetailPrice, getProductMinFloorPrice } from
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
-import { STANDARD_FOOTWEAR_CATEGORIES } from '../../utils/footwear.ts';
+import { STANDARD_FOOTWEAR_CATEGORIES, isHalfCartonAllowed } from '../../utils/footwear.ts';
 
 interface ProductManagementProps {
   currentUser: any;
@@ -634,9 +634,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                               {p.pairsPerCarton || 12} Pairs Lot
                             </div>
                             {(() => {
-                              const storeAllow = companySettings?.allowHalfCarton === true || companySettings?.allow_half_carton === true;
-                              const prodAllow = p.allowHalfCarton === true || p.allow_half_carton === true;
-                              const isHalf = storeAllow || prodAllow;
+                              const isHalf = isHalfCartonAllowed(p, companySettings);
                               const lot = Number(p.pairsPerCarton || 12) === 16 ? 16 : 12;
                               const minQty = p.minSaleQuantity ?? (isHalf ? lot / 2 : lot);
                               return (

@@ -900,6 +900,18 @@ export const api = {
       if (params.excludeId !== undefined && params.excludeId !== null) qs.set('excludeId', String(params.excludeId));
       return apiFetch<any>(`/products/suggest-article?${qs.toString()}`);
     },
+    aiSuggestFromImage: (image: string) =>
+      apiFetch<{
+        success: boolean;
+        title?: string;
+        category?: string;
+        brand?: string;
+        shoeType?: string;
+        error?: string;
+      }>('/products/ai-suggest-from-image', {
+        method: 'POST',
+        body: { image },
+      }),
     create: async (data: ProductFormValues) => {
       const normalizedData = { ...data, brand: String(data.brand ?? '').trim() || 'Unbranded' };
       const res = await apiFetch<any>('/products', { method: 'POST', body: normalizedData });

@@ -6,6 +6,7 @@ import { playAudioFeedback } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
 import { ShoeExchangeModal } from './ShoeExchangeModal.tsx';
 import { formatStockPrice, cleanStockPriceInput, getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
+import { isHalfCartonAllowed } from '../../utils/footwear.ts';
 import type { ActiveExchange } from '../../types.ts';
 import { offlineQueueService } from '../../services/offlineQueueService.ts';
 import { cacheCatalogOffline, lookupCachedProductOffline, searchCachedProductsOffline, resolveActiveTenantId } from '../../utils/offlineDb.ts';
@@ -663,18 +664,17 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     const isItemFixed = isWholesaleStore || isFixedPolicy;
 
     // Wholesale lot size & item-level half-carton permission
-    // Determination: Half-cartons are allowed if either the store setting is enabled
-    // (company_setting.allow_half_carton == true) OR the specific product override is enabled
-    // (product.allow_half_carton == true).
+    // Determination: Product-level allow_half_carton takes precedence as an explicit override.
     const rawPairsPerCarton = product.pairsPerCarton ?? product.pairs_per_carton;
     const pairsPerCarton = Number(rawPairsPerCarton) === 16 ? 16 : 12;
-    const isProductHalfAllowed = product.allowHalfCarton === true || (product as any).allow_half_carton === true;
-    const isItemHalfAllowed = storeAllowsHalfCarton || isProductHalfAllowed;
+    const isItemHalfAllowed = isHalfCartonAllowed(product, companySettings);
     // Calculation:
-    // If half-cartons are allowed: min_sale_quantity = pairs_per_ctn / 2
-    // Otherwise (not allowed): min_sale_quantity = pairs_per_ctn
-    const minSaleQuantity = isItemHalfAllowed ? (pairsPerCarton / 2) : pairsPerCarton;
-    const wholesaleStep = minSaleQuantity;
+    // - For Retailer: min_sale_quantity = 1 pair
+    // - For Wholesaler:
+    //   If half-cartons are allowed: min_sale_quantity = pairs_per_carton / 2
+    //   Otherwise (full carton only): min_sale_quantity = pairs_per_carton
+    const minSaleQuantity = isWholesaleStore ? (isItemHalfAllowed ? (pairsPerCarton / 2) : pairsPerCarton) : 1;
+    const wholesaleStep = isWholesaleStore ? minSaleQuantity : 1;
     const fixedUnitPrice = Math.round(Number(
       product.maxPrice ?? product.max_price ?? product.sellingPrice ?? product.selling_price ?? 0
     ));
@@ -704,8 +704,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
         }
 
         const lot = Number(existing.pairsPerCarton || pairsPerCarton) === 16 ? 16 : 12;
-        const existingHalfAllowed = existing.allowHalfCarton === true || (existing as any).allow_half_carton === true;
-        const isExistingItemHalfAllowed = storeAllowsHalfCarton || existingHalfAllowed;
+        const isExistingItemHalfAllowed = isHalfCartonAllowed(existing, companySettings);
         const step = isWholesaleStore ? (isExistingItemHalfAllowed ? (lot / 2) : lot) : 1;
         const newQty = Math.min(existing.quantity + step, product.totalStock);
 
@@ -739,8 +738,8 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
           maxSalePrice: itemMaxSalePrice,
           unitPrice: startingUnitPrice,
           pairsPerCarton,
-          allowHalfCarton: isProductHalfAllowed,
-          allow_half_carton: isProductHalfAllowed,
+          allowHalfCarton: isItemHalfAllowed,
+          allow_half_carton: isItemHalfAllowed,
           minSaleQuantity,
           min_sale_quantity: minSaleQuantity,
           quantity: initialQuantity,
@@ -765,7 +764,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
         .map((item) => {
           if (item.productId === productId) {
             const lot = Number(item.pairsPerCarton || 12) === 16 ? 16 : 12;
-            const isItemHalfAllowed = storeAllowsHalfCarton || item.allowHalfCarton === true || (item as any).allow_half_carton === true;
+            const isItemHalfAllowed = isHalfCartonAllowed(item, companySettings);
             const minSaleQty = isItemHalfAllowed ? (lot / 2) : lot;
             const wholesaleStep = minSaleQty;
 
@@ -825,7 +824,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
             if (isWholesaleStore) {
               const lot = Number(item.pairsPerCarton || 12) === 16 ? 16 : 12;
-              const isItemHalfAllowed = storeAllowsHalfCarton || item.allowHalfCarton === true || (item as any).allow_half_carton === true;
+              const isItemHalfAllowed = isHalfCartonAllowed(item, companySettings);
               const minSaleQty = isItemHalfAllowed ? (lot / 2) : lot;
               const wholesaleStep = minSaleQty;
               const minAllowed = wholesaleStep;
@@ -857,7 +856,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
               );
               if (isWholesaleStore) {
                 const lot = Number(item.pairsPerCarton || 12) === 16 ? 16 : 12;
-                const isItemHalfAllowed = storeAllowsHalfCarton || item.allowHalfCarton === true || (item as any).allow_half_carton === true;
+                const isItemHalfAllowed = isHalfCartonAllowed(item, companySettings);
                 const minSaleQty = isItemHalfAllowed ? (lot / 2) : lot;
                 const wholesaleStep = minSaleQty;
                 const maxMult = Math.floor(item.totalStock / wholesaleStep) * wholesaleStep;
@@ -1906,7 +1905,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       <td className="py-3 px-3">
                         {isWholesaleStore ? (() => {
                           const lotSize = Number(item.pairsPerCarton || 12) === 16 ? 16 : 12;
-                          const isItemHalfAllowed = storeAllowsHalfCarton || item.allowHalfCarton === true || (item as any).allow_half_carton === true;
+                          const isItemHalfAllowed = isHalfCartonAllowed(item, companySettings);
                           const minSaleQty = isItemHalfAllowed ? (lotSize / 2) : lotSize;
                           const wholesaleStep = minSaleQty;
                           const isMinusDisabled = item.quantity <= wholesaleStep;

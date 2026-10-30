@@ -301,28 +301,42 @@ export function buildArticleInfo(
 }
 
 /**
- * Determination: Half-cartons are allowed if either the store setting is enabled
- * (company_setting.allow_half_carton == true) OR the specific product override
- * is enabled (product.allow_half_carton == true).
+ * Determination: Product-level allow_half_carton takes precedence as an explicit override.
+ * - If product explicitly specifies allowHalfCarton (true or false), that rule is enforced.
+ *   (e.g., if a wholesale store globally allows half cartons, but a specific product has allowHalfCarton = false,
+ *    that product is strictly Full Carton only).
+ * - If product does not specify (undefined or null), it inherits the store default (storeSetting.allow_half_carton).
  */
 export function isHalfCartonAllowed(
   product?: { allowHalfCarton?: boolean; allow_half_carton?: boolean } | null,
   storeSetting?: { allowHalfCarton?: boolean; allow_half_carton?: boolean } | null
 ): boolean {
-  const storeEnabled = storeSetting?.allowHalfCarton === true || storeSetting?.allow_half_carton === true;
-  const productEnabled = product?.allowHalfCarton === true || product?.allow_half_carton === true;
-  return storeEnabled || productEnabled;
+  const productVal = product?.allowHalfCarton ?? product?.allow_half_carton;
+  if (typeof productVal === 'boolean') {
+    return productVal;
+  }
+  return storeSetting?.allowHalfCarton === true || storeSetting?.allow_half_carton === true;
 }
 
 /**
  * Dynamic minimum sale quantity calculation:
- * If half-cartons are allowed: min_sale_quantity = pairs_per_ctn / 2
- * Otherwise (not allowed): min_sale_quantity = pairs_per_ctn
+ * - For Retailer: min_sale_quantity = 1 pair
+ * - For Wholesaler:
+ *     If half-cartons are allowed: min_sale_quantity = pairs_per_carton / 2
+ *     Otherwise (full carton only): min_sale_quantity = pairs_per_carton
  */
 export function calculateMinSaleQuantity(
   product?: { pairsPerCarton?: number; pairs_per_carton?: number; allowHalfCarton?: boolean; allow_half_carton?: boolean } | null,
-  storeSetting?: { allowHalfCarton?: boolean; allow_half_carton?: boolean } | null
+  storeSetting?: { allowHalfCarton?: boolean; allow_half_carton?: boolean; businessType?: string; business_type?: string } | null
 ): number {
+  const businessType = String((storeSetting as any)?.businessType || (storeSetting as any)?.business_type || '').toUpperCase();
+  const isWholesale = businessType === 'WHOLESALE';
+
+  // Retail stores always sell by individual pairs (min 1 pair)
+  if (storeSetting && (businessType === 'RETAIL' || (!isWholesale && businessType.length > 0))) {
+    return 1;
+  }
+
   const rawPairs = Number(product?.pairsPerCarton ?? product?.pairs_per_carton ?? 12);
   const pairsPerCtn = rawPairs === 16 ? 16 : 12;
   const halfAllowed = isHalfCartonAllowed(product, storeSetting);

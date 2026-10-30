@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { SideEndBoxLabelModal } from './SideEndBoxLabelModal.tsx';
 import { BarcodeStickerModal } from './BarcodeStickerModal.tsx';
@@ -94,18 +94,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     effectiveSettings?.allow_half_carton === true ||
     effectiveSettings?.allowHalfCarton === true;
 
-  // Item-level "Allow Half Carton (0.5)" setting: checked (true) by default for new products
+  // Item-level "Allow Half Carton (0.5)" setting: defaults to store setting or product's saved preference
   const [allowHalfCarton, setAllowHalfCarton] = useState<boolean>(() => {
     if (product) {
       if (product.allowHalfCarton !== undefined) return Boolean(product.allowHalfCarton);
       if (product.allow_half_carton !== undefined) return Boolean(product.allow_half_carton);
-      return true; // Default for existing catalog items
+      return storeAllowsHalfCarton;
     }
-    return true; // New product: checked by default
+    return storeAllowsHalfCarton;
   });
 
-  // Determination: Half-cartons are allowed if either the store setting is enabled OR product override is enabled
-  const isFractionalAllowed = storeAllowsHalfCarton || allowHalfCarton;
+  // Determination: Product-level setting is the explicit rule for this product
+  const isFractionalAllowed = allowHalfCarton;
 
   const [pairsPerCarton, setPairsPerCarton] = useState<number>(() => {
     const raw =
@@ -151,7 +151,39 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const effectiveCartonSize = isWholesaleStore ? (pairsPerCarton === 16 ? 16 : 12) : lotSize;
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string>(product?.primaryImageUrl || '');
 
-  // Keep product image support without the retired AI categorization/suggestion workflow.
+  // AI Vision Suggestor State (strictly for retail stores only)
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    title?: string;
+    category?: string;
+    brand?: string;
+    shoeType?: string;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleRunAiImageAnalysis = async (imageDataUrl: string) => {
+    if (isWholesaleStore || !imageDataUrl) return;
+    setIsAiAnalyzing(true);
+    setAiError(null);
+    try {
+      const res = await api.products.aiSuggestFromImage(imageDataUrl);
+      if (res && res.success) {
+        setAiSuggestions({
+          title: res.title || '',
+          category: res.category ? normalizeFootwearCategory(res.category) : undefined,
+          brand: res.brand ? toTitleCaseLive(res.brand) : 'Unbranded',
+          shoeType: res.shoeType || '',
+        });
+      } else {
+        setAiError(res?.error || 'Could not detect product attributes from image.');
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'AI image suggestion failed. You can enter details manually.');
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
+
   const handleProductImageUpload = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -173,8 +205,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           return;
         }
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        setPrimaryImageUrl(canvas.toDataURL('image/jpeg', 0.88));
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setPrimaryImageUrl(resizedDataUrl);
         setErrorMessage('');
+        if (!isWholesaleStore) {
+          handleRunAiImageAnalysis(resizedDataUrl);
+        }
       };
       image.onerror = () => setErrorMessage('Unable to read this image. Please try another file.');
       image.src = String(reader.result || '');
@@ -344,6 +380,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const formatted = normalizeFootwearCategory(newCat);
     setCategory(formatted);
     updateClassificationCodes(brand, formatted, effectiveProductId);
+  };
+
+  const handleApplyAllAiSuggestions = () => {
+    if (!aiSuggestions || isWholesaleStore) return;
+    if (aiSuggestions.title) {
+      setProductName(aiSuggestions.title);
+    }
+    if (aiSuggestions.brand) {
+      handleBrandChange(aiSuggestions.brand);
+    }
+    if (aiSuggestions.category) {
+      handleCategoryChange(aiSuggestions.category);
+    }
+  };
+
+  const handleApplySingleAiSuggestion = (field: 'title' | 'brand' | 'category') => {
+    if (!aiSuggestions || isWholesaleStore) return;
+    if (field === 'title' && aiSuggestions.title) {
+      setProductName(aiSuggestions.title);
+    } else if (field === 'brand' && aiSuggestions.brand) {
+      handleBrandChange(aiSuggestions.brand);
+    } else if (field === 'category' && aiSuggestions.category) {
+      handleCategoryChange(aiSuggestions.category);
+    }
   };
 
   const handleArticleChange = (rawVal: string) => {
@@ -1130,29 +1190,236 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ========================================================= */}
           {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Optional product image: manual upload or URL, without AI suggestions. */}
-              <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-[#1A263D] dark:bg-[#0D1424]">
-                <div className="mb-3 flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4 text-purple-600 dark:text-purple-300" />
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-white">Product Image <span className="font-normal normal-case text-gray-500">(optional)</span></h5>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                  {primaryImageUrl ? (
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
-                      <img src={primaryImageUrl} alt="Product preview" className="h-full w-full object-contain" />
-                      <button type="button" onClick={() => setPrimaryImageUrl('')} aria-label="Remove product image" className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black"><X className="h-3 w-3" /></button>
-                    </div>
-                  ) : null}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-purple-500/10">
-                      <Upload className="h-4 w-4" /> Upload product image
-                      <input type="file" accept="image/*" className="hidden" onChange={(event) => { handleProductImageUpload(event.target.files?.[0]); event.currentTarget.value = ''; }} />
-                    </label>
-                    <input type="url" value={primaryImageUrl.startsWith('data:') ? '' : primaryImageUrl} onChange={(event) => setPrimaryImageUrl(event.target.value)} placeholder="Or paste an image URL" className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
-                    <p className="text-[11px] text-gray-500 dark:text-slate-400">Images are resized before saving. AI brand, category, and title suggestions have been removed.</p>
+              {/* Product Image Section for Wholesale Stores (Standard upload, no AI suggestions) */}
+              {isWholesaleStore && (
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-[#1A263D] dark:bg-[#0D1424]">
+                  <div className="mb-3 flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-white">
+                      Product Image <span className="font-normal normal-case text-gray-500">(optional)</span>
+                    </h5>
                   </div>
-                </div>
-              </section>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    {primaryImageUrl ? (
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
+                        <img src={primaryImageUrl} alt="Product preview" className="h-full w-full object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => setPrimaryImageUrl('')}
+                          aria-label="Remove product image"
+                          className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black transition"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : null}
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-purple-500/10">
+                        <Upload className="h-4 w-4" /> Upload product image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            handleProductImageUpload(event.target.files?.[0]);
+                            event.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                      <input
+                        type="url"
+                        value={primaryImageUrl.startsWith('data:') ? '' : primaryImageUrl}
+                        onChange={(event) => setPrimaryImageUrl(event.target.value)}
+                        placeholder="Or paste an image URL"
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                        Images are resized to optimal dimensions before saving.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Product Image & AI Vision Suggestor (Strictly for Retail Stores) */}
+              {!isWholesaleStore && (
+                <section className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/40 via-white to-indigo-50/30 p-4 shadow-xs dark:border-purple-900/40 dark:from-[#0f172a] dark:via-[#0D1424] dark:to-purple-950/20">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-600 text-white shadow-xs">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                        Product Photo & AI Suggestor
+                      </h5>
+                    </div>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
+                      Retail Store Only
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    {primaryImageUrl ? (
+                      <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-purple-200 bg-white dark:border-slate-700 dark:bg-slate-900 shadow-xs">
+                        <img src={primaryImageUrl} alt="Product preview" className="h-full w-full object-contain p-1" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrimaryImageUrl('');
+                            setAiSuggestions(null);
+                            setAiError(null);
+                          }}
+                          aria-label="Remove product image"
+                          className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black transition"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : null}
+
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-purple-300 bg-white/80 px-3 py-2.5 text-xs font-semibold text-purple-900 transition hover:border-purple-500 hover:bg-purple-50 dark:border-purple-700/60 dark:bg-slate-900/80 dark:text-purple-200 dark:hover:bg-purple-950/40">
+                          <Upload className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          <span>Upload Shoe Photo (Auto AI Suggest)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              handleProductImageUpload(event.target.files?.[0]);
+                              event.currentTarget.value = '';
+                            }}
+                          />
+                        </label>
+
+                        {primaryImageUrl && !isAiAnalyzing && (
+                          <button
+                            type="button"
+                            onClick={() => handleRunAiImageAnalysis(primaryImageUrl)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-600 px-3 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 active:scale-95 transition dark:border-purple-600"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>Re-analyze</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={primaryImageUrl.startsWith('data:') ? '' : primaryImageUrl}
+                          onChange={(event) => setPrimaryImageUrl(event.target.value)}
+                          placeholder="Or paste an image URL"
+                          className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                        />
+                        {primaryImageUrl && !primaryImageUrl.startsWith('data:') && !isAiAnalyzing && (
+                          <button
+                            type="button"
+                            onClick={() => handleRunAiImageAnalysis(primaryImageUrl)}
+                            className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
+                          >
+                            Analyze
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                        Upload a photo of the shoe to automatically detect and suggest Title, Category, and Brand.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* AI Scanning State */}
+                  {isAiAnalyzing && (
+                    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-purple-200 bg-purple-100/70 p-3 text-xs text-purple-900 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-200 animate-pulse">
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-600 dark:text-purple-400 shrink-0" />
+                      <span className="font-medium">
+                        Analyzing footwear photo with Gemini AI... detecting Title, Category & Brand...
+                      </span>
+                    </div>
+                  )}
+
+                  {/* AI Error Note */}
+                  {aiError && !isAiAnalyzing && (
+                    <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>{aiError}</span>
+                    </div>
+                  )}
+
+                  {/* AI Suggestions Results Panel */}
+                  {aiSuggestions && !isAiAnalyzing && (
+                    <div className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/70 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>AI Suggestions Detected</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleApplyAllAiSuggestions}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition"
+                        >
+                          <Check className="h-3 w-3 stroke-[3]" />
+                          <span>Apply All</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {aiSuggestions.title ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleAiSuggestion('title')}
+                            title="Click to apply this title"
+                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
+                          >
+                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Title:</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
+                              {aiSuggestions.title}
+                            </span>
+                          </button>
+                        ) : null}
+
+                        {aiSuggestions.category ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleAiSuggestion('category')}
+                            title="Click to apply this category"
+                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
+                          >
+                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Category:</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
+                              {aiSuggestions.category}
+                            </span>
+                          </button>
+                        ) : null}
+
+                        {aiSuggestions.brand ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleAiSuggestion('brand')}
+                            title="Click to apply this brand"
+                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
+                          >
+                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Brand:</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
+                              {aiSuggestions.brand}
+                            </span>
+                          </button>
+                        ) : null}
+
+                        {aiSuggestions.shoeType ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white/70 px-2 py-1 text-[11px] text-gray-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+                            <span className="text-[10px] uppercase font-bold text-gray-400">Style:</span>
+                            <span>{aiSuggestions.shoeType}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
 
               <div className="bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 p-5 rounded-2xl border border-gray-200 dark:border-[#1A263D] shadow-xs dark:shadow-[0_0_20px_rgba(59,130,246,0.05)] space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">

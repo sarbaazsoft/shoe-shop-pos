@@ -1,7 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, Loader2, X, AlertCircle, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
-import { api, setAuthSession } from '../../services/api';
-import { toTitleCaseLive, toLowerTrimmed } from '../../utils/textFormat';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Loader2,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  ShieldCheck,
+  Sparkles,
+  Check,
+  Sun,
+  Moon,
+} from 'lucide-react';
+import { api, setAuthSession } from '../../services/api.ts';
+import { toTitleCaseLive, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { useTheme } from '../../context/ThemeContext.tsx';
 
 interface FreeTrialOnboardingModalProps {
   isOpen: boolean;
@@ -11,6 +30,8 @@ interface FreeTrialOnboardingModalProps {
   platformOwnerEmail?: string;
   platformOwnerPhone?: string;
   onStoreCreated?: (tenantId: number, loginUrl: string, user?: any, token?: string) => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> = ({
@@ -21,7 +42,48 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   platformOwnerEmail: _platformOwnerEmail,
   platformOwnerPhone: _platformOwnerPhone,
   onStoreCreated,
+  theme: propTheme,
+  onToggleTheme,
 }) => {
+  const globalTheme = useTheme();
+
+  // Dark mode resolution: supports propTheme, global ThemeContext, localStorage, and DOM
+  const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>(() => {
+    if (propTheme) return propTheme;
+    if (globalTheme?.theme) return globalTheme.theme;
+    try {
+      const landing = localStorage.getItem('pos_landing_theme');
+      if (landing === 'light' || landing === 'dark') return landing;
+      const app = localStorage.getItem('pos_theme');
+      if (app === 'light' || app === 'dark') return app;
+    } catch {}
+    return 'dark';
+  });
+
+  useEffect(() => {
+    if (propTheme) {
+      setInternalTheme(propTheme);
+    } else if (globalTheme?.theme) {
+      setInternalTheme(globalTheme.theme);
+    }
+  }, [propTheme, globalTheme?.theme]);
+
+  const isDark = internalTheme === 'dark';
+
+  const handleToggleTheme = () => {
+    const next = isDark ? 'light' : 'dark';
+    setInternalTheme(next);
+    if (onToggleTheme) {
+      onToggleTheme();
+    } else if (globalTheme?.setThemeMode) {
+      globalTheme.setThemeMode(next);
+    }
+    try {
+      localStorage.setItem('pos_landing_theme', next);
+      localStorage.setItem('pos_theme', next);
+    } catch {}
+  };
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -78,7 +140,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
     }
 
     const cleanEmail = toLowerTrimmed(email);
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail)) {
+    if (!cleanEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
       setEmailChecking(false);
       setEmailAvailable(null);
       setEmailCheckMessage(null);
@@ -117,16 +179,18 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
 
   if (!isOpen) return null;
 
+  // Validation calculations
   const cleanName = name.trim();
   const cleanEmail = toLowerTrimmed(email);
   const cleanPhone = phone.trim();
   const phoneDigits = cleanPhone.replace(/\D/g, '');
 
-  const isEmailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail);
-  const isNameValid = cleanName.length >= 2;
+  const isNameValid = cleanName.length >= 2 && /[a-zA-Z\u0600-\u06FF]/.test(cleanName);
+  const isEmailFormatValid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail);
   const isPhoneValid = phoneDigits.length >= 7 && phoneDigits.length <= 15;
   const isPasswordValid = password.length >= 6;
   const isConfirmPasswordValid = confirmPassword.length >= 6 && confirmPassword === password;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({
@@ -137,33 +201,33 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
       confirmPassword: true,
     });
 
-    if (!cleanName || cleanName.length < 2) {
-      setErrorMessage('Please enter your full name (at least 2 characters).');
+    if (!cleanName || !isNameValid) {
+      setErrorMessage('Please enter your full name (at least 2 letters).');
       return;
     }
 
     if (!cleanEmail || !isEmailFormatValid) {
-      setErrorMessage('Please enter a valid email address.');
+      setErrorMessage('Please enter a valid email address (e.g. owner@shoestore.com).');
+      return;
+    }
+
+    if (emailAvailable === false) {
+      setErrorMessage('This email is already in use. Please log in or use another email.');
       return;
     }
 
     if (!cleanPhone || !isPhoneValid) {
-      setErrorMessage('Please enter a valid Phone / WhatsApp number (at least 7 digits).');
+      setErrorMessage('Please enter a valid Phone / WhatsApp number (7 to 15 digits).');
       return;
     }
 
-    if (password.length < 6) {
+    if (!isPasswordValid) {
       setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match. Please verify your confirm password.');
-      return;
-    }
-
-    if (emailAvailable === false) {
-      setErrorMessage('This email is already in use. Please use a different email address or log in.');
       return;
     }
 
@@ -218,7 +282,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
         err?.code === 'EMAIL_ALREADY_EXISTS' ||
         String(err?.message || '').toLowerCase().includes('already in use')
       ) {
-        setErrorMessage('This email is already in use. Please use a different email address or sign in.');
+        setErrorMessage('This email is already registered. Please sign in or use another email.');
         setEmailAvailable(false);
       } else {
         setErrorMessage(
@@ -231,338 +295,595 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="free-trial-title"
-      className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
-    >
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#131B2E] rounded-3xl shadow-2xl border border-purple-200/70 dark:border-purple-800/60 overflow-hidden my-auto animate-in zoom-in-95 duration-200">
-        {/* Modal Header */}
-        <div className="relative p-6 sm:p-7 bg-gradient-to-br from-purple-700 via-indigo-700 to-slate-900 text-white overflow-hidden">
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="free-trial-title"
+        className={`form-modal-theme fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-colors duration-200 ${
+          isDark ? 'dark bg-black/80' : 'light bg-slate-900/60'
+        } backdrop-blur-xs`}
+        data-theme={isDark ? 'dark' : 'light'}
+        style={{ colorScheme: isDark ? 'dark' : 'light' }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isLoading) onClose();
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          className={`relative w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-colors duration-200 ${
+            isDark
+              ? 'bg-[#131B2E] text-white border border-purple-800/80 shadow-[0_12px_45px_rgba(0,0,0,0.8)]'
+              : 'bg-white text-slate-900 border border-slate-200 shadow-2xl'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* MODAL HEADER - Full Dark Mode Support */}
           <div
-            className="absolute -top-12 -right-12 w-36 h-36 bg-purple-400/25 rounded-full blur-2xl pointer-events-none"
-            aria-hidden="true"
-          />
-
-          <div className="flex items-start justify-between relative z-10">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white shrink-0">
-                <Sparkles className="w-6 h-6 text-purple-200" />
-              </div>
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-purple-100 text-xs font-semibold mb-1">
-                  <span>30-Day Free Trial</span>
-                  <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                  <span>Instant Setup</span>
-                </div>
-                <h2 id="free-trial-title" className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                  Create Your Store Account
-                </h2>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              aria-label="Close dialog"
-              className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/40 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <p className="mt-2.5 text-xs sm:text-sm text-purple-100/90 leading-relaxed relative z-10">
-            Get instant access to your dedicated footwear POS &amp; inventory counter. No credit card required.
-          </p>
-        </div>
-
-        {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} className="p-6 sm:p-7 space-y-4 max-h-[75vh] overflow-y-auto">
-          {errorMessage && (
-            <div
-              role="alert"
-              className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-start space-x-3 text-rose-700 dark:text-rose-300 text-xs sm:text-sm animate-in fade-in"
-            >
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
-            </div>
-          )}
-
-          {/* 1. Full Name */}
-          <div className="space-y-1">
-            <label
-              htmlFor="trial-fullname"
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-            >
-              Full Name <span className="text-purple-600 dark:text-purple-400">*</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                <User className="w-5 h-5" />
-              </div>
-              <input
-                id="trial-fullname"
-                type="text"
-                autoComplete="name"
-                required
-                value={name}
-                onChange={(e) => {
-                  setName(toTitleCaseLive(e.target.value));
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-                placeholder="e.g. Ahmed Raza"
-                disabled={isLoading}
-                className={`w-full pl-11 pr-4 py-2.5 sm:py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-900/80 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 transition-all ${
-                  touched.name && !isNameValid
-                    ? 'border-rose-400 focus:ring-rose-400/30'
-                    : 'border-slate-200 dark:border-slate-800 focus:border-purple-500 focus:ring-purple-500/20'
-                }`}
-              />
-            </div>
-            {touched.name && !isNameValid && (
-              <p className="text-[11px] text-rose-500 font-medium">Please enter your name (at least 2 characters).</p>
-            )}
-          </div>
-
-          {/* 2. Email Address */}
-          <div className="space-y-1">
-            <label
-              htmlFor="trial-email"
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-            >
-              Email Address <span className="text-purple-600 dark:text-purple-400">*</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                <Mail className="w-5 h-5" />
-              </div>
-              <input
-                id="trial-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
-                placeholder="owner@shoestore.com"
-                disabled={isLoading}
-                className={`w-full pl-11 pr-10 py-2.5 sm:py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-900/80 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 transition-all ${
-                  (touched.email && !isEmailFormatValid) || emailAvailable === false
-                    ? 'border-rose-400 focus:ring-rose-400/30'
-                    : 'border-slate-200 dark:border-slate-800 focus:border-purple-500 focus:ring-purple-500/20'
-                }`}
-              />
-              <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
-                {emailChecking && <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />}
-                {!emailChecking && emailAvailable === true && (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                )}
-                {!emailChecking && emailAvailable === false && (
-                  <AlertCircle className="w-4 h-4 text-rose-500" />
-                )}
-              </div>
-            </div>
-            {touched.email && !isEmailFormatValid && (
-              <p className="text-[11px] text-rose-500 font-medium">Please enter a valid email address.</p>
-            )}
-            {emailCheckMessage && (
-              <p className="text-[11px] text-rose-500 font-medium">{emailCheckMessage}</p>
-            )}
-          </div>
-
-          {/* 3. Phone / WhatsApp Number */}
-          <div className="space-y-1">
+            className={`px-6 py-4 transition-colors duration-200 border-b ${
+              isDark
+                ? 'bg-gradient-to-r from-purple-950 via-indigo-950 to-[#0F172A] border-purple-800/80 text-white'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}
+          >
             <div className="flex items-center justify-between">
-              <label
-                htmlFor="trial-phone"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-              >
-                Phone / WhatsApp Number <span className="text-purple-600 dark:text-purple-400">*</span>
-              </label>
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">For store alerts</span>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                <Phone className="w-5 h-5" />
-              </div>
-              <input
-                id="trial-phone"
-                type="tel"
-                autoComplete="tel"
-                required
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-                placeholder="e.g. +92 300 1234567"
-                disabled={isLoading}
-                className={`w-full pl-11 pr-4 py-2.5 sm:py-3 rounded-2xl text-sm font-mono bg-slate-50 dark:bg-slate-900/80 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 transition-all ${
-                  touched.phone && !isPhoneValid
-                    ? 'border-rose-400 focus:ring-rose-400/30'
-                    : 'border-slate-200 dark:border-slate-800 focus:border-purple-500 focus:ring-purple-500/20'
-                }`}
-              />
-            </div>
-            {touched.phone && !isPhoneValid && (
-              <p className="text-[11px] text-rose-500 font-medium">Please enter a valid phone number (at least 7 digits).</p>
-            )}
-          </div>
-
-          {/* 4. Password and Confirm Password Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Password */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="trial-password"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-                >
-                  Password <span className="text-purple-600 dark:text-purple-400">*</span>
-                </label>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500">Min 6</span>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  id="trial-password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-                  placeholder="Min 6 characters"
-                  disabled={isLoading}
-                  className={`w-full pl-10 pr-9 py-2.5 rounded-2xl text-sm bg-slate-50 dark:bg-slate-900/80 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 transition-all ${
-                    touched.password && !isPasswordValid
-                      ? 'border-rose-400 focus:ring-rose-400/30'
-                      : 'border-slate-200 dark:border-slate-800 focus:border-purple-500 focus:ring-purple-500/20'
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold shadow-2xs shrink-0 ${
+                    isDark
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-400/30'
+                      : 'bg-purple-500/10 text-purple-600 border-purple-500/20'
                   }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {touched.password && !isPasswordValid && (
-                <p className="text-[11px] text-rose-500 font-medium">Min 6 characters.</p>
-              )}
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="trial-confirm-password"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300"
-                >
-                  Confirm Password <span className="text-purple-600 dark:text-purple-400">*</span>
-                </label>
-                {confirmPassword && password && (
-                  <span
-                    className={`text-[10px] font-semibold ${
-                      confirmPassword === password ? 'text-emerald-500' : 'text-rose-500'
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3
+                      id="free-trial-title"
+                      className={`font-bold text-base tracking-tight ${
+                        isDark ? 'text-white' : 'text-slate-900'
+                      }`}
+                    >
+                      Register Free Trial Store
+                    </h3>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                        isDark
+                          ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}
+                    >
+                      30 Days Free
+                    </span>
+                  </div>
+                  <p
+                    className={`text-xs ${
+                      isDark ? 'text-purple-200/80' : 'text-slate-500'
                     }`}
                   >
-                    {confirmPassword === password ? 'Matched' : 'Mismatch'}
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                  <Lock className="w-4 h-4" />
+                    Instant POS access • No credit card required • Full inventory features
+                  </p>
                 </div>
-                <input
-                  id="trial-confirm-password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  onBlur={() => setTouched((prev) => ({ ...prev, confirmPassword: true }))}
-                  placeholder="Re-enter password"
-                  disabled={isLoading}
-                  className={`w-full pl-10 pr-9 py-2.5 rounded-2xl text-sm bg-slate-50 dark:bg-slate-900/80 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-2 transition-all ${
-                    touched.confirmPassword && !isConfirmPasswordValid
-                      ? 'border-rose-400 focus:ring-rose-400/30'
-                      : confirmPassword && confirmPassword === password
-                      ? 'border-emerald-400 dark:border-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/20'
-                      : 'border-slate-200 dark:border-slate-800 focus:border-purple-500 focus:ring-purple-500/20'
-                  }`}
-                />
+              </div>
+
+              {/* Header Right Actions: Theme Toggle + Close */}
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  tabIndex={-1}
-                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  onClick={handleToggleTheme}
+                  aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                    isDark
+                      ? 'border-purple-700/60 bg-purple-900/40 text-purple-200 hover:bg-purple-800/60 hover:text-white'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
                 >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isLoading}
+                  aria-label="Close dialog"
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isDark
+                      ? 'text-purple-300 hover:text-white hover:bg-white/10'
+                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              {touched.confirmPassword && !isConfirmPasswordValid && (
-                <p className="text-[11px] text-rose-500 font-medium">
-                  {confirmPassword.length < 6 ? 'Min 6 characters.' : 'Passwords do not match.'}
-                </p>
-              )}
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isLoading || (touched.email && emailAvailable === false)}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white font-bold text-sm shadow-xl shadow-purple-600/25 hover:shadow-purple-600/40 focus:outline-hidden focus:ring-2 focus:ring-purple-500/50 flex items-center justify-center space-x-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Creating Your Store Account...</span>
-                </>
-              ) : (
-                <>
-                  <span>Start Free Trial &amp; Continue</span>
-                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                </>
+          {/* MODAL BODY FORM */}
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col">
+            <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Alert Error Box */}
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs animate-in fade-in ${
+                    isDark
+                      ? 'bg-rose-950/60 border-rose-900/70 text-rose-300'
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+                  <span className="font-medium leading-relaxed">{errorMessage}</span>
+                </div>
               )}
-            </button>
-          </div>
 
-          {/* Trust Guarantees */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-4 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            <span className="inline-flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              30 Days Free
-            </span>
-            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-            <span>No Credit Card</span>
-            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-            <span>Instant Login</span>
-          </div>
-        </form>
-      </div>
-    </div>
+              {/* Card Container for Inputs */}
+              <div
+                className={`p-4 sm:p-5 rounded-2xl border shadow-xs space-y-4 transition-colors duration-200 ${
+                  isDark
+                    ? 'bg-[#0E1528] border-purple-900/50 shadow-inner'
+                    : 'bg-slate-50/70 border-slate-200'
+                }`}
+              >
+                {/* 1. Full Name */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="trial-fullname"
+                      className={`block font-bold text-xs ${
+                        isDark ? 'text-slate-200' : 'text-gray-800'
+                      }`}
+                    >
+                      Store Owner Full Name <span className="text-purple-500">*</span>
+                    </label>
+                    {touched.name && (
+                      <span className="text-[11px] font-mono">
+                        {isNameValid ? (
+                          <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                            <Check className="w-3 h-3 stroke-[3]" /> Valid
+                          </span>
+                        ) : (
+                          <span className="text-rose-500">Min 2 letters</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <input
+                      id="trial-fullname"
+                      type="text"
+                      autoComplete="name"
+                      required
+                      value={name}
+                      onChange={(e) => {
+                        setName(toTitleCaseLive(e.target.value));
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
+                      placeholder="e.g. Tariq Mehmood"
+                      disabled={isLoading}
+                      className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                        isDark
+                          ? 'bg-[#151E33] text-white placeholder-slate-500'
+                          : 'bg-white text-slate-900 placeholder-slate-400'
+                      } ${
+                        touched.name && !isNameValid
+                          ? isDark
+                            ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
+                            : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                          : touched.name && isNameValid
+                          ? isDark
+                            ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
+                            : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          : isDark
+                          ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                          : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                      }`}
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      {touched.name && isNameValid && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      )}
+                      {touched.name && !isNameValid && (
+                        <AlertCircle className="w-4 h-4 text-rose-500" />
+                      )}
+                    </div>
+                  </div>
+                  {touched.name && !isNameValid && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Please enter your full name (at least 2 letters).</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Email Address */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="trial-email"
+                      className={`block font-bold text-xs ${
+                        isDark ? 'text-slate-200' : 'text-gray-800'
+                      }`}
+                    >
+                      Email Address (Login Username) <span className="text-purple-500">*</span>
+                    </label>
+                    <span
+                      className={`text-[11px] font-mono ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
+                      Primary store owner email
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      id="trial-email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                      placeholder="owner@shoestore.com"
+                      disabled={isLoading}
+                      className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                        isDark
+                          ? 'bg-[#151E33] text-white placeholder-slate-500'
+                          : 'bg-white text-slate-900 placeholder-slate-400'
+                      } ${
+                        (touched.email && !isEmailFormatValid) || emailAvailable === false
+                          ? isDark
+                            ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
+                            : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                          : touched.email && isEmailFormatValid && emailAvailable === true
+                          ? isDark
+                            ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
+                            : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          : isDark
+                          ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                          : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                      }`}
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      {emailChecking && <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />}
+                      {!emailChecking && touched.email && isEmailFormatValid && emailAvailable === true && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      )}
+                      {!emailChecking && ((touched.email && !isEmailFormatValid) || emailAvailable === false) && (
+                        <AlertCircle className="w-4 h-4 text-rose-500" />
+                      )}
+                    </div>
+                  </div>
+                  {touched.email && !isEmailFormatValid && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Please enter a valid email address (e.g. store@example.com).</span>
+                    </div>
+                  )}
+                  {emailCheckMessage && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{emailCheckMessage}</span>
+                    </div>
+                  )}
+                  {!emailChecking && touched.email && isEmailFormatValid && emailAvailable === true && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Email is available for registration.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Phone / WhatsApp Number */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="trial-phone"
+                      className={`block font-bold text-xs ${
+                        isDark ? 'text-slate-200' : 'text-gray-800'
+                      }`}
+                    >
+                      Phone / WhatsApp Number <span className="text-purple-500">*</span>
+                    </label>
+                    <span
+                      className={`text-[11px] font-mono ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
+                      7 to 15 digits
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <input
+                      id="trial-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
+                      placeholder="e.g. +92 300 1234567 or 03001234567"
+                      disabled={isLoading}
+                      className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                        isDark
+                          ? 'bg-[#151E33] text-white placeholder-slate-500'
+                          : 'bg-white text-slate-900 placeholder-slate-400'
+                      } ${
+                        touched.phone && !isPhoneValid
+                          ? isDark
+                            ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
+                            : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                          : touched.phone && isPhoneValid
+                          ? isDark
+                            ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
+                            : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                          : isDark
+                          ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                          : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                      }`}
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      {touched.phone && isPhoneValid && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      )}
+                      {touched.phone && !isPhoneValid && (
+                        <AlertCircle className="w-4 h-4 text-rose-500" />
+                      )}
+                    </div>
+                  </div>
+                  {touched.phone && !isPhoneValid && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Please enter a valid phone number (at least 7 digits, no letters).</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Password & Confirm Password Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  {/* Password */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="trial-password"
+                        className={`block font-bold text-xs ${
+                          isDark ? 'text-slate-200' : 'text-gray-800'
+                        }`}
+                      >
+                        Owner Password <span className="text-purple-500">*</span>
+                      </label>
+                      <span
+                        className={`text-[10px] font-mono ${
+                          isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}
+                      >
+                        Min 6 chars
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="trial-password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        required
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+                        placeholder="At least 6 characters"
+                        disabled={isLoading}
+                        className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                          isDark
+                            ? 'bg-[#151E33] text-white placeholder-slate-500'
+                            : 'bg-white text-slate-900 placeholder-slate-400'
+                        } ${
+                          touched.password && !isPasswordValid
+                            ? isDark
+                              ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
+                              : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                            : touched.password && isPasswordValid
+                            ? isDark
+                              ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
+                              : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                            : isDark
+                            ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                            : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        tabIndex={-1}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className={`absolute inset-y-0 right-0 pr-3 flex items-center transition-colors cursor-pointer ${
+                          isDark
+                            ? 'text-slate-400 hover:text-white'
+                            : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {touched.password && !isPasswordValid && (
+                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Must be at least 6 characters.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="trial-confirm-password"
+                        className={`block font-bold text-xs ${
+                          isDark ? 'text-slate-200' : 'text-gray-800'
+                        }`}
+                      >
+                        Confirm Password <span className="text-purple-500">*</span>
+                      </label>
+                      {confirmPassword && password && (
+                        <span
+                          className={`text-[10px] font-semibold ${
+                            confirmPassword === password ? 'text-emerald-500' : 'text-rose-500'
+                          }`}
+                        >
+                          {confirmPassword === password ? '✓ Match' : 'Mismatch'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="trial-confirm-password"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        onBlur={() => setTouched((prev) => ({ ...prev, confirmPassword: true }))}
+                        placeholder="Re-enter password"
+                        disabled={isLoading}
+                        className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                          isDark
+                            ? 'bg-[#151E33] text-white placeholder-slate-500'
+                            : 'bg-white text-slate-900 placeholder-slate-400'
+                        } ${
+                          touched.confirmPassword && !isConfirmPasswordValid
+                            ? isDark
+                              ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
+                              : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                            : confirmPassword && confirmPassword === password && isConfirmPasswordValid
+                            ? isDark
+                              ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
+                              : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                            : isDark
+                            ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                            : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        tabIndex={-1}
+                        aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                        className={`absolute inset-y-0 right-0 pr-3 flex items-center transition-colors cursor-pointer ${
+                          isDark
+                            ? 'text-slate-400 hover:text-white'
+                            : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {touched.confirmPassword && !isConfirmPasswordValid && (
+                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {confirmPassword.length < 6
+                            ? 'Must be at least 6 characters.'
+                            : 'Passwords do not match.'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* MODAL FOOTER ACTION BAR - Full Dark Mode Support */}
+            <div
+              className={`px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 transition-colors duration-200 ${
+                isDark
+                  ? 'bg-[#0B1020] border-purple-900/60'
+                  : 'bg-slate-50 border-slate-200'
+              }`}
+            >
+              <div
+                className={`flex items-center gap-3 text-[11px] ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1 text-purple-400 font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  30 Days Free
+                </span>
+                <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>•</span>
+                <span>No Credit Card</span>
+                <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>•</span>
+                <span>Instant Launch</span>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isLoading}
+                  className={`px-4 py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
+                    isDark
+                      ? 'border-purple-900/70 bg-[#151E33] hover:bg-[#1A253F] text-purple-200 hover:text-white'
+                      : 'border-slate-300 hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading || (touched.email && emailAvailable === false)}
+                  className="btn-primary px-5 py-2.5 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md font-bold disabled:opacity-50 transition active:scale-[0.99]"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Creating Store Account...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Start 30-Day Free Trial</span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 };

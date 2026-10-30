@@ -7,6 +7,7 @@ import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { generateCode128Barcode, analyzeBarcode } from '../../utils/barcode.ts';
 import { parseCategoryPrefix, generateSuggestedArticle, buildArticleInfo, normalizeFootwearCategory } from '../../utils/footwear.ts';
 import { validateAndNormalizeProductPricing, validateProductBrand } from '../../schemas/productSchema.ts';
+import { getGeminiClient } from '../gemini.ts';
 
 const router = Router();
 
@@ -394,6 +395,240 @@ const handleValidateArticle = async (req: AuthenticatedRequest, res: Response) =
 router.get('/validate-article', requireAuth, handleValidateArticle);
 router.post('/validate-article', requireAuth, handleValidateArticle);
 
+interface ResolvedImagePayload {
+  base64Data: string;
+  mimeType: string;
+}
+
+async function parseAndValidateImage(imageInput: unknown): Promise<{ data?: ResolvedImagePayload; error?: string; statusCode?: number }> {
+  if (!imageInput || typeof imageInput !== 'string') {
+    return { error: 'Product image data is required and must be a string.', statusCode: 400 };
+  }
+
+  const trimmed = imageInput.trim();
+  if (!trimmed) {
+    return { error: 'Product image data cannot be empty.', statusCode: 400 };
+  }
+
+  // 1. HTTP or HTTPS Image URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const fetchRes = await fetch(trimmed, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/*,*/*'
+        }
+      });
+      clearTimeout(timeoutId);
+
+      if (!fetchRes.ok) {
+        return { error: `Unable to download image from the provided URL (HTTP ${fetchRes.status}).`, statusCode: 400 };
+      }
+
+      const contentTypeHeader = (fetchRes.headers.get('content-type') || '').toLowerCase();
+      const buffer = Buffer.from(await fetchRes.arrayBuffer());
+      if (buffer.length === 0) {
+        return { error: 'The provided image URL returned empty data.', statusCode: 400 };
+      }
+
+      let detectedMime = 'image/jpeg';
+      if (contentTypeHeader.startsWith('image/')) {
+        detectedMime = contentTypeHeader.split(';')[0].trim();
+      } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+        detectedMime = 'image/png';
+      } else if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+        detectedMime = 'image/jpeg';
+      } else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+        detectedMime = 'image/gif';
+      } else if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
+        detectedMime = 'image/webp';
+      }
+
+      return {
+        data: {
+          base64Data: buffer.toString('base64'),
+          mimeType: detectedMime,
+        }
+      };
+    } catch (fetchErr: any) {
+      return { error: `Could not fetch image from URL: ${fetchErr?.message || 'Network error'}`, statusCode: 400 };
+    }
+  }
+
+  // 2. Data URI (data:image/...;base64,...)
+  if (trimmed.startsWith('data:')) {
+    const match = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
+    if (!match) {
+      return { error: 'Invalid data URI image format.', statusCode: 400 };
+    }
+    const mime = match[1].trim().toLowerCase();
+    const rawData = match[2].trim().replace(/\s+/g, '');
+    if (!rawData) {
+      return { error: 'Data URI contains no image payload.', statusCode: 400 };
+    }
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(rawData) || rawData.length % 4 !== 0) {
+      return { error: 'Invalid base64 payload in data URI.', statusCode: 400 };
+    }
+    return {
+      data: {
+        base64Data: rawData,
+        mimeType: mime || 'image/jpeg',
+      }
+    };
+  }
+
+  // 3. Raw Base64 String
+  const cleanBase64 = trimmed.replace(/\s+/g, '');
+  const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(cleanBase64) && cleanBase64.length % 4 === 0;
+  if (!isBase64 || cleanBase64.length < 32) {
+    return { error: 'Invalid image format. Provide a valid image URL or base64 data.', statusCode: 400 };
+  }
+
+  try {
+    const buf = Buffer.from(cleanBase64, 'base64');
+    if (buf.length < 16) {
+      return { error: 'Image data is too small to be a valid image file.', statusCode: 400 };
+    }
+
+    let detectedMime = 'image/jpeg';
+    const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
+    const isGif = buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46;
+    const isWebp = buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP';
+    const isBmp = buf[0] === 0x42 && buf[1] === 0x4d;
+
+    if (isPng) detectedMime = 'image/png';
+    else if (isJpg) detectedMime = 'image/jpeg';
+    else if (isGif) detectedMime = 'image/gif';
+    else if (isWebp) detectedMime = 'image/webp';
+    else if (isBmp) detectedMime = 'image/bmp';
+    else {
+      return { error: 'Invalid image format. Unrecognized image signature.', statusCode: 400 };
+    }
+
+    return {
+      data: {
+        base64Data: cleanBase64,
+        mimeType: detectedMime,
+      }
+    };
+  } catch {
+    return { error: 'Failed to decode base64 image data.', statusCode: 400 };
+  }
+}
+
+// AI Footwear Suggestor from Image - Strictly for Retail Stores
+router.post('/ai-suggest-from-image', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const tenantId = extractStrictTenantId(req);
+
+    // Enforce Retail stores only (business_type is stored in company_settings)
+    const settings = await getCompanyPricingSettings(tenantId);
+    if (settings.businessType === 'WHOLESALE') {
+      return res.status(403).json({
+        success: false,
+        error: 'AI image analysis is available for retail stores only.',
+      });
+    }
+
+    const { image } = req.body || {};
+    const resolved = await parseAndValidateImage(image);
+    if (resolved.error || !resolved.data) {
+      return res.status(resolved.statusCode || 400).json({
+        success: false,
+        error: resolved.error || 'Invalid product image.',
+      });
+    }
+
+    const { base64Data, mimeType } = resolved.data;
+    const aiClient = getGeminiClient();
+    const prompt = `You are an expert footwear merchandise cataloger for a retail shoe store POS system.
+Analyze this shoe/footwear image and extract the following:
+1. "title": A concise, marketable retail product title (e.g. "Men Casual Leather Sneaker", "Women Block Heel Sandal", "Kids Sport Running Shoe", "Toddler Slip-on Clog").
+2. "category": Must be one of these exact 5 standard categories: "Men", "Women", "Kids", "Toddler", "Infant".
+3. "brand": Brand name if clearly visible (e.g. Nike, Adidas, Bata, Service, Ndure, Puma, Clarks) or "Unbranded" if no visible brand.
+4. "shoeType": Specific footwear type (e.g. "Sneaker", "Sandal", "Boot", "Loafer", "Slipper", "Heel", "Formal Shoe").
+
+Respond ONLY with a valid JSON object matching this schema:
+{
+  "title": string,
+  "category": "Men" | "Women" | "Kids" | "Toddler" | "Infant",
+  "brand": string,
+  "shoeType": string
+}`;
+
+    let geminiRes;
+    try {
+      geminiRes = await aiClient.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType,
+                },
+              },
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+    } catch (apiErr: any) {
+      const errMsg = apiErr?.message || '';
+      if (errMsg.includes('Base64') || errMsg.includes('INVALID_ARGUMENT') || apiErr?.status === 400) {
+        return res.status(400).json({
+          success: false,
+          error: 'The provided image could not be processed by AI. Please provide a valid image file or URL.',
+        });
+      }
+      console.warn('Gemini generateContent error in ai-suggest-from-image:', errMsg);
+      return res.status(500).json({
+        success: false,
+        error: errMsg || 'Failed to analyze shoe image with AI.',
+      });
+    }
+
+    const rawText = geminiRes.text || '';
+    let parsed: any = {};
+    try {
+      const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      parsed = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      console.warn('Failed to parse Gemini JSON output:', rawText);
+    }
+
+    const category = normalizeFootwearCategory(parsed.category || 'Men');
+    const brand = String(parsed.brand || 'Unbranded').trim();
+    const title = String(parsed.title || '').trim();
+    const shoeType = String(parsed.shoeType || '').trim();
+
+    return res.json({
+      success: true,
+      title: title || `${category} Shoe`,
+      category,
+      brand: brand || 'Unbranded',
+      shoeType,
+    });
+  } catch (err: any) {
+    const errorMsg = err?.message || 'Failed to analyze shoe image.';
+    return res.status(500).json({
+      success: false,
+      error: errorMsg,
+    });
+  }
+});
+
 let productColumnsVerified = false;
 let productColumnsPromise: Promise<void> | null = null;
 
@@ -625,18 +860,21 @@ function mapProductRow(row: any, settings: {
 
   const rawPairsPerCarton = Number(row.pairs_per_carton ?? row.store_lot_size ?? 12);
   const pairsPerCarton = rawPairsPerCarton === 16 ? 16 : 12;
-  const allowHalfCarton = row.allow_half_carton !== false;
-
-  // Determination: Half-cartons are allowed if either the store setting is enabled
-  // (company_setting.allow_half_carton == true) OR the specific product override is enabled
-  // (product.allow_half_carton == true).
+  const rawProductAllowHalf = row.allow_half_carton !== undefined && row.allow_half_carton !== null
+    ? Boolean(row.allow_half_carton)
+    : null;
   const storeAllowsHalf = settings.allowHalfCarton === true || settings.allow_half_carton === true;
-  const isHalfAllowed = storeAllowsHalf || allowHalfCarton;
+  // Product-level override takes precedence if explicitly set (e.g. false overrides store default true)
+  const isHalfAllowed = rawProductAllowHalf !== null ? rawProductAllowHalf : storeAllowsHalf;
+  const allowHalfCarton = isHalfAllowed;
 
   // Calculation:
-  // If half-cartons are allowed: min_sale_quantity = pairs_per_ctn / 2
-  // Otherwise (not allowed): min_sale_quantity = pairs_per_ctn
-  const minSaleQuantity = isHalfAllowed ? (pairsPerCarton / 2) : pairsPerCarton;
+  // - For Retailer: min_sale_quantity = 1 pair
+  // - For Wholesaler:
+  //   If half-cartons are allowed: min_sale_quantity = pairs_per_carton / 2
+  //   Otherwise (full carton only): min_sale_quantity = pairs_per_carton
+  const isWholesale = settings.businessType === 'WHOLESALE';
+  const minSaleQuantity = isWholesale ? (isHalfAllowed ? (pairsPerCarton / 2) : pairsPerCarton) : 1;
 
   return {
     id: row.id,

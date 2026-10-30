@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
 import type { TenantInfo, BusinessType, PricingMode } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -317,6 +318,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const storesSwiperRef = useRef<HTMLDivElement>(null);
   const swiperInstanceRef = useRef<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { setThemeMode } = useTheme();
   const [landingTheme, setLandingTheme] = useState<'dark' | 'light'>(() => {
     try {
       return localStorage.getItem('pos_landing_theme') === 'light' ? 'light' : 'dark';
@@ -325,15 +327,14 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     }
   });
   const toggleLandingTheme = () => {
-    setLandingTheme((current) => {
-      const next = current === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('pos_landing_theme', next);
-      } catch {
-        // Theme still switches for this visit if storage is unavailable.
-      }
-      return next;
-    });
+    const next = landingTheme === 'dark' ? 'light' : 'dark';
+    try {
+      localStorage.setItem('pos_landing_theme', next);
+    } catch {}
+    setLandingTheme(next);
+    try {
+      setThemeMode(next);
+    } catch {}
   };
 
   useEffect(() => {
@@ -1436,6 +1437,8 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         platformOwnerEmail={platformOwnerEmail}
         platformOwnerPhone={platformOwnerPhone}
         onStoreCreated={handleStoreCreated}
+        theme={landingTheme}
+        onToggleTheme={toggleLandingTheme}
       />
 
     </div>
