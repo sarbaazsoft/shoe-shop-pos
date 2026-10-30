@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
-import { isFreeTrial, calculateDaysLeft } from '../../utils/subscription.ts';
+import { isFreeTrial, calculateDaysLeft, RENEWAL_TEMPLATE_CHIPS, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';
@@ -61,14 +61,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     } catch {}
   }, [visitKey]);
 
-  // Renewal / Upgrade Modal state
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'6_MONTHS' | 'YEARLY'>('YEARLY');
-  const [upgradeNotes, setUpgradeNotes] = useState('');
-  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
-  const [upgradeSuccessMessage, setUpgradeSuccessMessage] = useState<string | null>(null);
-  const [upgradeErrorMessage, setUpgradeErrorMessage] = useState<string | null>(null);
-
   const currentPlanRaw =
     companySettings?.subscriptionPlan ||
     companySettings?.subscription_plan ||
@@ -78,6 +70,54 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     currentUser?.plan;
 
   const isFree = isFreeTrial(currentPlanRaw);
+
+  // Renewal / Upgrade Modal state with Dynamic Templates
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'6_MONTHS' | 'YEARLY'>('YEARLY');
+  const [activeTemplateChip, setActiveTemplateChip] = useState<RenewalTemplateType>(() =>
+    resolveDefaultRenewalTemplateType(
+      companySettings?.subscriptionStatus || companySettings?.subscription_status,
+      currentPlanRaw
+    )
+  );
+  const [hasUserEditedNotes, setHasUserEditedNotes] = useState(false);
+  const [upgradeNotes, setUpgradeNotes] = useState<string>(() => {
+    const initType = resolveDefaultRenewalTemplateType(
+      companySettings?.subscriptionStatus || companySettings?.subscription_status,
+      currentPlanRaw
+    );
+    return getRenewalMessageTemplate(initType, 'YEARLY');
+  });
+  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
+  const [upgradeSuccessMessage, setUpgradeSuccessMessage] = useState<string | null>(null);
+  const [upgradeErrorMessage, setUpgradeErrorMessage] = useState<string | null>(null);
+
+  const handleOpenUpgradeModal = () => {
+    setUpgradeSuccessMessage(null);
+    setUpgradeErrorMessage(null);
+    setSelectedUpgradePlan('YEARLY');
+    const defaultType = resolveDefaultRenewalTemplateType(
+      companySettings?.subscriptionStatus || companySettings?.subscription_status,
+      currentPlanRaw
+    );
+    setActiveTemplateChip(defaultType);
+    setHasUserEditedNotes(false);
+    setUpgradeNotes(getRenewalMessageTemplate(defaultType, 'YEARLY'));
+    setIsUpgradeModalOpen(true);
+  };
+
+  const handleSelectUpgradePlan = (plan: '6_MONTHS' | 'YEARLY') => {
+    setSelectedUpgradePlan(plan);
+    if (!hasUserEditedNotes) {
+      setUpgradeNotes(getRenewalMessageTemplate(activeTemplateChip, plan));
+    }
+  };
+
+  const handleSelectTemplateChip = (chipType: RenewalTemplateType) => {
+    setActiveTemplateChip(chipType);
+    setHasUserEditedNotes(false);
+    setUpgradeNotes(getRenewalMessageTemplate(chipType, selectedUpgradePlan));
+  };
 
   // Context-aware greeting and subtext based on user requirements:
   // 1. First-Time Login / New Store Owner:
@@ -416,11 +456,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button
                 id="dashboard-renew-upgrade-subscription-btn"
                 type="button"
-                onClick={() => {
-                  setUpgradeSuccessMessage(null);
-                  setUpgradeErrorMessage(null);
-                  setIsUpgradeModalOpen(true);
-                }}
+                onClick={handleOpenUpgradeModal}
                 className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-bold transition shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95 border border-amber-300/40"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -1194,14 +1230,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Renew / Upgrade Subscription Modal */}
+      {/* Renew / Upgrade Subscription Modal matching ProductFormModal */}
       {isUpgradeModalOpen && (
         <div
           id="dashboard-renew-subscription-modal"
           role="dialog"
           aria-modal="true"
           aria-labelledby="dashboard-upgrade-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget && !isSubmittingUpgrade) {
               setIsUpgradeModalOpen(false);
@@ -1209,21 +1245,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           }}
         >
           <div
-            className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/70 shadow-2xl max-w-lg w-full overflow-hidden text-slate-900 dark:text-white animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-xl bg-white dark:bg-[#131B2E] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] border border-slate-200 dark:border-purple-800/80 animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-purple-900/50 bg-slate-50/80 dark:bg-[#0D1322]/80">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+            {/* Modal Header matching ProductFormModal dark gradient */}
+            <div className="bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 border-b border-slate-200 dark:border-purple-800/80 text-slate-800 dark:text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:bg-purple-500/20 dark:text-purple-300 border border-blue-500/20 dark:border-purple-400/30 flex items-center justify-center font-bold shadow-2xs">
+                  <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 id="dashboard-upgrade-title" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                    Renew / Upgrade Subscription
+                  <h3 id="dashboard-upgrade-title" className="font-bold text-base text-slate-900 dark:text-white tracking-tight">
+                    Renew / Upgrade Store Subscription
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-purple-200/70">
-                    Request a plan upgrade from Platform SuperAdmin to keep your store active
+                  <p className="text-xs text-slate-500 dark:text-purple-200/80">
+                    Request a plan upgrade from Platform SuperAdmin to keep your footwear POS active
                   </p>
                 </div>
               </div>
@@ -1232,31 +1268,37 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 onClick={() => setIsUpgradeModalOpen(false)}
                 disabled={isSubmittingUpgrade}
                 aria-label="Close dialog"
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer disabled:opacity-50"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-purple-300 dark:hover:text-white rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleRequestUpgrade} className="p-5 space-y-4">
-              {/* Current Status Box */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0A0E1A] border border-slate-200 dark:border-purple-900/50 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
-                    Current Plan
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    30-Day Free Tier Trial
-                  </span>
+            <form onSubmit={handleRequestUpgrade} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+              {/* Grouped rounded container: Current License Summary */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-purple-300 mb-2.5 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Store License Overview</span>
                 </div>
-                <div>
-                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
-                    Store
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white truncate block">
-                    {storeName}
-                  </span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                      Current Plan
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {isFree ? '30-Day Free Tier Trial' : 'Active Subscription'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                      Store Name
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white truncate mt-0.5 block">
+                      {storeName}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1274,126 +1316,158 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
               )}
 
-              {/* Plan Cards */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
-                  Select Extension Plan *
-                </label>
+              {/* Grouped rounded container: Interactive Plan Selection */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Select Extension Plan <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 dark:text-purple-300/70">
+                    Click to switch duration
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div
-                    onClick={() => setSelectedUpgradePlan('6_MONTHS')}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                  <button
+                    type="button"
+                    onClick={() => handleSelectUpgradePlan('6_MONTHS')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer relative ${
                       selectedUpgradePlan === '6_MONTHS'
-                        ? 'border-purple-600 dark:border-purple-400 bg-purple-50/70 dark:bg-purple-950/40 shadow-xs'
-                        : 'border-slate-200 dark:border-purple-900/40 bg-white dark:bg-[#0D1322] hover:border-slate-300 dark:hover:border-purple-800'
+                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/30 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300 dark:hover:border-purple-900/60'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
-                          6 Months Plan
-                        </span>
-                        <input
-                          type="radio"
-                          name="upgradePlan"
-                          checked={selectedUpgradePlan === '6_MONTHS'}
-                          onChange={() => setSelectedUpgradePlan('6_MONTHS')}
-                          className="text-purple-600 focus:ring-purple-500"
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-purple-200/70 leading-relaxed">
-                        Full POS, offline sync, inventory management & reports for 6 months.
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        6 Months Plan
+                      </span>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-300">
+                        6_MONTHS
+                      </span>
                     </div>
-                  </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                      Full POS, offline sync, inventory management & reports for 6 months.
+                    </p>
+                  </button>
 
-                  <div
-                    onClick={() => setSelectedUpgradePlan('YEARLY')}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between relative ${
+                  <button
+                    type="button"
+                    onClick={() => handleSelectUpgradePlan('YEARLY')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer relative ${
                       selectedUpgradePlan === 'YEARLY'
-                        ? 'border-purple-600 dark:border-purple-400 bg-purple-50/70 dark:bg-purple-950/40 shadow-xs ring-1 ring-purple-500/20'
-                        : 'border-slate-200 dark:border-purple-900/40 bg-white dark:bg-[#0D1322] hover:border-slate-300 dark:hover:border-purple-800'
+                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/30 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300 dark:hover:border-purple-900/60'
                     }`}
                   >
                     <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs">
                       Best Value
                     </span>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
-                          Yearly Plan (1 Year)
-                        </span>
-                        <input
-                          type="radio"
-                          name="upgradePlan"
-                          checked={selectedUpgradePlan === 'YEARLY'}
-                          onChange={() => setSelectedUpgradePlan('YEARLY')}
-                          className="text-purple-600 focus:ring-purple-500"
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-purple-200/70 leading-relaxed">
-                        Maximum savings with 12 months uninterrupted license & priority support.
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        Yearly Plan (1 Year)
+                      </span>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/70 text-emerald-700 dark:text-emerald-300">
+                        YEARLY
+                      </span>
                     </div>
-                  </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                      Maximum savings with 12 months uninterrupted license & priority support.
+                    </p>
+                  </button>
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  Notes / Special Requests (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={upgradeNotes}
-                  onChange={(e) => setUpgradeNotes(e.target.value)}
-                  placeholder="e.g. Please approve 1-year extension with wholesale module enabled."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-purple-900/70 bg-white dark:bg-[#0D1322] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-200 dark:border-purple-900/50">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUpgradeModalOpen(false);
-                    onNavigate('settings');
-                  }}
-                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-semibold cursor-pointer"
-                >
-                  Manage in Settings
-                </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsUpgradeModalOpen(false)}
-                    disabled={isSubmittingUpgrade}
-                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingUpgrade}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  >
-                    {isSubmittingUpgrade ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Submitting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Submit Renewal Request</span>
-                      </>
-                    )}
-                  </button>
+              {/* Grouped rounded container: Dynamic Payment Message & Quick Action Selector Chips */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Message / Payment Reference for SuperAdmin
+                  </label>
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
+                    Quick Templates:
+                  </span>
                 </div>
+
+                {/* Quick Action Template Selector Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {RENEWAL_TEMPLATE_CHIPS.map((chip) => {
+                    const isSelected = activeTemplateChip === chip.type && !hasUserEditedNotes;
+                    return (
+                      <button
+                        key={chip.type}
+                        type="button"
+                        onClick={() => handleSelectTemplateChip(chip.type)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 border ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-purple-500 shadow-xs'
+                            : 'bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-purple-200 border-slate-200 dark:border-purple-900/60 hover:bg-purple-100 dark:hover:bg-purple-900/60'
+                        }`}
+                      >
+                        <span>[{chip.label}]</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Editable Textarea */}
+                <div className="relative">
+                  <textarea
+                    rows={3}
+                    value={upgradeNotes}
+                    onChange={(e) => {
+                      setUpgradeNotes(e.target.value);
+                      setHasUserEditedNotes(true);
+                    }}
+                    placeholder="e.g. Hi Admin, completed Free Tier evaluation and upgrading to 1 Year Premium Plan for my store. Payment Ref ID: [Insert Ref ID]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-purple-400/40 bg-white dark:bg-purple-500/20 text-xs text-slate-900 dark:text-purple-100 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition leading-relaxed"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-purple-300/80">
+                  Tip: Pre-filled with standard format. Simply replace <code className="bg-slate-100 dark:bg-purple-950/60 px-1 py-0.5 rounded text-purple-600 dark:text-purple-300 font-mono">[Insert Ref ID]</code> with your actual bank/online transfer reference ID.
+                </p>
               </div>
             </form>
+
+            {/* Modal Footer Buttons matching ProductFormModal */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-purple-800/80 bg-slate-50/70 dark:bg-[#0D1322]/70 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUpgradeModalOpen(false);
+                  onNavigate('settings');
+                }}
+                className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-semibold cursor-pointer"
+              >
+                Manage in Settings
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsUpgradeModalOpen(false)}
+                  disabled={isSubmittingUpgrade}
+                  className="btn-secondary px-4 py-2.5 text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestUpgrade}
+                  disabled={isSubmittingUpgrade}
+                  className="btn-primary px-5 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-md font-bold disabled:opacity-50"
+                >
+                  {isSubmittingUpgrade ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Submit Renewal Request</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

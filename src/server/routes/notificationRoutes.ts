@@ -118,10 +118,35 @@ router.get('/', async (req: Request, res: Response) => {
        WHERE (pn.expires_at IS NULL OR pn.expires_at > NOW())
          AND (
            CASE
-             WHEN $3 = 'SUPERADMIN' THEN (pn.tenant_id IS NULL AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
-             WHEN $3 = 'ADMIN' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN'))
-             WHEN $3 = 'CASHIER' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
-             ELSE ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') = 'ALL')
+             WHEN $3 = 'SUPERADMIN' THEN (
+               COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
+               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+             )
+             WHEN $3 = 'ADMIN' THEN (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
+             WHEN $3 = 'CASHIER' THEN (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
+             ELSE (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') = 'ALL'
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
            END
          )
        ORDER BY pn.created_at DESC
@@ -206,10 +231,35 @@ router.get('/platform', async (req: Request, res: Response) => {
        WHERE (pn.expires_at IS NULL OR pn.expires_at > NOW())
          AND (
            CASE
-             WHEN $3 = 'SUPERADMIN' THEN (pn.tenant_id IS NULL AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
-             WHEN $3 = 'ADMIN' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN'))
-             WHEN $3 = 'CASHIER' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
-             ELSE ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') = 'ALL')
+             WHEN $3 = 'SUPERADMIN' THEN (
+               COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
+               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+             )
+             WHEN $3 = 'ADMIN' THEN (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
+             WHEN $3 = 'CASHIER' THEN (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
+             ELSE (
+               (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+               AND COALESCE(pn.target_role, 'ALL') = 'ALL'
+               AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE 'New Free Trial%'
+               AND pn.title NOT ILIKE 'Renewal Request%'
+               AND pn.action_url NOT ILIKE '%/superadmin%'
+             )
            END
          )
        ORDER BY pn.created_at DESC
@@ -278,6 +328,7 @@ router.post('/platform/dismiss-all', async (req: Request, res: Response) => {
        SELECT pn.id, $1, $2, NOW()
        FROM platform_notifications pn
        WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+         AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
        ON CONFLICT (notification_id, tenant_id, user_id) DO UPDATE SET read_at = NOW()`,
       [cleanTenantId, userId]
     );

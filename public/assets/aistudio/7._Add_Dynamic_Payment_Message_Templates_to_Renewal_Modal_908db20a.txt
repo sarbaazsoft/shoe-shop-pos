@@ -1,0 +1,21 @@
+Please update the Subscription Renewal Modal ("Renew Store Subscription") with automatic message template helpers and pre-filled message text based on the user's current plan and selected extension plan.
+
+Requirements:
+
+1. Dynamic Pre-filled Message Templates:
+   - When the modal opens or when the user changes their selected plan, update the "Message / Payment Reference for SuperAdmin" text box with a short, refined, professional template if the user hasn't typed a custom message yet.
+   - Template Rules:
+     * Free Tier -> Premium (6 Months or Yearly):
+       "Hi Admin, completed Free Tier evaluation and upgrading to [6 Months / 1 Year] Premium Plan for my store. Payment Ref ID: [Insert Ref ID]"
+     * Paid Tier Renewal (6 Months or Yearly):
+       "Hi Admin, renewing store's [6 Months / 1 Year] subscription. Payment Ref ID: [Insert Ref ID]"
+     * Expired Store:
+       "Hi Admin, store subscription expired. Paid via online transfer (Ref ID: [Insert Ref ID]). Please reactivate POS access."
+
+2. Quick Template Selector Chips / Buttons:
+   - Above or inside the Message input textarea, display clickable quick-action template chips (e.g., [Upgrading Free Tier], [Standard Renewal], [Urgent Reactivation]).
+   - Clicking a chip should populate the message field with that exact concise template so the user only needs to append their Payment Reference Number.
+
+3. Frontend Validation:
+   - Ensure the input remains editable so users can easily append or modify their payment reference ID.
+   - Maintain full light and dark mode styling consistent with the rest of the application.

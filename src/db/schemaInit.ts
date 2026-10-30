@@ -816,6 +816,17 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS platform_notifications_created_at_idx ON public.platform_notifications(created_at);
         CREATE INDEX IF NOT EXISTS platform_notification_reads_notif_idx ON public.platform_notification_reads(notification_id);
         CREATE INDEX IF NOT EXISTS platform_notification_reads_tenant_idx ON public.platform_notification_reads(tenant_id);
+
+        UPDATE public.platform_notifications
+        SET target_role = 'SUPERADMIN', tenant_id = NULL
+        WHERE target_role != 'SUPERADMIN'
+          AND (
+            title ILIKE 'New Free Trial%'
+            OR title ILIKE 'Renewal Request%'
+            OR action_url ILIKE '%/superadmin%'
+            OR message ILIKE '%Free Tier store registered%'
+            OR message ILIKE '%subscription renewal%'
+          );
       `);
     })().catch((error) => {
       platformNotificationsSchemaPromise = null;

@@ -168,24 +168,72 @@ export function getSubscriptionLabel(
 }
 
 /**
- * Returns a concise label for badge/chip displays (e.g. '30-Day Free Trial', '6 Months', 'Yearly').
+ * Returns a concise label for badge/chip displays (e.g. '30-Day Free Tier', '6 Months', 'Yearly').
  */
 export function getSubscriptionShortLabel(
   plan?: SubscriptionPlan | SubscriptionType | string | null
 ): string {
   if (isFreeTrial(plan)) {
-    return '30-Day Free Trial';
+    return '30-Day Free Tier';
   }
   const normalized = normalizeSubscriptionType(plan);
   switch (normalized) {
     case 'free_tier':
-      return 'Free Trial';
+      return 'Free Tier';
     case '6_months':
       return '6 Months';
     case '1_year':
       return 'Yearly';
     default:
-      return 'Free Trial';
+      return 'Free Tier';
   }
+}
+
+export type RenewalTemplateType = 'UPGRADE' | 'RENEWAL' | 'REACTIVATION';
+
+export interface RenewalTemplateChip {
+  type: RenewalTemplateType;
+  label: string;
+}
+
+export const RENEWAL_TEMPLATE_CHIPS: RenewalTemplateChip[] = [
+  { type: 'UPGRADE', label: 'Upgrading Free Tier' },
+  { type: 'RENEWAL', label: 'Standard Renewal' },
+  { type: 'REACTIVATION', label: 'Urgent Reactivation' },
+];
+
+/**
+ * Returns the exact dynamic payment message template based on template type and plan selection.
+ */
+export function getRenewalMessageTemplate(
+  type: RenewalTemplateType,
+  selectedPlan: '6_MONTHS' | 'YEARLY' = 'YEARLY'
+): string {
+  const planTerm = selectedPlan === '6_MONTHS' ? '6 Months' : '1 Year';
+  switch (type) {
+    case 'UPGRADE':
+      return `Hi Admin, completed Free Tier evaluation and upgrading to ${planTerm} Premium Plan for my store. Payment Ref ID: [Insert Ref ID]`;
+    case 'RENEWAL':
+      return `Hi Admin, renewing store's ${planTerm} subscription. Payment Ref ID: [Insert Ref ID]`;
+    case 'REACTIVATION':
+      return `Hi Admin, store subscription expired. Paid via online transfer (Ref ID: [Insert Ref ID]). Please reactivate POS access.`;
+  }
+}
+
+/**
+ * Automatically determines the default renewal template type based on store status and plan.
+ */
+export function resolveDefaultRenewalTemplateType(
+  status?: string | null,
+  currentPlan?: string | null
+): RenewalTemplateType {
+  const cleanStatus = String(status || '').toUpperCase();
+  if (cleanStatus === 'EXPIRED') {
+    return 'REACTIVATION';
+  }
+  if (isFreeTrial(currentPlan)) {
+    return 'UPGRADE';
+  }
+  return 'RENEWAL';
 }
 

@@ -8,6 +8,7 @@ import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAllAppSettings, updateAppSettings, APP_SETTINGS_DEFAULTS } from '../services/appSettingsService.ts';
+import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -301,17 +302,33 @@ router.post('/renew-subscription', requireAuth, requireAdmin, async (req: Authen
     const ownerPhone = String(ownerUser.phone || cs.phone || '').trim();
     const businessAddress = String(cs.address || '').trim();
 
-    // Alert SuperAdmin via platform notification about the renewal request
+    // Alert SuperAdmin via platform notification about the renewal request (strictly scoped to SUPERADMIN role)
     await pgClient
       .query(
-        `INSERT INTO platform_notifications (tenant_id, title, message, type, action_url, action_label, created_at)
-         VALUES ($1, $2, $3, 'SYSTEM', '/superadmin', 'Review Store', NOW())`,
+        `INSERT INTO platform_notifications (tenant_id, target_role, title, message, type, action_url, action_label, created_at)
+         VALUES (NULL, 'SUPERADMIN', $1, $2, 'SYSTEM', '/superadmin', 'Review Store', NOW())
+         RETURNING id, created_at`,
         [
-          tenantRow.id,
           `Renewal Request: ${storeName}`,
           `Store owner requested subscription renewal (${planLabel}) for '${storeName}'. Contact: ${ownerEmail} / ${ownerPhone}. Notes: ${fullNotes}`,
         ]
       )
+      .then(async (notifRes) => {
+        const notifRow = notifRes.rows[0];
+        if (notifRow?.id) {
+          await notifyPlatformAnnouncement({
+            id: notifRow.id,
+            tenantId: null,
+            targetRole: 'SUPERADMIN',
+            title: `Renewal Request: ${storeName}`,
+            message: `Store owner requested subscription renewal (${planLabel}) for '${storeName}'. Contact: ${ownerEmail} / ${ownerPhone}. Notes: ${fullNotes}`,
+            type: 'SYSTEM',
+            actionUrl: '/superadmin',
+            actionLabel: 'Review Store',
+            timestamp: notifRow.created_at,
+          }).catch(() => {});
+        }
+      })
       .catch(() => {});
 
     const renewalRow = {

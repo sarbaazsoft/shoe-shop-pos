@@ -384,6 +384,21 @@ export const Header: React.FC<HeaderProps> = ({
       const targetRoles = Array.isArray(payload.targetRoles) ? payload.targetRoles.map((r: string) => r.toUpperCase()) : undefined;
 
       // 1. Role isolation guards:
+      const titleLower = (payload.title || '').toLowerCase();
+      const msgLower = (payload.message || '').toLowerCase();
+      const actionUrlLower = (payload.actionUrl || '').toLowerCase();
+      const isSuperAdminOnlyNotice =
+        targetRole === 'SUPERADMIN' ||
+        titleLower.includes('new free trial') ||
+        titleLower.includes('renewal request') ||
+        msgLower.includes('free tier store registered') ||
+        msgLower.includes('subscription renewal') ||
+        actionUrlLower.includes('/superadmin');
+
+      if (userRole !== 'SUPERADMIN' && isSuperAdminOnlyNotice) {
+        return;
+      }
+
       if (userRole === 'SUPERADMIN') {
         // SuperAdmin NEVER receives store POS events (SALE, RETURN, EXCHANGE, PURCHASE, STOCK)
         if (['SALE', 'RETURN', 'EXCHANGE', 'PURCHASE', 'STOCK'].includes(payload.type)) {
@@ -392,8 +407,6 @@ export const Header: React.FC<HeaderProps> = ({
         if (targetRole && !['ALL', 'SUPERADMIN'].includes(targetRole)) {
           return;
         }
-        const titleLower = (payload.title || '').toLowerCase();
-        const msgLower = (payload.message || '').toLowerCase();
         if (titleLower.includes('welcome') || msgLower.includes('welcome to sarbaazsoft')) {
           return;
         }
@@ -408,8 +421,6 @@ export const Header: React.FC<HeaderProps> = ({
         if (targetRoles && !targetRoles.includes('CASHIER')) {
           return;
         }
-        const titleLower = (payload.title || '').toLowerCase();
-        const msgLower = (payload.message || '').toLowerCase();
         if (titleLower.includes('welcome') || msgLower.includes('welcome to sarbaazsoft')) {
           return;
         }
@@ -640,23 +651,44 @@ export const Header: React.FC<HeaderProps> = ({
       const aTargetRole = (a.targetRole || 'ALL').toUpperCase();
       const titleLower = (a.title || '').toLowerCase();
       const msgLower = (a.message || '').toLowerCase();
+      const actionUrlLower = (a.actionUrl || '').toLowerCase();
       const isWelcome =
         titleLower.includes('welcome') ||
         msgLower.includes('welcome to sarbaazsoft') ||
         msgLower.includes('thank you for choosing sarbaazsoft');
 
+      const isSuperAdminOnlyNotice =
+        aTargetRole === 'SUPERADMIN' ||
+        titleLower.includes('new free trial') ||
+        titleLower.includes('renewal request') ||
+        msgLower.includes('free tier store registered') ||
+        msgLower.includes('subscription renewal') ||
+        msgLower.includes('renewal request') ||
+        actionUrlLower.includes('/superadmin') ||
+        actionUrlLower.includes('/admin');
+
       if (isSuperAdminUser) {
         // SuperAdmin should never see store-targeted notices or store owner welcome messages
         if (isWelcome) return false;
-        if (a.tenantId !== null && a.tenantId !== undefined && a.tenantId > 0) return false;
+        if (a.tenantId !== null && a.tenantId !== undefined && a.tenantId > 0 && aTargetRole !== 'SUPERADMIN') return false;
         if (aTargetRole !== 'ALL' && aTargetRole !== 'SUPERADMIN') return false;
-      } else if (isCashierUser) {
+        return true;
+      }
+
+      // Non-SuperAdmin users (Store Owners, Cashiers, etc.) must NEVER see SuperAdmin notifications
+      if (isSuperAdminOnlyNotice) {
+        return false;
+      }
+
+      if (isCashierUser) {
         // Cashiers never receive store owner welcome messages or ADMIN-targeted notices
         if (isWelcome) return false;
         if (aTargetRole !== 'ALL' && aTargetRole !== 'CASHIER') return false;
       } else if (isAdminUser) {
         // Store Owners never receive CASHIER-only or SUPERADMIN-only notices
         if (aTargetRole !== 'ALL' && aTargetRole !== 'ADMIN') return false;
+      } else {
+        if (aTargetRole !== 'ALL') return false;
       }
       return true;
     });

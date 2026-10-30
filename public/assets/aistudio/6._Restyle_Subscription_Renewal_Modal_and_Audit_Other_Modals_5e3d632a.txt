@@ -1,0 +1,1 @@
+Restyle Renew Store Subscription modal to match `ProductFormModal`: dark gradient header, grouped rounded container, interactive plan toggles, and consistent buttons. Also, audit and align all other app modals with `ProductFormModal` styling and theme system.

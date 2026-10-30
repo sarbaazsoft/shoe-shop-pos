@@ -383,6 +383,8 @@ const mockStore: Record<string, any[]> = {
     { key: 'SW_KILL_SWITCH', value: 'false', category: 'system', description: 'Emergency Service Worker bypass toggle for PWA debugging', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'DISABLE_HMR', value: 'false', category: 'system', description: 'Disable Vite Hot Module Reloading in sandbox environments', is_secret: false, updated_at: new Date().toISOString() },
   ],
+  platform_notifications: [],
+  platform_notification_reads: [],
 };
 
 let mockIdCounters: Record<string, number> = {
@@ -407,6 +409,8 @@ let mockIdCounters: Record<string, number> = {
   stock_movements: 1,
   push_subscriptions: 1,
   trial_activations: 1,
+  platform_notifications: 1,
+  platform_notification_reads: 1,
 };
 
 function nextMockId(table: string): number {
@@ -644,6 +648,158 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         }
       }
       return { rows: entry ? ([entry] as unknown as T[]) : [], rowCount: entry ? 1 : 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // PLATFORM_NOTIFICATIONS tracking for Announcements & System Alerts
+  if (upper.includes('PLATFORM_NOTIFICATIONS')) {
+    if (!mockStore.platform_notifications) mockStore.platform_notifications = [];
+
+    if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.PLATFORM_NOTIFICATIONS') || upper.includes('INSERT INTO PLATFORM_NOTIFICATIONS')) {
+      const hasExplicitTargetRole = upper.includes('TARGET_ROLE');
+      let targetTenantId: number | null = null;
+      let targetRole = 'ALL';
+      let title = '';
+      let message = '';
+      let type = 'INFO';
+      let actionUrl = '';
+      let actionLabel = '';
+
+      if (hasExplicitTargetRole) {
+        targetTenantId = params[0] !== undefined && params[0] !== null ? Number(params[0]) : null;
+        targetRole = String(params[1] || 'ALL').toUpperCase();
+        title = String(params[2] || '');
+        message = String(params[3] || '');
+        type = String(params[4] || 'INFO');
+        actionUrl = String(params[5] || '');
+        actionLabel = String(params[6] || '');
+      } else {
+        targetTenantId = params[0] !== undefined && params[0] !== null ? Number(params[0]) : null;
+        title = String(params[1] || '');
+        message = String(params[2] || '');
+        type = String(params[3] || 'INFO');
+        actionUrl = String(params[4] || '');
+        actionLabel = String(params[5] || '');
+      }
+
+      const titleLower = title.toLowerCase();
+      const actionUrlLower = actionUrl.toLowerCase();
+      if (
+        titleLower.includes('new free trial') ||
+        titleLower.includes('renewal request') ||
+        actionUrlLower.includes('/superadmin')
+      ) {
+        targetRole = 'SUPERADMIN';
+        targetTenantId = null;
+      }
+
+      const entry = {
+        id: nextMockId('platform_notifications'),
+        tenant_id: targetTenantId,
+        target_role: targetRole,
+        title,
+        message,
+        type,
+        action_url: actionUrl,
+        action_label: actionLabel,
+        created_by: null,
+        expires_at: null,
+        created_at: new Date().toISOString(),
+      };
+      mockStore.platform_notifications.unshift(entry);
+      return { rows: [entry as unknown as T], rowCount: 1 };
+    }
+
+    if (upper.startsWith('SELECT')) {
+      const tenantId = params.length > 0 && params[0] !== null && params[0] !== undefined ? Number(params[0]) : 1;
+      const userId = params.length > 1 && params[1] !== null && params[1] !== undefined ? Number(params[1]) : 0;
+      const role = params.length > 2 && params[2] !== null && params[2] !== undefined ? String(params[2]).toUpperCase() : 'CASHIER';
+
+      const reads = mockStore.platform_notification_reads || [];
+      const list = (mockStore.platform_notifications || []).filter((pn: any) => {
+        const notifRole = (pn.target_role || 'ALL').toUpperCase();
+        const notifTitle = (pn.title || '').toLowerCase();
+        const notifMsg = (pn.message || '').toLowerCase();
+        const notifAction = (pn.action_url || '').toLowerCase();
+
+        const isSuperAdminOnly =
+          notifRole === 'SUPERADMIN' ||
+          notifTitle.includes('new free trial') ||
+          notifTitle.includes('renewal request') ||
+          notifMsg.includes('free tier store registered') ||
+          notifMsg.includes('subscription renewal') ||
+          notifAction.includes('/superadmin');
+
+        if (role === 'SUPERADMIN') {
+          if (notifTitle.includes('welcome to sarbaazsoft')) return false;
+          return true;
+        }
+
+        // NON-SUPERADMIN (Store Owners, Cashiers, Public) MUST NEVER SEE SUPERADMIN NOTIFICATIONS
+        if (isSuperAdminOnly) return false;
+
+        if (role === 'ADMIN') {
+          if (pn.tenant_id !== null && Number(pn.tenant_id) !== tenantId) return false;
+          return notifRole === 'ALL' || notifRole === 'ADMIN';
+        }
+
+        if (role === 'CASHIER') {
+          if (notifTitle.includes('welcome to sarbaazsoft')) return false;
+          if (pn.tenant_id !== null && Number(pn.tenant_id) !== tenantId) return false;
+          return notifRole === 'ALL' || notifRole === 'CASHIER';
+        }
+
+        return notifRole === 'ALL';
+      });
+
+      const rows = list.map((pn: any) => {
+        const isRead = reads.some((r: any) => Number(r.notification_id) === Number(pn.id) && (Number(r.tenant_id) === tenantId || Number(r.user_id) === userId));
+        return {
+          ...pn,
+          is_read: isRead,
+          created_by_name: 'Platform SuperAdmin',
+          read_count: '0',
+          store_name: pn.tenant_id ? (mockStore.tenants.find((t) => Number(t.id) === Number(pn.tenant_id))?.name || 'Store') : 'All Stores (Platform Broadcast)',
+        };
+      });
+
+      return { rows: rows as unknown as T[], rowCount: rows.length };
+    }
+
+    if (upper.startsWith('DELETE FROM')) {
+      const targetId = Number(params[0]);
+      mockStore.platform_notifications = (mockStore.platform_notifications || []).filter((pn: any) => Number(pn.id) !== targetId);
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (upper.startsWith('UPDATE')) {
+      for (const pn of mockStore.platform_notifications || []) {
+        const notifTitle = (pn.title || '').toLowerCase();
+        if (notifTitle.includes('new free trial') || notifTitle.includes('renewal request')) {
+          pn.target_role = 'SUPERADMIN';
+          pn.tenant_id = null;
+        }
+      }
+      return { rows: [], rowCount: 1 };
+    }
+
+    return { rows: [], rowCount: 0 };
+  }
+
+  if (upper.includes('PLATFORM_NOTIFICATION_READS')) {
+    if (!mockStore.platform_notification_reads) mockStore.platform_notification_reads = [];
+    if (upper.startsWith('INSERT INTO')) {
+      const notifId = Number(params[0] || 0);
+      const tid = Number(params[1] || 1);
+      const uid = Number(params[2] || 0);
+      mockStore.platform_notification_reads.push({
+        notification_id: notifId,
+        tenant_id: tid,
+        user_id: uid,
+        read_at: new Date().toISOString(),
+      });
+      return { rows: [], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
   }

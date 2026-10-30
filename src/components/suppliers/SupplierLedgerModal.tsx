@@ -112,10 +112,10 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
           transition={{ duration: 0.2 }}
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-900/60 rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]"
         >
-          {/* Top Header */}
-          <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-purple-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-purple-950/20">
+          {/* Top Header matching ProductFormModal */}
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-purple-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 text-slate-800 dark:text-white">
             <div className="flex items-start space-x-3">
-              <span className="w-11 h-11 rounded-xl bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center text-purple-700 dark:text-purple-300 shrink-0">
+              <span className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300 border border-purple-500/20 dark:border-purple-400/30 flex items-center justify-center font-bold shadow-2xs shrink-0">
                 <FileText className="w-5 h-5 stroke-[2.2]" />
               </span>
               <div>

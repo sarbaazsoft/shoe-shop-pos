@@ -360,17 +360,33 @@ export async function recordTrialActivation(data: {
       ]
     );
 
-    // Alert SuperAdmin via platform notification about the new free trial registration
+    // Alert SuperAdmin via platform notification about the new free trial registration (strictly scoped to SUPERADMIN role)
     await pgClient
       .query(
-        `INSERT INTO platform_notifications (tenant_id, title, message, type, action_url, action_label, created_at)
-         VALUES ($1, $2, $3, 'INFO', '/superadmin', 'View Store', NOW())`,
+        `INSERT INTO platform_notifications (tenant_id, target_role, title, message, type, action_url, action_label, created_at)
+         VALUES (NULL, 'SUPERADMIN', $1, $2, 'INFO', '/superadmin', 'View Store', NOW())
+         RETURNING id, created_at`,
         [
-          data.tenantId || null,
           `New Free Trial: ${String(data.storeName || 'New Store').trim()}`,
           `New 30-day Free Tier store registered by ${String(data.userName || 'Store Owner').trim()} (${cleanEmail}${data.phone ? ' • ' + data.phone : ''}).`,
         ]
       )
+      .then(async (notifRes) => {
+        const notifRow = notifRes.rows[0];
+        if (notifRow?.id) {
+          await notifyPlatformAnnouncement({
+            id: notifRow.id,
+            tenantId: null,
+            targetRole: 'SUPERADMIN',
+            title: `New Free Trial: ${String(data.storeName || 'New Store').trim()}`,
+            message: `New 30-day Free Tier store registered by ${String(data.userName || 'Store Owner').trim()} (${cleanEmail}${data.phone ? ' • ' + data.phone : ''}).`,
+            type: 'INFO',
+            actionUrl: '/superadmin',
+            actionLabel: 'View Store',
+            timestamp: notifRow.created_at,
+          }).catch(() => {});
+        }
+      })
       .catch(() => {});
 
     return res.rows[0];

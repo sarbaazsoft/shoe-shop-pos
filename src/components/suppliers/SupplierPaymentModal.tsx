@@ -130,14 +130,14 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-900/60 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col my-8"
         >
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 dark:border-purple-900/40 flex items-center justify-between bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent dark:from-purple-950/40 dark:to-slate-900">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-purple-800/80 flex items-center justify-between bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 text-slate-800 dark:text-white">
             <div className="flex items-center space-x-3">
-              <span className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
+              <span className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                 <CreditCard className="w-5 h-5 stroke-[2.2]" />
               </span>
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">Record Supplier Payment</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-purple-200/80">
                   Credit payment voucher &amp; update ledger balance
                 </p>
               </div>
@@ -145,7 +145,7 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-purple-300 dark:hover:text-white rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
-import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel } from '../../utils/subscription.ts';
+import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
   currentUser: any;
@@ -175,7 +175,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [selectedRenewalPlan, setSelectedRenewalPlan] = useState<'6_MONTHS' | 'YEARLY'>(() =>
     extractSubInfo(companySettings).subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'YEARLY'
   );
-  const [renewalNotes, setRenewalNotes] = useState('');
+  const [activeTemplateChip, setActiveTemplateChip] = useState<RenewalTemplateType>(() =>
+    resolveDefaultRenewalTemplateType(
+      companySettings?.subscriptionStatus || companySettings?.subscription_status,
+      companySettings?.subscriptionPlan || companySettings?.subscription_plan
+    )
+  );
+  const [hasUserEditedNotes, setHasUserEditedNotes] = useState(false);
+  const [renewalNotes, setRenewalNotes] = useState<string>(() => {
+    const initialPlan = extractSubInfo(companySettings).subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'YEARLY';
+    const initType = resolveDefaultRenewalTemplateType(
+      companySettings?.subscriptionStatus || companySettings?.subscription_status,
+      companySettings?.subscriptionPlan || companySettings?.subscription_plan
+    );
+    return getRenewalMessageTemplate(initType, initialPlan);
+  });
   const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
   const [renewalSuccessMessage, setRenewalSuccessMessage] = useState<string | null>(null);
   const [renewalErrorMessage, setRenewalErrorMessage] = useState<string | null>(null);
@@ -191,17 +205,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     ).toUpperCase();
     if (currentStatus === 'EXPIRED' && !hasAutoPromptedExpiredRef.current) {
       hasAutoPromptedExpiredRef.current = true;
+      const plan = subscriptionInfo.subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'YEARLY';
+      setSelectedRenewalPlan(plan);
+      setActiveTemplateChip('REACTIVATION');
+      setHasUserEditedNotes(false);
+      setRenewalNotes(getRenewalMessageTemplate('REACTIVATION', plan));
       setIsRenewModalOpen(true);
     }
-  }, [subscriptionInfo.subscriptionStatus, companySettings?.subscriptionStatus, companySettings?.subscription_status]);
+  }, [subscriptionInfo.subscriptionStatus, subscriptionInfo.subscriptionPlan, companySettings?.subscriptionStatus, companySettings?.subscription_status]);
 
   const handleOpenRenewModal = () => {
     setRenewalErrorMessage(null);
     setRenewalSuccessMessage(null);
-    setSelectedRenewalPlan(
-      subscriptionInfo.subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'YEARLY'
+    const plan = subscriptionInfo.subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'YEARLY';
+    setSelectedRenewalPlan(plan);
+    const defaultType = resolveDefaultRenewalTemplateType(
+      subscriptionInfo.subscriptionStatus,
+      subscriptionInfo.subscriptionPlan
     );
+    setActiveTemplateChip(defaultType);
+    setHasUserEditedNotes(false);
+    setRenewalNotes(getRenewalMessageTemplate(defaultType, plan));
     setIsRenewModalOpen(true);
+  };
+
+  const handleSelectRenewalPlan = (plan: '6_MONTHS' | 'YEARLY') => {
+    setSelectedRenewalPlan(plan);
+    if (!hasUserEditedNotes) {
+      setRenewalNotes(getRenewalMessageTemplate(activeTemplateChip, plan));
+    }
+  };
+
+  const handleSelectTemplateChip = (chipType: RenewalTemplateType) => {
+    setActiveTemplateChip(chipType);
+    setHasUserEditedNotes(false);
+    setRenewalNotes(getRenewalMessageTemplate(chipType, selectedRenewalPlan));
   };
 
   const handleRequestSubscriptionRenewal = async (e?: React.FormEvent) => {
@@ -3324,32 +3362,38 @@ setFormErrors(errors);
       {isRenewModalOpen && (
         <div
           id="renew-subscription-modal"
-          className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4"
+          className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRenewModalOpen(false);
+          }}
         >
-          <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/70 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-purple-900/50 bg-slate-50/70 dark:bg-[#0D1322]/70">
-              <div className="flex items-center space-x-2.5">
+          <div
+            className="relative w-full max-w-xl bg-white dark:bg-[#131B2E] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] border border-slate-200 dark:border-purple-800/80 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header matching ProductFormModal dark gradient */}
+            <div className="bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 border-b border-slate-200 dark:border-purple-800/80 text-slate-800 dark:text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shadow-2xs ${
                     String(subscriptionInfo.subscriptionStatus || '').toUpperCase() === 'EXPIRED'
-                      ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
-                      : 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30'
+                      ? 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-500/20 dark:border-amber-400/30'
+                      : 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300 border border-purple-500/20 dark:border-purple-400/30'
                   }`}
                 >
                   <RefreshCw className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white tracking-tight">
                     {String(subscriptionInfo.subscriptionStatus || '').toUpperCase() === 'EXPIRED'
                       ? 'Subscription Expired — Renew Store License'
                       : isTrialActive
-                      ? 'Free Trial — Upgrade / Extend Store License'
+                      ? 'Free Tier Evaluation — Upgrade Store License'
                       : 'Renew Store Subscription'}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-purple-200/80">
                     {isTrialActive
-                      ? 'Request a plan extension or upgrade from the Platform SuperAdmin'
+                      ? 'Upgrade from Free Tier to keep your footwear POS and store data active'
                       : 'Request a subscription extension from the Platform SuperAdmin'}
                   </p>
                 </div>
@@ -3357,13 +3401,14 @@ setFormErrors(errors);
               <button
                 type="button"
                 onClick={() => setIsRenewModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-purple-300 dark:hover:text-white rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition cursor-pointer"
+                aria-label="Close renewal modal"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleRequestSubscriptionRenewal} className="p-5 space-y-4">
+            <form onSubmit={handleRequestSubscriptionRenewal} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
               {/* Expired Alert Banner inside Modal */}
               {String(subscriptionInfo.subscriptionStatus || '').toUpperCase() === 'EXPIRED' && (
                 <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-700/60 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-200">
@@ -3371,35 +3416,41 @@ setFormErrors(errors);
                   <div>
                     <span className="font-bold">Your store subscription is currently EXPIRED.</span>
                     <p className="text-[11px] text-amber-700 dark:text-amber-300/90 mt-0.5">
-                      Select a renewal plan below to notify the SuperAdmin for immediate 1-click extension.
+                      Select a renewal plan below to notify the SuperAdmin for immediate 1-click reactivation.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Current License Summary */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0A0E1A] border border-slate-200 dark:border-purple-900/50 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
-                    Current Plan
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {isTrialActive
-                      ? '30-Day Free Trial'
-                      : subscriptionInfo.subscriptionPlan === '6_MONTHS'
-                      ? '6 Months Plan'
-                      : 'Yearly Plan (1 Year)'}
-                  </span>
+              {/* Grouped rounded container: Current License Summary */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-purple-300 mb-2.5 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Current License Details</span>
                 </div>
-                <div>
-                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
-                    Current Status &amp; Expiry
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {isTrialActive && subscriptionInfo.subscriptionStatus === 'ACTIVE'
-                      ? `Active Trial • ${subscriptionInfo.daysRemaining}d left`
-                      : `${subscriptionInfo.subscriptionStatus} • ${subscriptionInfo.daysRemaining}d left`}
-                  </span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                      Current Plan
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {isTrialActive
+                        ? '30-Day Free Tier'
+                        : subscriptionInfo.subscriptionPlan === '6_MONTHS'
+                        ? '6 Months Plan'
+                        : 'Yearly Plan (1 Year)'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                      Current Status &amp; Expiry
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {isTrialActive && subscriptionInfo.subscriptionStatus === 'ACTIVE'
+                        ? `Active Trial • ${subscriptionInfo.daysRemaining}d left`
+                        : `${subscriptionInfo.subscriptionStatus} • ${subscriptionInfo.daysRemaining}d left`}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -3412,7 +3463,7 @@ setFormErrors(errors);
                       Pending Renewal Request ({subscriptionInfo.pendingRenewalRequest.plan === '6_MONTHS' ? '6 Months Plan' : 'Yearly Plan'})
                     </span>
                     <p className="text-[11px] text-purple-700 dark:text-purple-300/80 mt-0.5">
-                      Awaiting SuperAdmin approval. Submitting again will update your preferred plan choice.
+                      Awaiting SuperAdmin approval. Submitting again will update your preferred plan choice and payment notes.
                     </p>
                   </div>
                 </div>
@@ -3432,19 +3483,24 @@ setFormErrors(errors);
                 </div>
               )}
 
-              {/* Plan Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
-                  Select Extension Plan *
-                </label>
+              {/* Grouped rounded container: Interactive Plan Selection */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Select Extension Plan <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 dark:text-purple-300/70">
+                    Click to switch duration
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setSelectedRenewalPlan('6_MONTHS')}
-                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer ${
+                    onClick={() => handleSelectRenewalPlan('6_MONTHS')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer relative ${
                       selectedRenewalPlan === '6_MONTHS'
-                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/20'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300'
+                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/30 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300 dark:hover:border-purple-900/60'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -3455,20 +3511,23 @@ setFormErrors(errors);
                         6_MONTHS
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
                       Extends store license by +6 months from current expiry or approval date.
                     </p>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setSelectedRenewalPlan('YEARLY')}
-                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer ${
+                    onClick={() => handleSelectRenewalPlan('YEARLY')}
+                    className={`p-3.5 rounded-xl border text-left transition cursor-pointer relative ${
                       selectedRenewalPlan === 'YEARLY'
-                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/20'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300'
+                        ? 'border-purple-600 bg-purple-50/80 dark:bg-purple-950/60 dark:border-purple-400 ring-2 ring-purple-500/30 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0E1A] hover:border-purple-300 dark:hover:border-purple-900/60'
                     }`}
                   >
+                    <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs">
+                      Best Value
+                    </span>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white">
                         Yearly Extension (1 Year)
@@ -3477,53 +3536,90 @@ setFormErrors(errors);
                         YEARLY
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                      Extends store license by +12 months with uninterrupted POS access.
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                      Extends store license by +12 months with uninterrupted POS access and full support.
                     </p>
                   </button>
                 </div>
               </div>
 
-              {/* Optional Note to SuperAdmin */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  Message / Payment Reference for SuperAdmin <span className="text-slate-400 font-normal">(Optional)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={renewalNotes}
-                  onChange={(e) => setRenewalNotes(e.target.value)}
-                  placeholder="e.g., Please extend our yearly license. Bank transfer ref #98412..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#0A0E1A] text-xs text-slate-900 dark:text-white outline-none focus:border-purple-600"
-                />
-              </div>
-
-              {/* Modal Footer Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200/80 dark:border-purple-900/40">
-                <button
-                  type="button"
-                  onClick={() => setIsRenewModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer transition"
-                >
-                  Close
-                </button>
-                <button
-                  id="submit-renew-subscription-btn"
-                  type="submit"
-                  disabled={isSubmittingRenewal}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSubmittingRenewal ? 'animate-spin' : ''}`} />
-                  <span>
-                    {isSubmittingRenewal
-                      ? 'Sending Request...'
-                      : subscriptionInfo.pendingRenewalRequest
-                      ? 'Update Renewal Request'
-                      : 'Send Renewal Request to SuperAdmin'}
+              {/* Grouped rounded container: Dynamic Payment Message & Quick Template Selector Chips */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Message / Payment Reference for SuperAdmin
+                  </label>
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
+                    Quick Templates:
                   </span>
-                </button>
+                </div>
+
+                {/* Quick Action Template Selector Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {RENEWAL_TEMPLATE_CHIPS.map((chip) => {
+                    const isSelected = activeTemplateChip === chip.type && !hasUserEditedNotes;
+                    return (
+                      <button
+                        key={chip.type}
+                        type="button"
+                        onClick={() => handleSelectTemplateChip(chip.type)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 border ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-purple-500 shadow-xs'
+                            : 'bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-purple-200 border-slate-200 dark:border-purple-900/60 hover:bg-purple-100 dark:hover:bg-purple-900/60'
+                        }`}
+                      >
+                        <span>[{chip.label}]</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Editable Textarea */}
+                <div className="relative">
+                  <textarea
+                    rows={3}
+                    value={renewalNotes}
+                    onChange={(e) => {
+                      setRenewalNotes(e.target.value);
+                      setHasUserEditedNotes(true);
+                    }}
+                    placeholder="e.g. Hi Admin, completed Free Tier evaluation and upgrading to 1 Year Premium Plan for my store. Payment Ref ID: [Insert Ref ID]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-purple-400/40 bg-white dark:bg-purple-500/20 text-xs text-slate-900 dark:text-purple-100 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition leading-relaxed"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-purple-300/80">
+                  Tip: Pre-filled with standard format. Simply replace <code className="bg-slate-100 dark:bg-purple-950/60 px-1 py-0.5 rounded text-purple-600 dark:text-purple-300 font-mono">[Insert Ref ID]</code> with your actual bank/online transfer reference ID.
+                </p>
               </div>
             </form>
+
+            {/* Modal Footer Buttons matching ProductFormModal */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-purple-800/80 bg-slate-50/70 dark:bg-[#0D1322]/70 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsRenewModalOpen(false)}
+                className="btn-secondary px-4 py-2.5 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                id="submit-renew-subscription-btn"
+                type="button"
+                onClick={handleRequestSubscriptionRenewal}
+                disabled={isSubmittingRenewal}
+                className="btn-primary px-5 py-2.5 text-xs flex items-center gap-2 cursor-pointer shadow-md font-bold disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSubmittingRenewal ? 'animate-spin' : ''}`} />
+                <span>
+                  {isSubmittingRenewal
+                    ? 'Sending Request...'
+                    : subscriptionInfo.pendingRenewalRequest
+                    ? 'Update Renewal Request'
+                    : 'Send Renewal Request to SuperAdmin'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}
