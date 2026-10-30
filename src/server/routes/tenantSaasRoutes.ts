@@ -359,6 +359,20 @@ export async function recordTrialActivation(data: {
         JSON.stringify(data.details || {}),
       ]
     );
+
+    // Alert SuperAdmin via platform notification about the new free trial registration
+    await pgClient
+      .query(
+        `INSERT INTO platform_notifications (tenant_id, title, message, type, action_url, action_label, created_at)
+         VALUES ($1, $2, $3, 'INFO', '/superadmin', 'View Store', NOW())`,
+        [
+          data.tenantId || null,
+          `New Free Trial: ${String(data.storeName || 'New Store').trim()}`,
+          `New 30-day Free Tier store registered by ${String(data.userName || 'Store Owner').trim()} (${cleanEmail}${data.phone ? ' • ' + data.phone : ''}).`,
+        ]
+      )
+      .catch(() => {});
+
     return res.rows[0];
   } catch (err: any) {
     console.error('[Trial Tracker] Failed to record trial activation:', err?.message || err);

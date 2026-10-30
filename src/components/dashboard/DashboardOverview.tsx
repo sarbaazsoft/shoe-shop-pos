@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X } from 'lucide-react';
+import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
+import { isFreeTrial, calculateDaysLeft } from '../../utils/subscription.ts';
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';
@@ -17,13 +18,130 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   companySettings,
   onNavigate,
 }) => {
+  const tenantId = currentUser?.tenantId || currentUser?.tenant_id || companySettings?.id || '1';
+  const userId = currentUser?.id || currentUser?.email || 'owner';
+  const visitKey = `pos_store_owner_visited_${tenantId}_${userId}`;
+  const dismissKey = `pos_welcome_banner_dismissed_${tenantId}_${userId}`;
+
   const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('pos_welcome_partner_dismissed') !== 'true';
+      if (
+        localStorage.getItem(dismissKey) === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true'
+      ) {
+        return false;
+      }
+      return true;
     } catch {
       return true;
     }
   });
+
+  const [isFirstTime] = useState<boolean>(() => {
+    try {
+      if (currentUser?.onboardingCompleted === false) {
+        return true;
+      }
+      const visited = localStorage.getItem(visitKey);
+      return visited !== 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Automatically record visit after initial session mount so future sessions are recognized as Returning
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(visitKey)) {
+        const timer = setTimeout(() => {
+          localStorage.setItem(visitKey, 'true');
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, [visitKey]);
+
+  // Renewal / Upgrade Modal state
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<'6_MONTHS' | 'YEARLY'>('YEARLY');
+  const [upgradeNotes, setUpgradeNotes] = useState('');
+  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
+  const [upgradeSuccessMessage, setUpgradeSuccessMessage] = useState<string | null>(null);
+  const [upgradeErrorMessage, setUpgradeErrorMessage] = useState<string | null>(null);
+
+  const currentPlanRaw =
+    companySettings?.subscriptionPlan ||
+    companySettings?.subscription_plan ||
+    companySettings?.subscriptionType ||
+    companySettings?.subscription_type ||
+    currentUser?.subscriptionPlan ||
+    currentUser?.plan;
+
+  const isFree = isFreeTrial(currentPlanRaw);
+
+  // Context-aware greeting and subtext based on user requirements:
+  // 1. First-Time Login / New Store Owner:
+  //    Greeting: "Welcome to your new store! You are currently on the 30-day Free Tier."
+  //    Subtext: "Explore all features, and when you are ready, upgrade to our Premium 6-Month or Yearly Plan to keep your store active."
+  // 2. Returning Free Tier Store Owner:
+  //    Greeting: "Welcome back! Enjoying your Free Tier trial?"
+  //    Subtext: "If you are satisfied with our service, upgrade to our Premium 6-Month or Yearly Plan."
+  // 3. Returning Paid Tier Store Owner:
+  //    Greeting: "Welcome back! Thank you for being a valued Premium subscriber."
+  let bannerGreeting = '';
+  let bannerSubtext = '';
+  let showRenewUpgradeButton = false;
+  let bannerBadge = '';
+
+  if (isFree) {
+    if (isFirstTime) {
+      bannerGreeting = 'Welcome to your new store! You are currently on the 30-day Free Tier.';
+      bannerSubtext = 'Explore all features, and when you are ready, upgrade to our Premium 6-Month or Yearly Plan to keep your store active.';
+      showRenewUpgradeButton = true;
+      bannerBadge = '30-Day Free Tier';
+    } else {
+      bannerGreeting = 'Welcome back! Enjoying your Free Tier trial?';
+      bannerSubtext = 'If you are satisfied with our service, upgrade to our Premium 6-Month or Yearly Plan.';
+      showRenewUpgradeButton = true;
+      bannerBadge = 'Free Tier Trial';
+    }
+  } else {
+    bannerGreeting = 'Welcome back! Thank you for being a valued Premium subscriber.';
+    bannerSubtext = 'Thank you for choosing SarbaazSoft to power your footwear business. Your premium store license is active.';
+    showRenewUpgradeButton = false;
+    bannerBadge = 'Premium Subscriber';
+  }
+
+  const handleDismissWelcomeBanner = () => {
+    try {
+      localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+      localStorage.setItem(dismissKey, 'true');
+    } catch {}
+    setShowWelcomeBanner(false);
+  };
+
+  const handleRequestUpgrade = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSubmittingUpgrade(true);
+    setUpgradeErrorMessage(null);
+    setUpgradeSuccessMessage(null);
+    try {
+      const res = await api.settings.requestSubscriptionRenewal({
+        plan: selectedUpgradePlan,
+        notes: upgradeNotes.trim() || undefined,
+      });
+      setUpgradeSuccessMessage(
+        res?.message || 'Subscription renewal request has been sent to the SuperAdmin for approval.'
+      );
+      setUpgradeNotes('');
+    } catch (err: any) {
+      setUpgradeErrorMessage(
+        err?.message || 'Failed to submit subscription renewal request. Please try again.'
+      );
+    } finally {
+      setIsSubmittingUpgrade(false);
+    }
+  };
 
   const storeName =
     companySettings?.name ||
@@ -264,9 +382,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Welcome Partner Banner */}
+      {/* Context-Aware Store Owner Welcome Greeting Banner */}
       {showWelcomeBanner && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-900/90 via-indigo-900/90 to-slate-900 border border-purple-400/40 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div
+          id="dashboard-welcome-banner"
+          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-900/95 via-indigo-900/90 to-slate-900 border border-purple-400/40 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+        >
           <div className="flex items-start gap-3.5 min-w-0 z-10">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center shrink-0 shadow-md border border-purple-300/30">
               <Store className="w-5 h-5 text-white" />
@@ -275,37 +396,51 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/30 border border-purple-400/40 text-purple-200">
                   <Sparkles className="w-3 h-3 text-purple-300" />
-                  Official Retail Partner
+                  {bannerBadge}
                 </span>
-                <span className="text-xs font-mono text-purple-300/80">• SarbaazSoft Shoe POS</span>
+                <span className="text-xs font-mono text-purple-300/80">• {storeName}</span>
               </div>
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                Welcome to SarbaazSoft Shoe POS, {storeName}!
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white leading-snug">
+                {bannerGreeting}
               </h2>
-              <p className="text-xs sm:text-sm text-purple-100/90 mt-1 leading-relaxed max-w-3xl">
-                Thank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with {storeName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.
-              </p>
+              {bannerSubtext && (
+                <p className="text-xs sm:text-sm text-purple-100/90 mt-1 leading-relaxed max-w-3xl">
+                  {bannerSubtext}
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center z-10">
+          <div className="flex items-center flex-wrap gap-2.5 shrink-0 self-end md:self-center z-10">
+            {showRenewUpgradeButton && (
+              <button
+                id="dashboard-renew-upgrade-subscription-btn"
+                type="button"
+                onClick={() => {
+                  setUpgradeSuccessMessage(null);
+                  setUpgradeErrorMessage(null);
+                  setIsUpgradeModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-bold transition shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95 border border-amber-300/40"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Renew / Upgrade Subscription</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onNavigate('pos')}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <ShoppingCart className="w-3.5 h-3.5" />
               <span>Open POS</span>
             </button>
+
             <button
               type="button"
-              onClick={() => {
-                try {
-                  localStorage.setItem('pos_welcome_partner_dismissed', 'true');
-                } catch {}
-                setShowWelcomeBanner(false);
-              }}
-              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+              onClick={handleDismissWelcomeBanner}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
               title="Dismiss announcement"
               aria-label="Dismiss welcome banner"
             >
@@ -1058,6 +1193,210 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Renew / Upgrade Subscription Modal */}
+      {isUpgradeModalOpen && (
+        <div
+          id="dashboard-renew-subscription-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dashboard-upgrade-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSubmittingUpgrade) {
+              setIsUpgradeModalOpen(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/70 shadow-2xl max-w-lg w-full overflow-hidden text-slate-900 dark:text-white animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-purple-900/50 bg-slate-50/80 dark:bg-[#0D1322]/80">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+                </div>
+                <div>
+                  <h3 id="dashboard-upgrade-title" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    Renew / Upgrade Subscription
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-purple-200/70">
+                    Request a plan upgrade from Platform SuperAdmin to keep your store active
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUpgradeModalOpen(false)}
+                disabled={isSubmittingUpgrade}
+                aria-label="Close dialog"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleRequestUpgrade} className="p-5 space-y-4">
+              {/* Current Status Box */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0A0E1A] border border-slate-200 dark:border-purple-900/50 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                    Current Plan
+                  </span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">
+                    30-Day Free Tier Trial
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-400 dark:text-slate-500 block">
+                    Store
+                  </span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white truncate block">
+                    {storeName}
+                  </span>
+                </div>
+              </div>
+
+              {upgradeSuccessMessage && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-700/60 flex items-center gap-2.5 text-xs text-emerald-700 dark:text-emerald-300 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>{upgradeSuccessMessage}</span>
+                </div>
+              )}
+
+              {upgradeErrorMessage && (
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-700/60 flex items-center gap-2.5 text-xs text-rose-700 dark:text-rose-300 font-semibold">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{upgradeErrorMessage}</span>
+                </div>
+              )}
+
+              {/* Plan Cards */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">
+                  Select Extension Plan *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setSelectedUpgradePlan('6_MONTHS')}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      selectedUpgradePlan === '6_MONTHS'
+                        ? 'border-purple-600 dark:border-purple-400 bg-purple-50/70 dark:bg-purple-950/40 shadow-xs'
+                        : 'border-slate-200 dark:border-purple-900/40 bg-white dark:bg-[#0D1322] hover:border-slate-300 dark:hover:border-purple-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                          6 Months Plan
+                        </span>
+                        <input
+                          type="radio"
+                          name="upgradePlan"
+                          checked={selectedUpgradePlan === '6_MONTHS'}
+                          onChange={() => setSelectedUpgradePlan('6_MONTHS')}
+                          className="text-purple-600 focus:ring-purple-500"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-purple-200/70 leading-relaxed">
+                        Full POS, offline sync, inventory management & reports for 6 months.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setSelectedUpgradePlan('YEARLY')}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between relative ${
+                      selectedUpgradePlan === 'YEARLY'
+                        ? 'border-purple-600 dark:border-purple-400 bg-purple-50/70 dark:bg-purple-950/40 shadow-xs ring-1 ring-purple-500/20'
+                        : 'border-slate-200 dark:border-purple-900/40 bg-white dark:bg-[#0D1322] hover:border-slate-300 dark:hover:border-purple-800'
+                    }`}
+                  >
+                    <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs">
+                      Best Value
+                    </span>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                          Yearly Plan (1 Year)
+                        </span>
+                        <input
+                          type="radio"
+                          name="upgradePlan"
+                          checked={selectedUpgradePlan === 'YEARLY'}
+                          onChange={() => setSelectedUpgradePlan('YEARLY')}
+                          className="text-purple-600 focus:ring-purple-500"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-purple-200/70 leading-relaxed">
+                        Maximum savings with 12 months uninterrupted license & priority support.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                  Notes / Special Requests (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={upgradeNotes}
+                  onChange={(e) => setUpgradeNotes(e.target.value)}
+                  placeholder="e.g. Please approve 1-year extension with wholesale module enabled."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-purple-900/70 bg-white dark:bg-[#0D1322] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-200 dark:border-purple-900/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUpgradeModalOpen(false);
+                    onNavigate('settings');
+                  }}
+                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Manage in Settings
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsUpgradeModalOpen(false)}
+                    disabled={isSubmittingUpgrade}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingUpgrade}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {isSubmittingUpgrade ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Submit Renewal Request</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

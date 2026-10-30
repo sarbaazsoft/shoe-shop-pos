@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink, Bell, BellRing, CheckCheck, Check, SlidersHorizontal, CreditCard } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api';
 import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
@@ -48,14 +48,50 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
+  // SuperAdmin Notifications Dropdown state
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifMenuFilter, setNotifMenuFilter] = useState<'ALL' | 'RENEWALS' | 'TRIALS' | 'ANNOUNCEMENTS'>('ALL');
+  const notifMenuRef = useRef<HTMLDivElement>(null);
+  const [superAdminReadNotifs, setSuperAdminReadNotifs] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('pos_superadmin_read_notifs');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // SuperAdmin Platform Tools Dropdown state (Send Notification, Import Data, Export Platform Backup)
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserDropdown(false);
       }
+      if (notifMenuRef.current && !notifMenuRef.current.contains(event.target as Node)) {
+        setShowNotifDropdown(false);
+      }
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target as Node)) {
+        setShowToolsDropdown(false);
+      }
     };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowUserDropdown(false);
+        setShowNotifDropdown(false);
+        setShowToolsDropdown(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleOpenProfile = () => {
@@ -332,6 +368,181 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       setExtendingTrialId(null);
     }
   };
+
+  const handleMarkAllNotifsRead = () => {
+    const allIds = formattedSuperAdminNotifs.map((n) => n.id);
+    const updated = Array.from(new Set([...superAdminReadNotifs, ...allIds]));
+    setSuperAdminReadNotifs(updated);
+    try {
+      localStorage.setItem('pos_superadmin_read_notifs', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleMarkNotifRead = (id: string) => {
+    if (superAdminReadNotifs.includes(id)) return;
+    const updated = [...superAdminReadNotifs, id];
+    setSuperAdminReadNotifs(updated);
+    try {
+      localStorage.setItem('pos_superadmin_read_notifs', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const formattedSuperAdminNotifs = useMemo(() => {
+    const items: Array<{
+      id: string;
+      rawId?: number;
+      category: 'RENEWAL' | 'TRIAL' | 'ANNOUNCEMENT';
+      title: string;
+      message: string;
+      storeName: string;
+      tenantId?: number;
+      createdAt: string;
+      isUnread: boolean;
+      actionLabel?: string;
+      onAction?: () => void;
+      onDelete?: () => void;
+    }> = [];
+
+    // 1. Process platform notifications (Renewal requests, Free trials, Broadcasts)
+    notificationsList.forEach((notif) => {
+      const titleLower = (notif.title || '').toLowerCase();
+      const msgLower = (notif.message || '').toLowerCase();
+      const isRenewal = titleLower.includes('renewal') || msgLower.includes('renewal');
+      const isTrial = titleLower.includes('trial') || msgLower.includes('trial');
+
+      let category: 'RENEWAL' | 'TRIAL' | 'ANNOUNCEMENT' = 'ANNOUNCEMENT';
+      if (isRenewal) category = 'RENEWAL';
+      else if (isTrial) category = 'TRIAL';
+
+      const notifKey = `pn-${notif.id}`;
+      const isUnread = !superAdminReadNotifs.includes(notifKey);
+
+      let actionLabel = '';
+      let onAction: (() => void) | undefined = undefined;
+
+      if (isRenewal) {
+        actionLabel = 'Manage Subscription';
+        onAction = () => {
+          handleMarkNotifRead(notifKey);
+          setShowNotifDropdown(false);
+          const targetStore = notif.tenantId
+            ? stores.find((s) => s.id === notif.tenantId)
+            : stores.find((s) => notif.title.toLowerCase().includes(s.name.toLowerCase()));
+          if (targetStore) {
+            setStoreToEditSub(targetStore);
+          } else {
+            setActiveTab('stores');
+            if (notif.storeName && notif.storeName !== 'All Stores (Platform Broadcast)') {
+              setSearchQuery(notif.storeName);
+            }
+          }
+        };
+      } else if (isTrial) {
+        actionLabel = 'View Store';
+        onAction = () => {
+          handleMarkNotifRead(notifKey);
+          setShowNotifDropdown(false);
+          if (notif.tenantId) {
+            onOpenStore(notif.tenantId);
+          } else {
+            setActiveTab('trials');
+          }
+        };
+      }
+
+      items.push({
+        id: notifKey,
+        rawId: notif.id,
+        category,
+        title: notif.title,
+        message: notif.message,
+        storeName: notif.storeName || 'Platform',
+        tenantId: notif.tenantId || undefined,
+        createdAt: notif.createdAt,
+        isUnread,
+        actionLabel,
+        onAction,
+        onDelete: () => {
+          handleDeleteNotification(notif.id);
+        },
+      });
+    });
+
+    // 2. Add recent 30-day trial activations from trialActivations if not already present
+    trialActivations.slice(0, 15).forEach((trial) => {
+      const trialKey = `trial-${trial.id}`;
+      const alreadyHasPn = items.some(
+        (it) => it.category === 'TRIAL' && (it.tenantId === trial.tenantId || it.storeName.toLowerCase() === trial.storeName.toLowerCase())
+      );
+      if (!alreadyHasPn) {
+        const isUnread = !superAdminReadNotifs.includes(trialKey);
+        items.push({
+          id: trialKey,
+          category: 'TRIAL',
+          title: `Free Trial Activated: ${trial.storeName}`,
+          message: `Owner ${trial.userName} (${trial.email}) activated 30-day Free Tier. ${trial.daysRemaining} days left.`,
+          storeName: trial.storeName,
+          tenantId: trial.tenantId || undefined,
+          createdAt: trial.activatedAt || trial.trialStartDate,
+          isUnread,
+          actionLabel: '+30d Extend',
+          onAction: () => {
+            handleMarkNotifRead(trialKey);
+            handleExtendTrial(trial.id, 30);
+          },
+        });
+      }
+    });
+
+    // 3. Add expiring stores (<= 3 days remaining) or already expired stores as renewal prompts
+    stores
+      .filter((s) => s.status === 'ACTIVE' && ((s.daysLeft !== undefined && s.daysLeft <= 3) || s.subscriptionStatus === 'EXPIRED'))
+      .slice(0, 5)
+      .forEach((st) => {
+        const expKey = `exp-${st.id}-${st.subscriptionStatus}`;
+        const alreadyHasRenewal = items.some((it) => it.category === 'RENEWAL' && it.tenantId === st.id);
+        if (!alreadyHasRenewal) {
+          const isUnread = !superAdminReadNotifs.includes(expKey);
+          const daysRemaining = st.daysLeft ?? 0;
+          items.push({
+            id: expKey,
+            category: 'RENEWAL',
+            title: st.subscriptionStatus === 'EXPIRED' ? `Store Subscription Expired: ${st.name}` : `Subscription Expiring Soon: ${st.name}`,
+            message: `${st.name} (${st.subscriptionPlan || 'Free Tier'}) has ${daysRemaining <= 0 ? 'expired' : `${daysRemaining} days remaining`}. Review renewal plan.`,
+            storeName: st.name,
+            tenantId: st.id,
+            createdAt: st.subscriptionEndDate || new Date().toISOString(),
+            isUnread,
+            actionLabel: 'Extend Subscription',
+            onAction: () => {
+              handleMarkNotifRead(expKey);
+              setShowNotifDropdown(false);
+              setStoreToEditSub(st);
+            },
+          });
+        }
+      });
+
+    // Sort by createdAt desc
+    return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [notificationsList, trialActivations, stores, superAdminReadNotifs, handleDeleteNotification, handleExtendTrial, onOpenStore]);
+
+  const filteredNotifsList = useMemo(() => {
+    if (notifMenuFilter === 'RENEWALS') {
+      return formattedSuperAdminNotifs.filter((n) => n.category === 'RENEWAL');
+    }
+    if (notifMenuFilter === 'TRIALS') {
+      return formattedSuperAdminNotifs.filter((n) => n.category === 'TRIAL');
+    }
+    if (notifMenuFilter === 'ANNOUNCEMENTS') {
+      return formattedSuperAdminNotifs.filter((n) => n.category === 'ANNOUNCEMENT');
+    }
+    return formattedSuperAdminNotifs;
+  }, [formattedSuperAdminNotifs, notifMenuFilter]);
+
+  const unreadSuperAdminNotifsCount = useMemo(() => {
+    return formattedSuperAdminNotifs.filter((n) => n.isUnread).length;
+  }, [formattedSuperAdminNotifs]);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -1632,7 +1843,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           </div>
 
           {/* Center: Quick Filter Search Input (aligned with Store Header Quick Search) */}
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
+          <div className="hidden lg:flex items-center flex-1 max-w-xs xl:max-w-sm mx-2">
             <div className="relative w-full">
               <Search className="w-4 h-4 text-slate-400 dark:text-purple-300/70 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -1654,55 +1865,319 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             </div>
           </div>
 
-          {/* Right: Actions, Theme Dropdown, User Profile & Sign Out */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setNotifError(null);
-                setNotificationModalOpen(true);
-              }}
-              title="Send custom notification to all stores or a specific store"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-500/15 dark:hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-500/30 text-xs font-bold transition cursor-pointer"
-            >
-              <Megaphone className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Send Notification</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setImportSqlError(null);
-                setImportSqlModalOpen(true);
-              }}
-              title="Import Multi-Store or Platform .SQL File"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/15 dark:hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-500/30 text-xs font-bold transition cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Import Data</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportPlatformSql}
-              disabled={exportingPlatform}
-              title="Export All Stores & Platform Backup"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-500/30 text-xs font-bold transition cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">
-                {exportingPlatform ? 'Exporting...' : 'Export All Backup'}
-              </span>
-            </button>
-
+          {/* Right: Actions, Notifications Dropdown, Tools Dropdown, Refresh, Theme, User Profile */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Primary Action: Add Store */}
             <button
               type="button"
               onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white text-xs font-bold shadow-xs shadow-purple-600/20 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white text-xs font-bold shadow-xs shadow-purple-600/20 transition cursor-pointer shrink-0"
+              title="Add New Store Tenant"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Add New Store</span>
+              <span className="hidden sm:inline">Add Store</span>
             </button>
+
+            {/* Platform Tools Dropdown (Send Notification, Import Data, Export All Backup) */}
+            <div ref={toolsMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowToolsDropdown((prev) => !prev);
+                  setShowNotifDropdown(false);
+                  setShowUserDropdown(false);
+                }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                  showToolsDropdown
+                    ? 'bg-purple-100 dark:bg-purple-500/30 text-purple-800 dark:text-white border-purple-300 dark:border-purple-400/50'
+                    : 'bg-slate-100 hover:bg-slate-200/80 dark:bg-[#131B2E] dark:hover:bg-[#1A263D] border-slate-200/80 dark:border-indigo-500/20 text-slate-700 dark:text-slate-200'
+                }`}
+                title="Data & Broadcast Tools"
+                aria-expanded={showToolsDropdown}
+                aria-haspopup="true"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="hidden md:inline">Tools</span>
+                <ChevronDown className={`w-3 h-3 opacity-60 transition-transform ${showToolsDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {showToolsDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-[#120726] border border-slate-200 dark:border-purple-400/40 rounded-xl shadow-2xl p-1.5 z-50 backdrop-blur-md space-y-1"
+                  >
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 dark:text-purple-300/70 uppercase tracking-wider">
+                      Platform Tools
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifError(null);
+                        setNotificationModalOpen(true);
+                        setShowToolsDropdown(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:text-purple-700 dark:hover:text-white transition cursor-pointer text-left"
+                    >
+                      <Megaphone className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 dark:text-white">Send Notification</div>
+                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Broadcast announcement to stores</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImportSqlError(null);
+                        setImportSqlModalOpen(true);
+                        setShowToolsDropdown(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-white transition cursor-pointer text-left"
+                    >
+                      <Upload className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 dark:text-white">Import Data</div>
+                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Import multi-store .SQL backup</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleExportPlatformSql();
+                        setShowToolsDropdown(false);
+                      }}
+                      disabled={exportingPlatform}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-white transition cursor-pointer text-left disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 dark:text-white">
+                          {exportingPlatform ? 'Exporting...' : 'Export All Backup'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Download platform SQL dump</div>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* SUPERADMIN NOTIFICATIONS DROPDOWN MENU */}
+            <div ref={notifMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotifDropdown((prev) => !prev);
+                  setShowToolsDropdown(false);
+                  setShowUserDropdown(false);
+                }}
+                className={`relative p-2 rounded-xl transition cursor-pointer border ${
+                  showNotifDropdown
+                    ? 'bg-purple-100 dark:bg-purple-500/30 text-purple-800 dark:text-white border-purple-300 dark:border-purple-400/50 ring-2 ring-purple-400/40'
+                    : 'bg-slate-100 hover:bg-slate-200/80 dark:bg-[#131B2E] dark:hover:bg-[#1A263D] border-slate-200/80 dark:border-indigo-500/20 text-slate-600 dark:text-slate-200'
+                }`}
+                title="SuperAdmin Notifications (Renewals & Trials)"
+                aria-label="SuperAdmin Notifications"
+                aria-expanded={showNotifDropdown}
+                aria-haspopup="true"
+              >
+                {unreadSuperAdminNotifsCount > 0 ? (
+                  <BellRing className="w-4 h-4 text-purple-600 dark:text-purple-300 animate-pulse" />
+                ) : (
+                  <Bell className="w-4 h-4" />
+                )}
+                {unreadSuperAdminNotifsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-extrabold shadow-sm ring-2 ring-white dark:ring-[#0D1322]">
+                    {unreadSuperAdminNotifsCount > 99 ? '99+' : unreadSuperAdminNotifsCount}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showNotifDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -6 }}
+                    transition={{ duration: 0.16 }}
+                    className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-purple-500/30 rounded-2xl shadow-2xl z-50 backdrop-blur-md overflow-hidden flex flex-col"
+                  >
+                    {/* Header */}
+                    <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+                            SuperAdmin Notifications
+                          </h3>
+                          {unreadSuperAdminNotifsCount > 0 && (
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                              {unreadSuperAdminNotifsCount} new
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Renewals, free trials &amp; system alerts
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={handleMarkAllNotifsRead}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer text-[11px] flex items-center gap-1"
+                          title="Mark all as read"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-semibold hidden sm:inline">Mark read</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={loadNotifications}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+                          title="Refresh notifications"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${loadingNotifications ? 'animate-spin text-purple-600' : ''}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="px-3 pt-2 pb-1.5 flex items-center gap-1 border-b border-slate-100 dark:border-slate-800 overflow-x-auto text-[11px] bg-white dark:bg-[#0F172A]">
+                      {(
+                        [
+                          { id: 'ALL', label: 'All' },
+                          { id: 'RENEWALS', label: 'Renewals' },
+                          { id: 'TRIALS', label: 'Trials' },
+                          { id: 'ANNOUNCEMENTS', label: 'Broadcasts' },
+                        ] as const
+                      ).map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setNotifMenuFilter(f.id)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                            notifMenuFilter === f.id
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Notifications List */}
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {filteredNotifsList.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 dark:text-slate-500 space-y-2">
+                          <Bell className="w-8 h-8 mx-auto opacity-30 stroke-[1.5]" />
+                          <div className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                            No notifications right now
+                          </div>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                            All subscription renewals and store registrations are up to date.
+                          </p>
+                        </div>
+                      ) : (
+                        filteredNotifsList.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => handleMarkNotifRead(item.id)}
+                            className={`p-3 transition-colors flex gap-2.5 text-xs hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer ${
+                              item.isUnread ? 'bg-purple-50/30 dark:bg-purple-950/20' : ''
+                            }`}
+                          >
+                            {/* Category Icon */}
+                            <div className="mt-0.5 shrink-0">
+                              {item.category === 'RENEWAL' ? (
+                                <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                </div>
+                              ) : item.category === 'TRIAL' ? (
+                                <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                </div>
+                              ) : (
+                                <div className="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+                                  <Megaphone className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="font-bold text-slate-900 dark:text-white truncate text-xs">
+                                  {item.title}
+                                </span>
+                                {item.isUnread && (
+                                  <span className="w-2 h-2 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug line-clamp-2">
+                                {item.message}
+                              </p>
+
+                              <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                  <span>{item.storeName}</span>
+                                  <span>&bull;</span>
+                                  <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                </div>
+
+                                {item.onAction && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      item.onAction?.();
+                                    }}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer"
+                                  >
+                                    {item.actionLabel || 'Manage'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNotifDropdown(false);
+                          setActiveTab('trials');
+                        }}
+                        className="text-purple-600 dark:text-purple-400 font-bold hover:underline px-2 py-1 cursor-pointer"
+                      >
+                        View All Trials
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNotifDropdown(false);
+                          setNotifError(null);
+                          setNotificationModalOpen(true);
+                        }}
+                        className="text-slate-500 dark:text-slate-400 font-semibold hover:text-slate-700 dark:hover:text-white px-2 py-1 cursor-pointer"
+                      >
+                        + New Announcement
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <button
               type="button"

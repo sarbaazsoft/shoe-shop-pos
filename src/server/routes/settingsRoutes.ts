@@ -305,8 +305,9 @@ router.post('/renew-subscription', requireAuth, requireAdmin, async (req: Authen
     await pgClient
       .query(
         `INSERT INTO platform_notifications (tenant_id, title, message, type, action_url, action_label, created_at)
-         VALUES (NULL, $1, $2, 'SYSTEM', '/superadmin', 'Review Store', NOW())`,
+         VALUES ($1, $2, $3, 'SYSTEM', '/superadmin', 'Review Store', NOW())`,
         [
+          tenantRow.id,
           `Renewal Request: ${storeName}`,
           `Store owner requested subscription renewal (${planLabel}) for '${storeName}'. Contact: ${ownerEmail} / ${ownerPhone}. Notes: ${fullNotes}`,
         ]

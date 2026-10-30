@@ -1,0 +1,14 @@
+Fix the store owner welcome greeting banner to be context-aware (First-time vs. Returning):
+
+1. First-Time Login / New Store Owner:
+   - Greeting: "Welcome to your new store! You are currently on the 30-day Free Tier."
+   - Subtext: "Explore all features, and when you are ready, upgrade to our Premium 6-Month or Yearly Plan to keep your store active."
+   - Include a clickable "Renew / Upgrade Subscription" button opening the modal.
+
+2. Returning Free Tier Store Owner:
+   - Greeting: "Welcome back! Enjoying your Free Tier trial?"
+   - Subtext: "If you are satisfied with our service, upgrade to our Premium 6-Month or Yearly Plan."
+   - Include the "Renew / Upgrade Subscription" button.
+
+3. Returning Paid Tier Store Owner:
+   - Greeting: "Welcome back! Thank you for being a valued Premium subscriber."

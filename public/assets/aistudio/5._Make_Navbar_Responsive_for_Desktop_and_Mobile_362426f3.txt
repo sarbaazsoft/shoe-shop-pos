@@ -1,0 +1,17 @@
+Refactor the navigation bar component (Navbar.tsx) to implement responsive layout behavior across desktop and mobile viewports:
+
+Desktop Layout (md: and up):
+
+Retain Inherit Position: Keep the brand logo and company name ("SarbaazSoft POS") in their standard, left-aligned position alongside the default navigation items.
+
+Preserve the standard horizontal desktop layout for links, action buttons (e.g., Free Trial, Login), and the light/dark mode toggle.
+
+Mobile Layout (Small Devices):
+
+Left: Place the hamburger menu toggle icon on the left.
+
+Center: Horizontally center the logo and company name ("SarbaazSoft POS") within the header bar, scaling down text size/spacing appropriately to avoid overflow.
+
+Right: Position the light/dark mode toggle on the right.
+
+Drawer / Menu: Move all main navigation links, the Free Trial button, and the Login button inside the collapsible mobile drawer opened by the hamburger icon.

@@ -6,6 +6,7 @@ import { toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
 import type { TenantInfo, BusinessType, PricingMode } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
 import { useTheme } from '../../context/ThemeContext';
+import { Navbar } from './Navbar';
 
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -317,7 +318,6 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const statsSectionRef = useRef<HTMLElement>(null);
   const storesSwiperRef = useRef<HTMLDivElement>(null);
   const swiperInstanceRef = useRef<any>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { setThemeMode } = useTheme();
   const [landingTheme, setLandingTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -957,102 +957,15 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       className="min-h-screen bg-[#070A24] lt:bg-[#F7F8FF] text-slate-100 lt:text-slate-800 font-sans selection:bg-violet-500 selection:text-white"
     >
       {/* 1. TOP NAVIGATION BAR */}
-      <header className="sticky top-0 z-30 border-b border-white/[0.04] lt:border-slate-200 bg-[#0A0B34]/80 lt:bg-white/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[68px] flex items-center justify-between gap-4">
-          <button type="button" onClick={() => scrollToSection('top', 'home')} className="flex items-center gap-2.5 text-left cursor-pointer shrink-0" aria-label="SarbaazSoft POS home">
-            <svg viewBox="0 0 64 42" className="w-11 h-8 shrink-0" aria-hidden="true">
-              <path d="M6 31c0-3 2-5 5-6l12-5c3-1.5 6-4.5 8-8 1-1.5 2.8-1.5 3.8 0 1.8 2.8 4.5 5 8.2 5.8l11 2.4c3.5.8 6 3.8 6 7.3 0 2.5-2 4.5-4.5 4.5H10.5C8 37 6 34.5 6 31z" fill="#7C6CFF" />
-              <path d="M6 33.5h53.5c1 0 1.8.8 1.8 1.8s-.8 1.7-1.8 1.7H8c-1.5 0-2.5-1-2-3.5z" fill="#B7ADFF" />
-              <path d="M23 18l3 2m-6 1.5l3 2m-6 1.5l3 2" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-              <path d="M14 29c7-1 14-3.5 21-8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
-            </svg>
-            <span>
-              <span className="block text-[22px] font-extrabold tracking-tight leading-none text-white lt:text-slate-900">SarbaazSoft POS</span>
-              <span className="mt-1 block text-[10px] text-slate-400 lt:text-slate-500">Smart POS for Shoe Businesses</span>
-            </span>
-          </button>
-
-          <nav className="hidden md:flex items-center gap-9 text-[13px] font-medium" aria-label="Primary">
-            {landingNavItems.map(({ key, label, section }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => scrollToSection(section, key)}
-                aria-current={activeNav === key ? 'page' : undefined}
-                className={`py-2 transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-300 ${activeNav === key ? 'text-[#8B7CFF] lt:text-[#5B4BFF]' : 'text-slate-100 lt:text-slate-800 hover:text-[#B9A9FF] lt:hover:text-[#5B4BFF]'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleLandingTheme}
-              aria-label={landingTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              title={landingTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-400/40 lt:border-indigo-200 text-violet-200 lt:text-indigo-700 hover:bg-indigo-500/10 lt:hover:bg-indigo-50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
-            >
-              {landingTheme === 'dark' ? <Sun className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
-            </button>
-            <button
-              type="button"
-              onClick={onGlobalLogin}
-              className="hidden sm:inline-flex items-center justify-center rounded-lg border border-[#7C6CFF] px-7 py-2 text-[13px] font-medium text-white lt:text-slate-900 hover:bg-[#6D5CFF]/15 lt:hover:bg-[#6D5CFF]/10 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => openGetStartedWithPlan('TRIAL')}
-              className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 text-white px-5 py-2 text-[13px] font-bold border border-purple-400/40 shadow-md shadow-purple-600/25 transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]"
-            >
-              Start Free Trial
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen((open) => !open)}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="landing-mobile-menu"
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 lt:border-slate-200 text-white lt:text-slate-900 cursor-pointer"
-            >
-              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-        {mobileMenuOpen && (
-          <div id="landing-mobile-menu" className="md:hidden border-t border-white/5 lt:border-slate-200 bg-[#0A0B34] lt:bg-white px-4 py-3">
-            <div className="flex flex-col">
-              {landingNavItems.map(({ key, label, section }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setMobileMenuOpen(false); scrollToSection(section, key); }}
-                  className={`py-3 text-left text-sm font-medium cursor-pointer ${activeNav === key ? 'text-[#8B7CFF] lt:text-[#5B4BFF]' : 'text-slate-100 lt:text-slate-800'}`}
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={toggleLandingTheme}
-                className="py-3 text-left text-sm font-medium text-slate-100 lt:text-slate-800 cursor-pointer"
-              >
-                {landingTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMobileMenuOpen(false); onGlobalLogin(); }}
-                className="mt-2 rounded-lg border border-[#7C6CFF] py-2.5 text-sm font-medium text-white lt:text-slate-900 cursor-pointer"
-              >
-                Login
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
+      <Navbar
+        activeNav={activeNav}
+        navItems={landingNavItems}
+        onNavigate={scrollToSection}
+        onLogin={onGlobalLogin}
+        onStartFreeTrial={() => openGetStartedWithPlan('TRIAL')}
+        landingTheme={landingTheme}
+        onToggleTheme={toggleLandingTheme}
+      />
 
       {/* 2. HERO */}
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0B0C38_0%,#080A2C_60%,#070A24_100%)] lt:bg-[linear-gradient(180deg,#EEF0FF_0%,#F7F8FF_100%)]">
