@@ -1,0 +1,1 @@
+Fix store subscription settings view where a free trial store incorrectly displays the plan as "Yearly Plan". It should dynamically reflect the active free trial status.

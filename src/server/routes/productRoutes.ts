@@ -521,7 +521,7 @@ async function parseAndValidateImage(imageInput: unknown): Promise<{ data?: Reso
 }
 
 // AI Footwear Suggestor from Image - Strictly for Retail Stores
-router.post('/ai-suggest-from-image', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+async function handleAiProductSuggestion(req: AuthenticatedRequest, res: Response) {
   try {
     const tenantId = extractStrictTenantId(req);
 
@@ -545,19 +545,32 @@ router.post('/ai-suggest-from-image', requireAuth, async (req: AuthenticatedRequ
 
     const { base64Data, mimeType } = resolved.data;
     const aiClient = getGeminiClient();
-    const prompt = `You are an expert footwear merchandise cataloger for a retail shoe store POS system.
-Analyze this shoe/footwear image and extract the following:
-1. "title": A concise, marketable retail product title (e.g. "Men Casual Leather Sneaker", "Women Block Heel Sandal", "Kids Sport Running Shoe", "Toddler Slip-on Clog").
-2. "category": Must be one of these exact 5 standard categories: "Men", "Women", "Kids", "Toddler", "Infant".
-3. "brand": Brand name if clearly visible (e.g. Nike, Adidas, Bata, Service, Ndure, Puma, Clarks) or "Unbranded" if no visible brand.
-4. "shoeType": Specific footwear type (e.g. "Sneaker", "Sandal", "Boot", "Loafer", "Slipper", "Heel", "Formal Shoe").
+    const prompt = `You are an expert footwear cataloger and AI vision inspector for a retail shoe store POS system.
+Examine this product image carefully.
 
-Respond ONLY with a valid JSON object matching this schema:
+First, strictly determine if this image shows footwear (shoes, sneakers, boots, sandals, heels, slides, slippers, loafers, clogs, flats, etc.).
+If the image does NOT show footwear (e.g. it is an alarm clock, electronic device, watch, furniture, vehicle, fruit, pet, general clothing item like shirt/pants, etc.), you MUST set "isFootwear": false.
+
+If the image DOES show footwear:
+1. "isFootwear": true
+2. "confidence": "HIGH" | "MEDIUM" | "LOW" (confidence in recognizing the footwear model/style)
+3. "brand": Brand name if clearly visible (e.g. "Nike", "Adidas", "Puma", "Bata", "Service", "Ndure", "Clarks", "Gucci", "Skechers") or "Unbranded" / "Local" if not clearly identified or generic.
+4. "isBrandUnknown": boolean (true if the brand trademark or logo is not clearly visible or cannot be determined with certainty)
+5. "category": Must be one of the standard footwear categories, such as "Casual Shoes", "Sneakers", "Sandals & Chappals", "Flat Sandals", "Heeled Sandals", "Boots", "Loafers", "Formal Shoes", "Men", "Women", "Kids", "Toddler", "Infant".
+6. "title": A concise, marketable retail product title representing the color-free silhouette or model (e.g. "Air Max 270 Athletic Runner", "Classic Leather Penny Loafer", "Double-Strap Slide Sandal", "Suede Chelsea Ankle Boot", "Block Heel Dress Sandal"). Avoid arbitrary temporary color words in the title.
+7. "shoeType": Specific footwear category/silhouette (e.g. "Sneaker", "Running Shoe", "Sandal", "Boot", "Loafer", "Heel", "Slipper").
+8. "visualClues": An array of 2 to 4 concise observed visual features (e.g. ["Swoosh logo on lateral quarter", "Air-cushioned bubble midsole", "Textured rubber tread", "Mesh and synthetic upper"]).
+
+Respond strictly with valid JSON conforming to:
 {
-  "title": string,
-  "category": "Men" | "Women" | "Kids" | "Toddler" | "Infant",
+  "isFootwear": boolean,
+  "confidence": "HIGH" | "MEDIUM" | "LOW",
   "brand": string,
-  "shoeType": string
+  "isBrandUnknown": boolean,
+  "category": string,
+  "title": string,
+  "shoeType": string,
+  "visualClues": string[]
 }`;
 
     let geminiRes;
@@ -592,7 +605,7 @@ Respond ONLY with a valid JSON object matching this schema:
           error: 'The provided image could not be processed by AI. Please provide a valid image file or URL.',
         });
       }
-      console.warn('Gemini generateContent error in ai-suggest-from-image:', errMsg);
+      console.warn('Gemini generateContent error in ai-suggest:', errMsg);
       return res.status(500).json({
         success: false,
         error: errMsg || 'Failed to analyze shoe image with AI.',
@@ -608,16 +621,83 @@ Respond ONLY with a valid JSON object matching this schema:
       console.warn('Failed to parse Gemini JSON output:', rawText);
     }
 
-    const category = normalizeFootwearCategory(parsed.category || 'Men');
-    const brand = String(parsed.brand || 'Unbranded').trim();
-    const title = String(parsed.title || '').trim();
-    const shoeType = String(parsed.shoeType || '').trim();
+    // Footwear Guardrail Check
+    if (parsed.isFootwear === false) {
+      return res.status(400).json({
+        success: false,
+        error: 'Alert: Image is not a valid footwear image. Please upload an image of a shoe.',
+      });
+    }
+
+    const rawCatName = String(parsed.category || 'Casual Shoes').trim();
+    const rawBrandName = String(parsed.brand || 'Unbranded').trim();
+    const title = String(parsed.title || `${rawCatName} Shoe`).trim();
+    const shoeType = String(parsed.shoeType || 'Shoe').trim();
+    const confidence = (['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH') as 'HIGH' | 'MEDIUM' | 'LOW';
+
+    // Query existing store categories
+    let existingCategories: any[] = [];
+    try {
+      const catRes = await pgClient.query<any>('SELECT id, name FROM categories');
+      existingCategories = catRes.rows || [];
+    } catch {}
+
+    const matchedCat = existingCategories.find(
+      (c) => (c.name || '').toLowerCase() === rawCatName.toLowerCase()
+    );
+
+    // Query existing store brands from products
+    let existingBrands: string[] = [];
+    try {
+      const brandRes = await pgClient.query<any>(
+        'SELECT DISTINCT brand FROM products WHERE tenant_id = $1 AND brand IS NOT NULL AND TRIM(brand) != \'\'',
+        [tenantId]
+      );
+      existingBrands = (brandRes.rows || []).map((r) => r.brand).filter(Boolean);
+    } catch {}
+
+    const matchedBrand = existingBrands.find(
+      (b) => b.toLowerCase() === rawBrandName.toLowerCase()
+    );
+
+    const isUnknownBrand = Boolean(
+      parsed.isBrandUnknown ||
+      !rawBrandName ||
+      rawBrandName.toLowerCase() === 'unbranded' ||
+      rawBrandName.toLowerCase() === 'local' ||
+      rawBrandName.toLowerCase() === 'unknown'
+    );
+
+    const suggestion = {
+      title,
+      category: {
+        suggestedName: rawCatName,
+        matchedName: matchedCat ? matchedCat.name : null,
+        matchedId: matchedCat ? matchedCat.id : null,
+        isExisting: !!matchedCat,
+        confidence,
+      },
+      brand: {
+        suggestedName: rawBrandName,
+        matchedName: matchedBrand || null,
+        isExisting: !!matchedBrand,
+        isUnknown: isUnknownBrand,
+        confidence,
+      },
+      confidence,
+      shoeType,
+      isFootwear: true,
+      visualClues: Array.isArray(parsed.visualClues) && parsed.visualClues.length > 0
+        ? parsed.visualClues
+        : ['Footwear silhouette detected', `${shoeType} structure`],
+    };
 
     return res.json({
       success: true,
-      title: title || `${category} Shoe`,
-      category,
-      brand: brand || 'Unbranded',
+      suggestion,
+      title,
+      category: rawCatName,
+      brand: rawBrandName,
       shoeType,
     });
   } catch (err: any) {
@@ -627,7 +707,11 @@ Respond ONLY with a valid JSON object matching this schema:
       error: errorMsg,
     });
   }
-});
+}
+
+router.post('/ai-suggest', requireAuth, handleAiProductSuggestion);
+router.post('/ai-suggest-from-image', requireAuth, handleAiProductSuggestion);
+
 
 let productColumnsVerified = false;
 let productColumnsPromise: Promise<void> | null = null;

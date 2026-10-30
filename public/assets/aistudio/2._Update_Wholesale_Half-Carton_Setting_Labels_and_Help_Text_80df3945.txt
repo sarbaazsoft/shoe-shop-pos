@@ -1,0 +1,5 @@
+Update the labels and helper text for the wholesale half-carton setting in both the Onboarding wizard (TenantOnboardingWizard.tsx) and Settings view to:
+
+"Globally Allow Half-Carton Selling (0.5 Carton)"
+
+Helper text: "If disabled globally, you can still enable or override this option individually at the product level."

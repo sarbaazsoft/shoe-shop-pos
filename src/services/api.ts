@@ -1,7 +1,7 @@
 // Central API service with JWT token injection, tenant isolation, and offline catalog fallback
 import { cacheCatalogOffline, deleteCachedProductOffline, lookupCachedProductOffline, searchCachedProductsOffline } from '../utils/offlineDb.ts';
 import { transformKeysToCamelCase } from '../utils/caseTransformer.ts';
-import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType } from '../types.ts';
+import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult } from '../types.ts';
 
 const TOKEN_KEY = 'pos_auth_token';
 const ALT_TOKEN_KEY = 'shoe_pos_jwt_token';
@@ -900,6 +900,15 @@ export const api = {
       if (params.excludeId !== undefined && params.excludeId !== null) qs.set('excludeId', String(params.excludeId));
       return apiFetch<any>(`/products/suggest-article?${qs.toString()}`);
     },
+    aiSuggest: (image: string) =>
+      apiFetch<{
+        success: boolean;
+        suggestion?: AiProductSuggestionResult;
+        error?: string;
+      }>('/products/ai-suggest', {
+        method: 'POST',
+        body: { image },
+      }),
     aiSuggestFromImage: (image: string) =>
       apiFetch<{
         success: boolean;
@@ -907,6 +916,7 @@ export const api = {
         category?: string;
         brand?: string;
         shoeType?: string;
+        suggestion?: AiProductSuggestionResult;
         error?: string;
       }>('/products/ai-suggest-from-image', {
         method: 'POST',

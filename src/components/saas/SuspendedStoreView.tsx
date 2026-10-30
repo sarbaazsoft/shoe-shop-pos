@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldOff, Lock, ArrowLeft, Shield, KeyRound, Calendar, Clock } from 'lucide-react';
 import type { TenantInfo } from '../../types';
+import { isFreeTrial } from '../../utils/subscription';
 
 interface SuspendedStoreViewProps {
   tenant: TenantInfo | null;
@@ -32,8 +33,11 @@ export const SuspendedStoreView: React.FC<SuspendedStoreViewProps> = ({
       })
     : 'N/A';
 
-  const planLabel =
-    tenant?.subscriptionPlan === '6_MONTHS' ? '6 Months' : 'Yearly';
+  const planLabel = isFreeTrial(tenant?.subscriptionPlan)
+    ? '30-Day Free Trial'
+    : tenant?.subscriptionPlan === '6_MONTHS'
+    ? '6 Months'
+    : 'Yearly';
 
   return (
     <div className="min-h-[calc(100vh-3rem)] bg-slate-950 text-slate-100 flex items-center justify-center p-6">

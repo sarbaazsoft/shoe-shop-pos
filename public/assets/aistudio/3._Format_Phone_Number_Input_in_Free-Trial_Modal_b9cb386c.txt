@@ -1,0 +1,1 @@
+Update the phone input field in FreeTrialOnboardingModal.tsx to automatically insert hyphens after the country code and carrier code as the user types (e.g., +92-300-1234567). Keep the real-time validation active to ensure the final cleaned digits fall within the required length.

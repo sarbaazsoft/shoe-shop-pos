@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
-import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType } from '../../utils/subscription.ts';
+import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
   currentUser: any;
@@ -101,6 +101,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         src?.subscription_plan ||
         subscriptionType
     );
+    const isTrial =
+      subscriptionPlan === 'free_tier' ||
+      subscriptionType === 'free_tier' ||
+      isFreeTrial(
+        sub?.subscriptionPlan ||
+          sub?.subscription_plan ||
+          src?.subscriptionPlan ||
+          src?.subscription_plan ||
+          subscriptionPlan
+      );
     const subscriptionStartDate =
       sub?.subscriptionStartDate ||
       sub?.subscription_start_date ||
@@ -109,7 +119,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       src?.subscription_start_date ||
       new Date().toISOString();
     const defaultEnd = new Date(subscriptionStartDate);
-    if (subscriptionPlan === 'free_tier') {
+    if (isTrial) {
       defaultEnd.setDate(defaultEnd.getDate() + 30);
     } else if (subscriptionPlan === '6_MONTHS') {
       defaultEnd.setMonth(defaultEnd.getMonth() + 6);
@@ -149,6 +159,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       subscriptionStatus,
       daysRemaining,
       daysLeft: daysRemaining,
+      isTrial,
+      isExpired: (!Number.isNaN(endMs) && endMs < Date.now()) || subscriptionStatus === 'EXPIRED',
       pendingRenewalRequest,
     };
   };
@@ -156,6 +168,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [subscriptionInfo, setSubscriptionInfo] = useState(() =>
     extractSubInfo(companySettings)
   );
+
 
   // Subscription Renewal Request Modal State
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
@@ -266,10 +279,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       companySettings?.pricingPolicyLocked ??
       true
     ),
-    subscription_plan: companySettings?.subscriptionPlan || companySettings?.subscription_plan || 'YEARLY',
-    subscription_start_date: companySettings?.subscriptionStartDate || companySettings?.subscription_start_date || '',
-    subscription_end_date: companySettings?.subscriptionEndDate || companySettings?.subscription_end_date || '',
-    subscription_status: companySettings?.subscriptionStatus || companySettings?.subscription_status || 'ACTIVE',
+    subscription_plan: extractSubInfo(companySettings).subscriptionPlan,
+    subscription_start_date: extractSubInfo(companySettings).subscriptionStartDate,
+    subscription_end_date: extractSubInfo(companySettings).subscriptionEndDate,
+    subscription_status: extractSubInfo(companySettings).subscriptionStatus,
   });
 
   useEffect(() => {
@@ -393,6 +406,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+
+  // Active Free Trial Determination
+  const isTrialActive = Boolean(
+    (subscriptionInfo as any).isTrial ||
+    isFreeTrial(
+      subscriptionInfo.subscriptionPlan ||
+      formData.subscription_plan ||
+      companySettings?.subscriptionPlan ||
+      companySettings?.subscription_plan ||
+      companySettings?.subscriptionType
+    )
+  );
 
   // Receipt Logo Upload & Camera Capture State
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -938,6 +963,13 @@ setFormErrors(errors);
               ).toUpperCase();
               const isExpired = rawStatus === 'EXPIRED';
               const isSuspended = rawStatus === 'SUSPENDED';
+              const statusDisplay = isExpired
+                ? 'EXPIRED'
+                : isSuspended
+                ? 'SUSPENDED'
+                : isTrialActive
+                ? 'FREE TRIAL'
+                : rawStatus;
               return (
                 <div
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold border ${
@@ -945,27 +977,43 @@ setFormErrors(errors);
                       ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
                       : isSuspended
                       ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
+                      : isTrialActive
+                      ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
                       : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isExpired ? 'bg-amber-500' : isSuspended ? 'bg-rose-500' : 'bg-emerald-500'
+                      isExpired
+                        ? 'bg-amber-500'
+                        : isSuspended
+                        ? 'bg-rose-500'
+                        : isTrialActive
+                        ? 'bg-indigo-500 animate-pulse'
+                        : 'bg-emerald-500'
                     }`}
                   />
-                  <span>Status: {rawStatus}</span>
+                  <span>Status: {statusDisplay}</span>
                 </div>
               );
             })()}
 
             {/* Subscription Plan */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 text-purple-700 dark:text-purple-200 font-semibold">
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold border ${
+                isTrialActive
+                  ? 'bg-indigo-50/70 dark:bg-indigo-950/50 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-200'
+                  : 'bg-purple-50/70 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 text-purple-700 dark:text-purple-200'
+              }`}
+            >
               <span>Plan:</span>
               <span className="font-mono font-bold">
-                {(subscriptionInfo.subscriptionPlan ||
-                  formData.subscription_plan ||
-                  companySettings?.subscriptionPlan ||
-                  companySettings?.subscription_plan) === '6_MONTHS'
+                {isTrialActive
+                  ? '30-Day Free Trial'
+                  : (subscriptionInfo.subscriptionPlan ||
+                      formData.subscription_plan ||
+                      companySettings?.subscriptionPlan ||
+                      companySettings?.subscription_plan) === '6_MONTHS'
                   ? '6 Months'
                   : 'Yearly'}
               </span>
@@ -1254,6 +1302,13 @@ setFormErrors(errors);
                   ).toUpperCase();
                   const isExp = statusUpper === 'EXPIRED';
                   const isSusp = statusUpper === 'SUSPENDED';
+                  const statusBadgeText = isExp
+                    ? 'EXPIRED'
+                    : isSusp
+                    ? 'SUSPENDED'
+                    : isTrialActive
+                    ? 'FREE TRIAL'
+                    : statusUpper;
                   return (
                     <span
                       className={`inline-flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1 rounded-xl border ${
@@ -1261,15 +1316,23 @@ setFormErrors(errors);
                           ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
                           : isSusp
                           ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
+                          : isTrialActive
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60'
                           : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
                       }`}
                     >
                       <span
                         className={`w-2 h-2 rounded-full ${
-                          isExp ? 'bg-amber-500' : isSusp ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'
+                          isExp
+                            ? 'bg-amber-500'
+                            : isSusp
+                            ? 'bg-rose-500'
+                            : isTrialActive
+                            ? 'bg-indigo-500 animate-pulse'
+                            : 'bg-emerald-500 animate-pulse'
                         }`}
                       />
-                      <span>{statusUpper}</span>
+                      <span>{statusBadgeText}</span>
                     </span>
                   );
                 })()}
@@ -1280,7 +1343,7 @@ setFormErrors(errors);
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Renew Subscription</span>
+                  <span>{isTrialActive ? 'Upgrade / Extend' : 'Renew Subscription'}</span>
                 </button>
               </div>
             </div>
@@ -1308,6 +1371,34 @@ setFormErrors(errors);
               </div>
             )}
 
+            {isTrialActive && String(subscriptionInfo.subscriptionStatus || formData.subscription_status || '').toUpperCase() !== 'EXPIRED' && (
+              <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-indigo-50/90 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-indigo-950/40 border border-indigo-200/90 dark:border-indigo-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-2">
+                      <span>Active 30-Day Free Trial</span>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                        {subscriptionInfo.daysRemaining} days left
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-indigo-700 dark:text-indigo-300/90 mt-0.5">
+                      Your store has full access to all retail shoe POS, inventory, barcode, and reporting features during your free trial. You can request a 6-month or yearly plan extension at any time.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenRenewModal}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shrink-0 cursor-pointer shadow-xs transition"
+                >
+                  Upgrade / Extend Plan
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Subscription Plan */}
               <div>
@@ -1316,15 +1407,26 @@ setFormErrors(errors);
                 </label>
                 <div className="h-11 px-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {(subscriptionInfo.subscriptionPlan || formData.subscription_plan) === '6_MONTHS'
+                    {isTrialActive
+                      ? '30-Day Free Trial'
+                      : (subscriptionInfo.subscriptionPlan || formData.subscription_plan) === '6_MONTHS'
                       ? '6 Months Plan'
                       : 'Yearly Plan (1 Year)'}
                   </span>
-                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300">
-                    {subscriptionInfo.subscriptionPlan || formData.subscription_plan || 'YEARLY'}
+                  <span
+                    className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      isTrialActive
+                        ? 'bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300'
+                        : 'bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300'
+                    }`}
+                  >
+                    {isTrialActive
+                      ? 'FREE_TRIAL'
+                      : (subscriptionInfo.subscriptionPlan || formData.subscription_plan || 'YEARLY')}
                   </span>
                 </div>
               </div>
+
 
               {/* Subscription Expiry & Days Remaining */}
               <div>
@@ -1955,7 +2057,7 @@ setFormErrors(errors);
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>Wholesale Minimum Selling Quantity</span>
+                        <span>Globally Allow Half-Carton Selling (0.5 Carton)</span>
                         {!isPlatformOwner && (
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800/60 flex items-center gap-1">
                             <Lock className="w-3 h-3 text-amber-500" />
@@ -1965,8 +2067,8 @@ setFormErrors(errors);
                       </h4>
                       <p className="text-xs text-slate-500 dark:text-purple-200/80">
                         {isPlatformOwner
-                          ? 'Configure whether this wholesale store allows selling in half-cartons or enforces full cartons:'
-                          : 'Root Store Configuration: Only the Platform Owner (SuperAdmin) can change carton quantity rules.'}
+                          ? 'If disabled globally, you can still enable or override this option individually at the product level.'
+                          : 'Root Store Configuration: Only the Platform Owner (SuperAdmin) can change carton quantity rules. If disabled globally, you can still enable or override this option individually at the product level.'}
                       </p>
                     </div>
                   </div>
@@ -2003,13 +2105,13 @@ setFormErrors(errors);
                     />
                     <div className="text-xs min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white">0.5 Carton (Half Carton)</span>
+                        <span className="font-bold text-slate-900 dark:text-white">Globally Allow Half-Carton Selling (0.5 Carton)</span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-semibold font-mono">
                           Flexible
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">
-                        Allow customers to order in 0.5 carton increments (e.g. 6 pairs for 12-pair carton, 8 pairs for 16-pair carton).
+                        If disabled globally, you can still enable or override this option individually at the product level.
                       </span>
                     </div>
                   </label>
@@ -3241,10 +3343,14 @@ setFormErrors(errors);
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                     {String(subscriptionInfo.subscriptionStatus || '').toUpperCase() === 'EXPIRED'
                       ? 'Subscription Expired — Renew Store License'
+                      : isTrialActive
+                      ? 'Free Trial — Upgrade / Extend Store License'
                       : 'Renew Store Subscription'}
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Request a subscription extension from the Platform SuperAdmin
+                    {isTrialActive
+                      ? 'Request a plan extension or upgrade from the Platform SuperAdmin'
+                      : 'Request a subscription extension from the Platform SuperAdmin'}
                   </p>
                 </div>
               </div>
@@ -3278,7 +3384,11 @@ setFormErrors(errors);
                     Current Plan
                   </span>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {subscriptionInfo.subscriptionPlan === '6_MONTHS' ? '6 Months Plan' : 'Yearly Plan'}
+                    {isTrialActive
+                      ? '30-Day Free Trial'
+                      : subscriptionInfo.subscriptionPlan === '6_MONTHS'
+                      ? '6 Months Plan'
+                      : 'Yearly Plan (1 Year)'}
                   </span>
                 </div>
                 <div>
@@ -3286,7 +3396,9 @@ setFormErrors(errors);
                     Current Status &amp; Expiry
                   </span>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {subscriptionInfo.subscriptionStatus} • {subscriptionInfo.daysRemaining}d left
+                    {isTrialActive && subscriptionInfo.subscriptionStatus === 'ACTIVE'
+                      ? `Active Trial • ${subscriptionInfo.daysRemaining}d left`
+                      : `${subscriptionInfo.subscriptionStatus} • ${subscriptionInfo.daysRemaining}d left`}
                   </span>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
+  ArrowLeft,
   Loader2,
   X,
   AlertCircle,
@@ -19,7 +20,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
-import { toTitleCaseLive, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber } from '../../utils/textFormat.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
 
 interface FreeTrialOnboardingModalProps {
@@ -603,13 +604,29 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                     >
                       Phone / WhatsApp Number <span className="text-purple-500">*</span>
                     </label>
-                    <span
-                      className={`text-[11px] font-mono ${
-                        isDark ? 'text-slate-400' : 'text-slate-500'
-                      }`}
-                    >
-                      7 to 15 digits
-                    </span>
+                    {phone ? (
+                      <span className="text-[11px] font-mono">
+                        {isPhoneValid ? (
+                          <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                            <Check className="w-3 h-3 stroke-[3]" /> Valid ({phoneDigits.length} digits)
+                          </span>
+                        ) : (
+                          <span className="text-rose-500 font-medium">
+                            {phoneDigits.length < 7
+                              ? `Need min 7 digits (${phoneDigits.length}/7)`
+                              : 'Exceeds 15 digits'}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-[11px] font-mono ${
+                          isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}
+                      >
+                        7 to 15 digits
+                      </span>
+                    )}
                   </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -622,11 +639,15 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       required
                       value={phone}
                       onChange={(e) => {
-                        setPhone(e.target.value);
+                        const formatted = formatPhoneNumber(e.target.value, phone);
+                        setPhone(formatted);
+                        if (!touched.phone) {
+                          setTouched((prev) => ({ ...prev, phone: true }));
+                        }
                         if (errorMessage) setErrorMessage(null);
                       }}
                       onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-                      placeholder="e.g. +92 300 1234567 or 03001234567"
+                      placeholder="e.g. +92-300-1234567"
                       disabled={isLoading}
                       className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
                         isDark
@@ -658,7 +679,17 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                   {touched.phone && !isPhoneValid && (
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>Please enter a valid phone number (at least 7 digits, no letters).</span>
+                      <span>
+                        {phoneDigits.length < 7
+                          ? `Please enter at least 7 digits (e.g. +92-300-1234567). Current: ${phoneDigits.length} digits.`
+                          : 'Phone number cannot exceed 15 digits.'}
+                      </span>
+                    </div>
+                  )}
+                  {touched.phone && isPhoneValid && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Phone format verified ({phoneDigits.length} digits). Hyphens added automatically.</span>
                     </div>
                   )}
                 </div>
@@ -824,44 +855,53 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                   </div>
                 </div>
               </div>
+
+              {/* Trust Badges / Bullet Info repositioned inside modal body at the bottom */}
+              <div
+                className={`flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 py-2.5 px-3 rounded-xl border text-[11px] sm:text-xs transition-colors ${
+                  isDark
+                    ? 'bg-purple-950/20 border-purple-900/40 text-slate-300'
+                    : 'bg-purple-50/50 border-purple-200/60 text-slate-600'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  30 Days Free
+                </span>
+                <span className={isDark ? 'text-purple-800' : 'text-purple-300'}>•</span>
+                <span className="inline-flex items-center gap-1 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  No Credit Card
+                </span>
+                <span className={isDark ? 'text-purple-800' : 'text-purple-300'}>•</span>
+                <span className="inline-flex items-center gap-1 font-medium">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[2.5]" />
+                  Instant Launch
+                </span>
+              </div>
             </div>
 
-            {/* MODAL FOOTER ACTION BAR - Full Dark Mode Support */}
+            {/* MODAL FOOTER ACTION BAR - Aligned with ProductFormModal */}
             <div
-              className={`px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 transition-colors duration-200 ${
+              className={`px-6 py-4 border-t flex items-center justify-between gap-3 transition-colors duration-200 ${
                 isDark
                   ? 'bg-[#0B1020] border-purple-900/60'
                   : 'bg-slate-50 border-slate-200'
               }`}
             >
-              <div
-                className={`flex items-center gap-3 text-[11px] ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}
-              >
-                <span className="inline-flex items-center gap-1 text-purple-400 font-semibold">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  30 Days Free
-                </span>
-                <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>•</span>
-                <span>No Credit Card</span>
-                <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>•</span>
-                <span>Instant Launch</span>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  className={`px-4 py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
-                    isDark
-                      ? 'border-purple-900/70 bg-[#151E33] hover:bg-[#1A253F] text-purple-200 hover:text-white'
-                      : 'border-slate-300 hover:bg-slate-100 text-slate-700'
-                  }`}
+                  className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs font-bold"
                 >
-                  Cancel
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
                 </button>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="submit"
                   disabled={isLoading || (touched.email && emailAvailable === false)}

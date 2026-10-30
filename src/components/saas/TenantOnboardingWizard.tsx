@@ -1112,10 +1112,10 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                               {/* Minimum Selling Quantity (0.5 or 1 Carton) */}
                               <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                                  Wholesale Minimum Selling Quantity *
+                                  Globally Allow Half-Carton Selling (0.5 Carton)
                                 </label>
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  Configure whether your wholesale store allows selling in half-cartons or enforces full cartons:
+                                  If disabled globally, you can still enable or override this option individually at the product level.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                                   <label
@@ -1135,11 +1135,11 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                     />
                                     <div className="text-xs">
                                       <span className="font-bold text-slate-900 dark:text-white block flex items-center gap-1.5">
-                                        <span>0.5 Carton (Half Carton)</span>
+                                        <span>Globally Allow Half-Carton Selling (0.5 Carton)</span>
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-mono">Flexible</span>
                                       </span>
                                       <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                                        Allow orders in 0.5 carton increments (e.g. 6 or 8 pairs minimum)
+                                        If disabled globally, you can still enable or override this option individually at the product level.
                                       </span>
                                     </div>
                                   </label>

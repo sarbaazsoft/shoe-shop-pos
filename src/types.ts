@@ -214,12 +214,49 @@ export interface CompanySettings {
   updatedAt: string;
 }
 
+export interface Brand {
+  id?: number;
+  name: string;
+  logo?: string;
+  prefix?: string;
+}
+
+export type AiConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface AiBrandSuggestion {
+  suggestedName: string;
+  matchedName?: string | null;
+  matchedId?: number | null;
+  isExisting?: boolean;
+  isUnknown?: boolean;
+  confidence?: AiConfidenceLevel;
+}
+
+export interface AiCategorySuggestion {
+  suggestedName: string;
+  matchedName?: string | null;
+  matchedId?: number | null;
+  isExisting?: boolean;
+  confidence?: AiConfidenceLevel;
+}
+
+export interface AiProductSuggestionResult {
+  title: string;
+  category: AiCategorySuggestion;
+  brand: AiBrandSuggestion;
+  confidence: AiConfidenceLevel;
+  shoeType?: string;
+  isFootwear?: boolean;
+  visualClues?: string[];
+}
+
 export interface Category {
   id?: number;
   name: string;
   productCount?: number;
   totalUnits?: number;
 }
+
 
 export interface Product {
   id: number;

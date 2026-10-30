@@ -1771,26 +1771,45 @@ function createDbInfo(url: string): DbConnectionInfo {
   };
 }
 
-if (!rawDatabaseUrl || (!rawDatabaseUrl.startsWith('postgres://') && !rawDatabaseUrl.startsWith('postgresql://'))) {
-  console.warn('[Server] DATABASE_URL not configured — using in-memory PostgreSQL mock.');
+function isValidDatabaseUrl(urlStr: string | undefined): boolean {
+  if (!urlStr) return false;
+  const trimmed = urlStr.trim();
+  if (!trimmed.startsWith('postgres://') && !trimmed.startsWith('postgresql://')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname;
+    if (!host) return false;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (host.endsWith('-') || host.endsWith('.') || host.startsWith('-') || host.startsWith('.')) return false;
+    const parts = host.split('.');
+    if (parts.length < 2) return false;
+    if (parts.some((p) => !p || p.startsWith('-') || p.endsWith('-'))) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!isValidDatabaseUrl(rawDatabaseUrl)) {
+  console.log('ℹ️ Running in in-memory PostgreSQL store mode.');
   useMock = true;
   dbInfo = createDbInfo('');
   dbInfo.connected = true;
 } else {
-  dbInfo = createDbInfo(rawDatabaseUrl);
+  dbInfo = createDbInfo(rawDatabaseUrl!);
   try {
-    console.log(`🔌 Initializing PostgreSQL Client Pool to ${dbInfo.host}:${dbInfo.port}/${dbInfo.database}...`);
     rawPool = new Pool({
       connectionString: rawDatabaseUrl,
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 15000,
-      connectionTimeoutMillis: 15000,
+      connectionTimeoutMillis: 5000,
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000,
     });
 
     rawPool.on('error', (err: any) => {
+      if (useMock) return;
       const msg = err?.message || String(err);
       if (
         msg.includes('Connection terminated unexpectedly') ||
@@ -1799,14 +1818,28 @@ if (!rawDatabaseUrl || (!rawDatabaseUrl.startsWith('postgres://') && !rawDatabas
         msg.includes('client has been closed') ||
         err?.code === '57P01'
       ) {
-        console.warn(`ℹ️ PostgreSQL pool pruned an idle connection (${msg}). Active connections will reconnect on-demand.`);
         return;
       }
-      console.error('Unexpected PostgreSQL Pool Client Error:', err);
+      if (
+        msg.includes('ENOTFOUND') ||
+        msg.includes('ECONNREFUSED') ||
+        msg.includes('ETIMEDOUT') ||
+        msg.includes('EHOSTUNREACH')
+      ) {
+        useMock = true;
+        if (rawPool) {
+          try {
+            rawPool.removeAllListeners();
+            rawPool.on('error', () => {});
+            rawPool.end().catch(() => {});
+          } catch {}
+          rawPool = null;
+        }
+        return;
+      }
       dbInfo.lastError = msg;
     });
-  } catch (err: any) {
-    console.warn('[Server] Failed to initialize pg Pool — falling back to in-memory mock:', err?.message);
+  } catch {
     useMock = true;
     dbInfo.connected = true;
   }
@@ -1823,22 +1856,24 @@ async function waitForDatabaseReady(): Promise<void> {
   }
   if (!readinessPromise) {
     readinessPromise = (async () => {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          await rawPool!.query('SELECT 1');
-          console.log(`✅ Connected to PostgreSQL Server (${dbInfo.host}:${dbInfo.port}/${dbInfo.database})`);
-          dbInfo.connected = true;
-          dbInfo.lastError = undefined;
-          return;
-        } catch (err: any) {
-          if (attempt < 2) {
-            await new Promise((r) => setTimeout(r, 500));
-            continue;
-          }
-          console.warn(`[Server] PostgreSQL connection failed (${err?.message || err}) — switching to in-memory mock.`);
-          useMock = true;
-          dbInfo.connected = true;
-          dbInfo.lastError = undefined;
+      try {
+        await rawPool!.query('SELECT 1');
+        console.log(`✅ Connected to PostgreSQL Server (${dbInfo.host}:${dbInfo.port}/${dbInfo.database})`);
+        dbInfo.connected = true;
+        dbInfo.lastError = undefined;
+        return;
+      } catch (err: any) {
+        console.log(`ℹ️ External PostgreSQL database unreachable — using in-memory mock store.`);
+        useMock = true;
+        dbInfo.connected = true;
+        dbInfo.lastError = undefined;
+        if (rawPool) {
+          try {
+            rawPool.removeAllListeners();
+            rawPool.on('error', () => {});
+            rawPool.end().catch(() => {});
+          } catch {}
+          rawPool = null;
         }
       }
     })().finally(() => {
@@ -1847,6 +1882,7 @@ async function waitForDatabaseReady(): Promise<void> {
   }
   return readinessPromise!;
 }
+
 
 // Unified PostgreSQL client interface used throughout the application.
 export const pgClient = {

@@ -4591,10 +4591,10 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                     {/* Minimum Selling Quantity (0.5 or 1 Carton) */}
                     <div className="p-3.5 rounded-xl bg-gray-50/80 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 space-y-2">
                       <label className="block text-xs font-bold text-gray-800 dark:text-slate-200">
-                        Minimum Selling Quantity <span className="text-red-500 dark:text-pink-400">*</span>
+                        Globally Allow Half-Carton Selling (0.5 Carton)
                       </label>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Select whether this wholesale store can sell in half-cartons or full cartons:
+                        If disabled globally, you can still enable or override this option individually at the product level.
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                         <label
@@ -4614,11 +4614,11 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           />
                           <div className="text-xs">
                             <span className="font-bold text-slate-900 dark:text-white block flex items-center gap-1.5">
-                              <span>0.5 Carton (Half Carton)</span>
+                              <span>Globally Allow Half-Carton Selling (0.5 Carton)</span>
                               <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-mono">Flexible</span>
                             </span>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                              Allow sales in 0.5 carton increments (e.g. 6 or 8 pairs minimum)
+                              If disabled globally, you can still enable or override this option individually at the product level.
                             </span>
                           </div>
                         </label>

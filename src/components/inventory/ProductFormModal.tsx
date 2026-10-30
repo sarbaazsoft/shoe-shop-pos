@@ -4,6 +4,7 @@ import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, A
 import { api } from '../../services/api.ts';
 import { SideEndBoxLabelModal } from './SideEndBoxLabelModal.tsx';
 import { BarcodeStickerModal } from './BarcodeStickerModal.tsx';
+
 import { generateCode128Barcode, analyzeBarcode } from '../../utils/barcode.ts';
 import { parseBrandPrefix, parseCategoryPrefix, generateSuggestedArticle, STANDARD_FOOTWEAR_CATEGORIES, normalizeFootwearCategory } from '../../utils/footwear.ts';
 import { BarcodeSvg } from '../common/BarcodeSvg.tsx';
@@ -183,6 +184,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setIsAiAnalyzing(false);
     }
   };
+
 
   const handleProductImageUpload = (file?: File) => {
     if (!file) return;
@@ -1420,6 +1422,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   )}
                 </section>
               )}
+
+
 
               <div className="bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 p-5 rounded-2xl border border-gray-200 dark:border-[#1A263D] shadow-xs dark:shadow-[0_0_20px_rgba(59,130,246,0.05)] space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">

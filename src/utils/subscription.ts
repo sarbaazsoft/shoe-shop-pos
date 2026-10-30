@@ -124,20 +124,68 @@ export const normalizeSubscriptionPlan = (raw?: string | null): 'free_tier' | '6
 };
 
 /**
+ * Helper to determine if a given plan or subscription type is a Free Trial
+ */
+export function isFreeTrial(
+  plan?: SubscriptionPlan | SubscriptionType | string | null
+): boolean {
+  if (!plan) return true;
+  const clean = String(plan).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return (
+    clean === 'free_tier' ||
+    clean === 'freetier' ||
+    clean === 'free' ||
+    clean === 'trial' ||
+    clean === 'free_trial' ||
+    clean === '30_day_trial' ||
+    clean === '30_days' ||
+    clean === 'pro_trial' ||
+    clean.includes('trial') ||
+    clean.includes('free')
+  );
+}
+
+/**
  * Returns a human-friendly label for a subscription plan or type.
  */
 export function getSubscriptionLabel(
   plan?: SubscriptionPlan | SubscriptionType | string | null
 ): string {
+  if (isFreeTrial(plan)) {
+    return '30-Day Free Trial';
+  }
   const normalized = normalizeSubscriptionType(plan);
   switch (normalized) {
     case 'free_tier':
-      return '30-Day Free Tier';
+      return '30-Day Free Trial';
     case '6_months':
       return '6 Months Plan';
     case '1_year':
       return 'Yearly Plan (1 Year)';
     default:
-      return '30-Day Free Tier';
+      return '30-Day Free Trial';
   }
 }
+
+/**
+ * Returns a concise label for badge/chip displays (e.g. '30-Day Free Trial', '6 Months', 'Yearly').
+ */
+export function getSubscriptionShortLabel(
+  plan?: SubscriptionPlan | SubscriptionType | string | null
+): string {
+  if (isFreeTrial(plan)) {
+    return '30-Day Free Trial';
+  }
+  const normalized = normalizeSubscriptionType(plan);
+  switch (normalized) {
+    case 'free_tier':
+      return 'Free Trial';
+    case '6_months':
+      return '6 Months';
+    case '1_year':
+      return 'Yearly';
+    default:
+      return 'Free Trial';
+  }
+}
+
