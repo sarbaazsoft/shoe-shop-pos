@@ -1,0 +1,6 @@
+{
+  "name": "SarbaazSoft Shoe POS",
+  "description": "Multi-tenant retail shoe shop POS and inventory management system with offline sync, barcode label printing, and multi-store support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

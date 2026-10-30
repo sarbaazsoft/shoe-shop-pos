@@ -1,0 +1,53 @@
+[build]
+  command = "npm run build:netlify"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["pg", "bcryptjs", "jsonwebtoken"]
+
+# Route all /api/* requests to the Express serverless function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/api/:splat"
+  status = 200
+  force = true
+
+# NOTE: /sw.js and /admin/manifest.webmanifest are static files produced by the build.
+# They must NOT be redirected (that previously replaced the real service worker with a 404/kill-switch).
+
+# React SPA Fallback (/admin, /install, /login, /app, etc.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ---- PWA / Android install headers ----
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/*.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/admin/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*.apk"
+  [headers.values]
+    Content-Type = "application/vnd.android.package-archive"
+    Content-Disposition = "attachment; filename=\"SarbaazSoft-POS.apk\""
