@@ -355,6 +355,16 @@ export const Header: React.FC<HeaderProps> = ({
     actionLabel?: string;
   } | null>(null);
 
+  const currentRole = String(currentUser?.role || '').trim().toUpperCase();
+  const isSuperAdminUser = currentRole === 'SUPERADMIN';
+  const isAdminUser = currentRole === 'ADMIN';
+  const isCashierUser = currentRole === 'CASHIER';
+
+  const currentRoleRef = useRef(currentRole);
+  useEffect(() => {
+    currentRoleRef.current = currentRole;
+  }, [currentRole]);
+
   // Check push subscription on mount and setup real-time SSE stream
   useEffect(() => {
     if (isWebPushSupported()) {
@@ -367,8 +377,52 @@ export const Header: React.FC<HeaderProps> = ({
         });
     }
 
-    // Connect to real-time event stream for active sessions
+    // Connect to real-time event stream for active sessions with strict role isolation
     const cleanupStream = connectRealtimeNotificationStream((payload) => {
+      const userRole = currentRoleRef.current;
+      const targetRole = payload.targetRole ? String(payload.targetRole).toUpperCase() : undefined;
+      const targetRoles = Array.isArray(payload.targetRoles) ? payload.targetRoles.map((r: string) => r.toUpperCase()) : undefined;
+
+      // 1. Role isolation guards:
+      if (userRole === 'SUPERADMIN') {
+        // SuperAdmin NEVER receives store POS events (SALE, RETURN, EXCHANGE, PURCHASE, STOCK)
+        if (['SALE', 'RETURN', 'EXCHANGE', 'PURCHASE', 'STOCK'].includes(payload.type)) {
+          return;
+        }
+        if (targetRole && !['ALL', 'SUPERADMIN'].includes(targetRole)) {
+          return;
+        }
+        const titleLower = (payload.title || '').toLowerCase();
+        const msgLower = (payload.message || '').toLowerCase();
+        if (titleLower.includes('welcome') || msgLower.includes('welcome to sarbaazsoft')) {
+          return;
+        }
+      } else if (userRole === 'CASHIER') {
+        // Cashiers never receive store owner management alerts (PURCHASE, STOCK, SUPPLIER) or welcome messages
+        if (['PURCHASE', 'STOCK', 'SUPPLIER'].includes(payload.type)) {
+          return;
+        }
+        if (targetRole && !['ALL', 'CASHIER'].includes(targetRole)) {
+          return;
+        }
+        if (targetRoles && !targetRoles.includes('CASHIER')) {
+          return;
+        }
+        const titleLower = (payload.title || '').toLowerCase();
+        const msgLower = (payload.message || '').toLowerCase();
+        if (titleLower.includes('welcome') || msgLower.includes('welcome to sarbaazsoft')) {
+          return;
+        }
+      } else if (userRole === 'ADMIN') {
+        // Store Owners never receive CASHIER-only or SUPERADMIN-only alerts
+        if (targetRole && !['ALL', 'ADMIN'].includes(targetRole)) {
+          return;
+        }
+        if (targetRoles && !targetRoles.includes('ADMIN')) {
+          return;
+        }
+      }
+
       fetchLiveNotifications();
       // Display instant floating notification toast
       setLivePushToast({
@@ -380,6 +434,8 @@ export const Header: React.FC<HeaderProps> = ({
         returnNumber: payload.returnNumber,
         totalAmount: payload.totalAmount,
         deepLinkUrl: payload.deepLinkUrl,
+        actionUrl: payload.actionUrl,
+        actionLabel: payload.actionLabel,
       });
 
       // Automatically dismiss after 9 seconds
@@ -579,12 +635,39 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const unreadPosCount = notifications.filter((n) => !readNotifIds.includes(n.id)).length;
-  const unreadAnnouncementsCount = platformAnnouncements.filter((a) => !a.isRead).length;
-  const unreadCount = unreadPosCount + unreadAnnouncementsCount;
-  const activeUrgentNotice = platformAnnouncements.find((a) => !a.isRead && a.type === 'URGENT');
+  const visibleAnnouncements = useMemo(() => {
+    return platformAnnouncements.filter((a) => {
+      const aTargetRole = (a.targetRole || 'ALL').toUpperCase();
+      const titleLower = (a.title || '').toLowerCase();
+      const msgLower = (a.message || '').toLowerCase();
+      const isWelcome =
+        titleLower.includes('welcome') ||
+        msgLower.includes('welcome to sarbaazsoft') ||
+        msgLower.includes('thank you for choosing sarbaazsoft');
 
-  // Unified Notifications list combining Notices and Store Activity in a single column
+      if (isSuperAdminUser) {
+        // SuperAdmin should never see store-targeted notices or store owner welcome messages
+        if (isWelcome) return false;
+        if (a.tenantId !== null && a.tenantId !== undefined && a.tenantId > 0) return false;
+        if (aTargetRole !== 'ALL' && aTargetRole !== 'SUPERADMIN') return false;
+      } else if (isCashierUser) {
+        // Cashiers never receive store owner welcome messages or ADMIN-targeted notices
+        if (isWelcome) return false;
+        if (aTargetRole !== 'ALL' && aTargetRole !== 'CASHIER') return false;
+      } else if (isAdminUser) {
+        // Store Owners never receive CASHIER-only or SUPERADMIN-only notices
+        if (aTargetRole !== 'ALL' && aTargetRole !== 'ADMIN') return false;
+      }
+      return true;
+    });
+  }, [platformAnnouncements, isSuperAdminUser, isCashierUser, isAdminUser]);
+
+  const unreadPosCount = notifications.filter((n) => !readNotifIds.includes(n.id)).length;
+  const unreadAnnouncementsCount = visibleAnnouncements.filter((a) => !a.isRead).length;
+  const unreadCount = unreadPosCount + unreadAnnouncementsCount;
+  const activeUrgentNotice = visibleAnnouncements.find((a) => !a.isRead && a.type === 'URGENT');
+
+  // Unified Notifications list combining Notices and Store Activity in a single column with strict role isolation
   const unifiedNotifications = useMemo(() => {
     const parseTime = (val: any) => {
       if (!val) return 0;
@@ -592,7 +675,7 @@ export const Header: React.FC<HeaderProps> = ({
       return isNaN(t) ? 0 : t;
     };
 
-    const announcementItems = platformAnnouncements.map((a) => ({
+    const announcementItems = visibleAnnouncements.map((a) => ({
       kind: 'ANNOUNCEMENT' as const,
       id: `notice-${a.id}`,
       rawId: a.id,
@@ -608,7 +691,19 @@ export const Header: React.FC<HeaderProps> = ({
       raw: a,
     }));
 
-    const activityItems = notifications.map((n) => {
+    // Strict role isolation for activity feed
+    let filteredNotifications = notifications;
+    if (isSuperAdminUser) {
+      filteredNotifications = [];
+    } else if (isCashierUser) {
+      // Cashiers only receive their counter POS checkout activities, never store owner administrative alerts
+      filteredNotifications = notifications.filter((n) => {
+        const typeUpper = (n.type || '').toUpperCase();
+        return !['PURCHASE', 'STOCK', 'LOW_STOCK', 'SUPPLIER'].includes(typeUpper);
+      });
+    }
+
+    const activityItems = filteredNotifications.map((n) => {
       const isRead = readNotifIds.includes(n.id);
       const ts = n.timestamp || n.created_at || n.sale_date;
       return {
@@ -635,7 +730,7 @@ export const Header: React.FC<HeaderProps> = ({
       if (aUrgent !== bUrgent) return bUrgent - aUrgent;
       return b.timestamp - a.timestamp;
     });
-  }, [platformAnnouncements, notifications, readNotifIds]);
+  }, [visibleAnnouncements, notifications, readNotifIds, isSuperAdminUser, isCashierUser]);
 
   const handleActivityClick = (item: any) => {
     const raw = item.raw || item;

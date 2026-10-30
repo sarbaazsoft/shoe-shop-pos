@@ -61,33 +61,43 @@ export function getVapidPublicKey(): string {
   return vapidPublicKey;
 }
 
-// Active SSE client connections keyed by tenant_id for real-time dashboard session push
-const sseClientsByTenant = new Map<number, Set<Response>>();
+// Active SSE client connections with user ID, tenant ID and role metadata for role isolation
+export interface SseClientRecord {
+  res: Response;
+  tenantId: number;
+  userId: number;
+  role: string; // 'SUPERADMIN' | 'ADMIN' | 'CASHIER'
+}
 
-export function registerSseClient(tenantId: number, res: Response): () => void {
-  const cleanTenantId = Number(tenantId) || 1;
-  let clientSet = sseClientsByTenant.get(cleanTenantId);
-  if (!clientSet) {
-    clientSet = new Set<Response>();
-    sseClientsByTenant.set(cleanTenantId, clientSet);
-  }
-  clientSet.add(res);
+const sseClients = new Set<SseClientRecord>();
+
+export function registerSseClient(
+  tenantId: number,
+  userId: number,
+  role: string,
+  res: Response
+): () => void {
+  const cleanTenantId = Number(tenantId) || 0;
+  const cleanUserId = Number(userId) || 0;
+  const cleanRole = String(role || (cleanTenantId === 0 ? 'SUPERADMIN' : 'CASHIER')).trim().toUpperCase();
+
+  const client: SseClientRecord = {
+    res,
+    tenantId: cleanTenantId,
+    userId: cleanUserId,
+    role: cleanRole,
+  };
+  sseClients.add(client);
 
   const cleanup = () => {
-    const set = sseClientsByTenant.get(cleanTenantId);
-    if (set) {
-      set.delete(res);
-      if (set.size === 0) {
-        sseClientsByTenant.delete(cleanTenantId);
-      }
-    }
+    sseClients.delete(client);
   };
 
   return cleanup;
 }
 
 export interface PosActionNotification {
-  type: 'SALE' | 'RETURN' | 'EXCHANGE';
+  type: 'SALE' | 'RETURN' | 'EXCHANGE' | 'STOCK' | 'PURCHASE';
   title: string;
   message: string;
   invoiceNumber: string;
@@ -100,6 +110,7 @@ export interface PosActionNotification {
   netDifference?: number;
   customerName?: string;
   cashierName?: string;
+  cashierId?: number;
   itemsSummary?: string;
   exchangeDetails?: {
     oldItems: string;
@@ -109,14 +120,16 @@ export interface PosActionNotification {
   deepLinkUrl: string;
   timestamp: string;
   triggeredBy?: string;
+  targetRoles?: ('ADMIN' | 'CASHIER')[];
 }
 
 /**
- * Saves a browser or PWA Web Push subscription scoped to tenant and user.
+ * Saves a browser or PWA Web Push subscription scoped to tenant, user, and role.
  */
 export async function savePushSubscription(
   tenantId: number,
   userId: number,
+  userRole: string,
   subscription: {
     endpoint: string;
     keys?: {
@@ -131,6 +144,7 @@ export async function savePushSubscription(
     const endpoint = String(subscription?.endpoint || '').trim();
     const p256dh = String(subscription?.keys?.p256dh || '').trim();
     const auth = String(subscription?.keys?.auth || '').trim();
+    const cleanRole = String(userRole || (tenantId === 0 ? 'SUPERADMIN' : 'CASHIER')).trim().toUpperCase();
 
     if (!endpoint || !p256dh || !auth) {
       return false;
@@ -138,16 +152,17 @@ export async function savePushSubscription(
 
     await pgClient.query(
       `INSERT INTO public.push_subscriptions (
-        tenant_id, user_id, endpoint, p256dh, auth, user_agent, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        tenant_id, user_id, user_role, endpoint, p256dh, auth, user_agent, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       ON CONFLICT (endpoint) DO UPDATE SET
         tenant_id = EXCLUDED.tenant_id,
         user_id = EXCLUDED.user_id,
+        user_role = EXCLUDED.user_role,
         p256dh = EXCLUDED.p256dh,
         auth = EXCLUDED.auth,
         user_agent = EXCLUDED.user_agent,
         updated_at = NOW()`,
-      [tenantId, userId, endpoint, p256dh, auth, userAgent]
+      [tenantId, userId, cleanRole, endpoint, p256dh, auth, userAgent]
     );
 
     return true;
@@ -176,38 +191,30 @@ export async function removePushSubscription(endpoint: string): Promise<boolean>
 
 /**
  * Dispatches instant real-time notifications to:
- * 1. Active Web browser sessions via Server-Sent Events (SSE)
- * 2. Mobile Android/Apple installed PWAs and background web sessions via Web Push API
+ * 1. Active Web browser sessions via Server-Sent Events (SSE) with strict role isolation
+ * 2. Mobile Android/Apple installed PWAs and background web sessions via Web Push API with role filtering
  */
 export async function notifyPosAction(
   tenantId: number,
   payload: PosActionNotification
 ): Promise<void> {
   const cleanTenantId = Number(tenantId) || 1;
+  const allowedRoles = payload.targetRoles || ['ADMIN', 'CASHIER'];
 
   // 1. Deliver to active browser dashboard sessions via Server-Sent Events (SSE)
-  const clientSet = sseClientsByTenant.get(cleanTenantId);
-  if (clientSet && clientSet.size > 0) {
-    const sseMessage = `event: pos_action\ndata: ${JSON.stringify(payload)}\n\n`;
-    for (const clientRes of clientSet) {
+  // CRITICAL: SuperAdmin NEVER receives store POS notifications (prevent cross-role leakage).
+  // Only deliver to matching tenant store sessions with permitted roles (ADMIN and/or CASHIER).
+  const sseMessage = `event: pos_action\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    if (
+      client.tenantId === cleanTenantId &&
+      client.role !== 'SUPERADMIN' &&
+      allowedRoles.includes(client.role as any)
+    ) {
       try {
-        clientRes.write(sseMessage);
-      } catch (writeErr) {
-        // Closed socket, remove
-        clientSet.delete(clientRes);
-      }
-    }
-  }
-
-  // Also notify SuperAdmin dashboard if connected
-  const superAdminSet = sseClientsByTenant.get(0);
-  if (superAdminSet && superAdminSet.size > 0 && cleanTenantId !== 0) {
-    const sseMessage = `event: pos_action\ndata: ${JSON.stringify({ ...payload, storeTenantId: cleanTenantId })}\n\n`;
-    for (const clientRes of superAdminSet) {
-      try {
-        clientRes.write(sseMessage);
+        client.res.write(sseMessage);
       } catch {
-        superAdminSet.delete(clientRes);
+        sseClients.delete(client);
       }
     }
   }
@@ -226,8 +233,10 @@ export async function notifyPosAction(
     }>(
       `SELECT endpoint, p256dh, auth
        FROM public.push_subscriptions
-       WHERE tenant_id = $1 OR tenant_id = 0`,
-      [cleanTenantId]
+       WHERE tenant_id = $1
+         AND UPPER(user_role) = ANY($2)
+         AND tenant_id != 0`,
+      [cleanTenantId, allowedRoles]
     );
 
     if (subsRes.rows.length === 0) {
@@ -269,8 +278,6 @@ export async function notifyPosAction(
           urgency: 'high',
         });
       } catch (pushErr: any) {
-        // Prune expired or invalid subscriptions (404 Not Found or 410 Gone)
-        // 401/403 = subscription was created with a different VAPID key (e.g. keys regenerated); it can never work again.
         const code = pushErr?.statusCode;
         if (code === 404 || code === 410 || code === 401 || code === 403) {
           await removePushSubscription(row.endpoint).catch(() => {});
@@ -289,6 +296,7 @@ export async function notifyPosAction(
 export interface PlatformAnnouncementNotification {
   id?: number;
   tenantId?: number | null;
+  targetRole?: 'ALL' | 'ADMIN' | 'CASHIER' | 'SUPERADMIN';
   title: string;
   message: string;
   type?: 'INFO' | 'WARNING' | 'SUCCESS' | 'URGENT' | string;
@@ -299,13 +307,14 @@ export interface PlatformAnnouncementNotification {
 
 /**
  * Dispatches a custom announcement from SuperAdmin to all stores (global broadcast)
- * or to a targeted store, via real-time SSE stream and background Web Push.
+ * or to a targeted store, via real-time SSE stream and background Web Push, with strict role isolation.
  */
 export async function notifyPlatformAnnouncement(
   payload: PlatformAnnouncementNotification
 ): Promise<void> {
   const isGlobal = payload.tenantId === null || payload.tenantId === undefined || Number(payload.tenantId) === 0;
   const cleanTenantId = isGlobal ? null : (Number(payload.tenantId) || null);
+  const targetRole = String(payload.targetRole || 'ALL').toUpperCase();
 
   const eventPayload = {
     id: payload.id,
@@ -315,44 +324,30 @@ export async function notifyPlatformAnnouncement(
     actionUrl: payload.actionUrl || '',
     actionLabel: payload.actionLabel || '',
     tenantId: cleanTenantId,
+    targetRole,
     timestamp: payload.timestamp || new Date().toISOString(),
   };
 
   const sseMessage = `event: platform_announcement\ndata: ${JSON.stringify(eventPayload)}\n\n`;
 
-  // 1. Deliver to active browser sessions via SSE
-  if (isGlobal) {
-    for (const [, clientSet] of sseClientsByTenant.entries()) {
-      for (const clientRes of clientSet) {
-        try {
-          clientRes.write(sseMessage);
-        } catch {
-          clientSet.delete(clientRes);
-        }
-      }
-    }
-  } else if (cleanTenantId !== null) {
-    const targetSet = sseClientsByTenant.get(cleanTenantId);
-    if (targetSet) {
-      for (const clientRes of targetSet) {
-        try {
-          clientRes.write(sseMessage);
-        } catch {
-          targetSet.delete(clientRes);
-        }
-      }
-    }
-  }
+  // 1. Deliver to active browser sessions via SSE respecting strict role isolation
+  for (const client of sseClients) {
+    const isTenantMatch = isGlobal ? true : (client.tenantId === cleanTenantId);
+    if (!isTenantMatch) continue;
 
-  // Also deliver to superadmin sessions (tenant_id = 0)
-  const superAdminSet = sseClientsByTenant.get(0);
-  if (superAdminSet && (!cleanTenantId || cleanTenantId !== 0)) {
-    for (const clientRes of superAdminSet) {
-      try {
-        clientRes.write(sseMessage);
-      } catch {
-        superAdminSet.delete(clientRes);
-      }
+    // Strict role isolation:
+    if (targetRole === 'SUPERADMIN' && client.role !== 'SUPERADMIN') continue;
+    if (targetRole === 'ADMIN' && client.role !== 'ADMIN') continue;
+    if (targetRole === 'CASHIER' && client.role !== 'CASHIER') continue;
+    if (targetRole === 'ALL') {
+      // Store-specific alerts should not bleed into superadmin
+      if (cleanTenantId !== null && client.role === 'SUPERADMIN') continue;
+    }
+
+    try {
+      client.res.write(sseMessage);
+    } catch {
+      sseClients.delete(client);
     }
   }
 
@@ -363,10 +358,29 @@ export async function notifyPlatformAnnouncement(
 
   try {
     await ensurePushSubscriptionsSchema();
-    const query = isGlobal
-      ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions`
-      : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 OR tenant_id = 0`;
-    const params = isGlobal ? [] : [cleanTenantId];
+    let query: string;
+    let params: any[];
+
+    if (targetRole === 'SUPERADMIN') {
+      query = `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'SUPERADMIN'`;
+      params = [];
+    } else if (targetRole === 'ADMIN') {
+      query = isGlobal
+        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'ADMIN' AND tenant_id != 0`
+        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) = 'ADMIN'`;
+      params = isGlobal ? [] : [cleanTenantId];
+    } else if (targetRole === 'CASHIER') {
+      query = isGlobal
+        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'CASHIER' AND tenant_id != 0`
+        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) = 'CASHIER'`;
+      params = isGlobal ? [] : [cleanTenantId];
+    } else {
+      // 'ALL'
+      query = isGlobal
+        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions`
+        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) IN ('ADMIN', 'CASHIER')`;
+      params = isGlobal ? [] : [cleanTenantId];
+    }
 
     const subsRes = await pgClient.query<{
       endpoint: string;
@@ -386,6 +400,7 @@ export async function notifyPlatformAnnouncement(
         url: payload.actionUrl || '/',
         type: payload.type || 'INFO',
         notificationId: payload.id,
+        targetRole,
         timestamp: eventPayload.timestamp,
       },
       actions: payload.actionUrl

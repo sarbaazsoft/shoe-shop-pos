@@ -65,12 +65,12 @@ export async function sendWelcomeMsg(
     .trim();
   const welcomeText = messageWithoutDuplicateHeading || defaultWelcomeText;
 
-  // 2. Ensure platform notifications schema and create in-app notification in platform_notifications
+  // 2. Ensure platform notifications schema and create in-app notification in platform_notifications (strictly targeted to store owner ADMIN)
   await ensurePlatformNotificationsSchema();
   const notifRes = await pgClient.query<{ id: number; created_at: string }>(
     `INSERT INTO platform_notifications (
-       tenant_id, title, message, type, action_url, action_label, created_at
-     ) VALUES ($1, $2, $3, 'SUCCESS', $4, 'Open POS Terminal', NOW())
+       tenant_id, target_role, title, message, type, action_url, action_label, created_at
+     ) VALUES ($1, 'ADMIN', $2, $3, 'SUCCESS', $4, 'Open POS Terminal', NOW())
      RETURNING id, created_at`,
     [
       cleanTenantId,
@@ -81,10 +81,11 @@ export async function sendWelcomeMsg(
   );
   const notificationId = notifRes.rows[0]?.id;
 
-  // 3. Broadcast real-time SSE event & Web Push
+  // 3. Broadcast real-time SSE event & Web Push strictly to store owner (ADMIN)
   await notifyPlatformAnnouncement({
     id: notificationId,
     tenantId: cleanTenantId,
+    targetRole: 'ADMIN',
     title: welcomeTitle,
     message: welcomeText,
     type: 'SUCCESS',

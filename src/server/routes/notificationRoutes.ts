@@ -54,32 +54,36 @@ import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
 router.get('/', async (req: Request, res: Response) => {
   try {
     await ensurePlatformNotificationsSchema();
-    const { tenantId, userId } = resolveRequestIdentity(req);
+    const { tenantId, userId, role } = resolveRequestIdentity(req);
     const cleanTenantId = tenantId || 1;
 
-    // 1. Fetch recent sales activities
-    const salesRes = await pgClient.query(
-      `SELECT id, invoice_number, total_amount, sale_date, created_at
-       FROM sales
-       WHERE tenant_id = $1
-       ORDER BY id DESC
-       LIMIT 15`,
-      [cleanTenantId]
-    ).catch(() => ({ rows: [] }));
+    // 1. Fetch recent sales activities strictly by role (SuperAdmins never receive store POS activities)
+    let posNotifications: any[] = [];
+    if (role !== 'SUPERADMIN') {
+      const salesRes = await pgClient.query(
+        `SELECT id, invoice_number, total_amount, sale_date, created_at
+         FROM sales
+         WHERE tenant_id = $1
+         ORDER BY id DESC
+         LIMIT 15`,
+        [cleanTenantId]
+      ).catch(() => ({ rows: [] }));
 
-    const posNotifications = salesRes.rows.map((row: any) => ({
-      id: row.id,
-      type: 'SALE',
-      title: `Sale Confirmed #${row.invoice_number || row.id}`,
-      message: `Invoice for Rs. ${Number(row.total_amount || 0).toLocaleString()} completed.`,
-      timestamp: row.created_at || row.sale_date || new Date().toISOString(),
-      deepLinkUrl: '/reports',
-    }));
+      posNotifications = salesRes.rows.map((row: any) => ({
+        id: row.id,
+        type: 'SALE',
+        title: `Sale Confirmed #${row.invoice_number || row.id}`,
+        message: `Invoice for Rs. ${Number(row.total_amount || 0).toLocaleString()} completed.`,
+        timestamp: row.created_at || row.sale_date || new Date().toISOString(),
+        deepLinkUrl: '/reports',
+      }));
+    }
 
-    // 2. Fetch active platform announcements from SuperAdmin
+    // 2. Fetch active platform announcements strictly scoped by role
     const announcementsRes = await pgClient.query<{
       id: number;
       tenant_id: number | null;
+      target_role: string;
       title: string;
       message: string;
       type: string;
@@ -94,6 +98,7 @@ router.get('/', async (req: Request, res: Response) => {
       `SELECT
          pn.id,
          pn.tenant_id,
+         COALESCE(pn.target_role, 'ALL') AS target_role,
          pn.title,
          pn.message,
          pn.type,
@@ -110,16 +115,24 @@ router.get('/', async (req: Request, res: Response) => {
          ) AS is_read
        FROM platform_notifications pn
        LEFT JOIN users u ON u.id = pn.created_by
-       WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
-         AND (pn.expires_at IS NULL OR pn.expires_at > NOW())
+       WHERE (pn.expires_at IS NULL OR pn.expires_at > NOW())
+         AND (
+           CASE
+             WHEN $3 = 'SUPERADMIN' THEN (pn.tenant_id IS NULL AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
+             WHEN $3 = 'ADMIN' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN'))
+             WHEN $3 = 'CASHIER' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
+             ELSE ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') = 'ALL')
+           END
+         )
        ORDER BY pn.created_at DESC
        LIMIT 30`,
-      [cleanTenantId, userId]
+      [cleanTenantId, userId, role]
     ).catch(() => ({ rows: [] }));
 
     const announcements = announcementsRes.rows.map((r) => ({
       id: r.id,
       tenantId: r.tenant_id,
+      targetRole: r.target_role,
       title: r.title,
       message: r.message,
       type: r.type,
@@ -148,16 +161,17 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/notifications/platform - List platform announcements for store tenant
+// GET /api/notifications/platform - List platform announcements for store tenant with role isolation
 router.get('/platform', async (req: Request, res: Response) => {
   try {
     await ensurePlatformNotificationsSchema();
-    const { tenantId, userId } = resolveRequestIdentity(req);
+    const { tenantId, userId, role } = resolveRequestIdentity(req);
     const cleanTenantId = tenantId || 1;
 
     const announcementsRes = await pgClient.query<{
       id: number;
       tenant_id: number | null;
+      target_role: string;
       title: string;
       message: string;
       type: string;
@@ -172,6 +186,7 @@ router.get('/platform', async (req: Request, res: Response) => {
       `SELECT
          pn.id,
          pn.tenant_id,
+         COALESCE(pn.target_role, 'ALL') AS target_role,
          pn.title,
          pn.message,
          pn.type,
@@ -188,16 +203,24 @@ router.get('/platform', async (req: Request, res: Response) => {
          ) AS is_read
        FROM platform_notifications pn
        LEFT JOIN users u ON u.id = pn.created_by
-       WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
-         AND (pn.expires_at IS NULL OR pn.expires_at > NOW())
+       WHERE (pn.expires_at IS NULL OR pn.expires_at > NOW())
+         AND (
+           CASE
+             WHEN $3 = 'SUPERADMIN' THEN (pn.tenant_id IS NULL AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
+             WHEN $3 = 'ADMIN' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN'))
+             WHEN $3 = 'CASHIER' THEN ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER') AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%')
+             ELSE ((pn.tenant_id IS NULL OR pn.tenant_id = $1) AND COALESCE(pn.target_role, 'ALL') = 'ALL')
+           END
+         )
        ORDER BY pn.created_at DESC
        LIMIT 30`,
-      [cleanTenantId, userId]
+      [cleanTenantId, userId, role]
     ).catch(() => ({ rows: [] }));
 
     const announcements = announcementsRes.rows.map((r) => ({
       id: r.id,
       tenantId: r.tenant_id,
+      targetRole: r.target_role,
       title: r.title,
       message: r.message,
       type: r.type,
@@ -275,10 +298,10 @@ router.get('/vapid-public-key', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/notifications/subscribe - Save device push subscription
+// POST /api/notifications/subscribe - Save device push subscription scoped by role
 router.post('/subscribe', async (req: Request, res: Response) => {
   try {
-    const { tenantId, userId } = resolveRequestIdentity(req);
+    const { tenantId, userId, role } = resolveRequestIdentity(req);
     const subscription = req.body?.subscription || req.body;
     const userAgent = req.headers['user-agent'] || '';
 
@@ -286,7 +309,7 @@ router.post('/subscribe', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Invalid subscription object' });
     }
 
-    const success = await savePushSubscription(tenantId, userId, subscription, userAgent);
+    const success = await savePushSubscription(tenantId, userId, role, subscription, userAgent);
     res.json({ success });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to save subscription' });
@@ -327,19 +350,19 @@ router.post('/test-push', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/notifications/stream - Server-Sent Events (SSE) real-time stream
+// GET /api/notifications/stream - Server-Sent Events (SSE) real-time stream with role isolation
 router.get('/stream', (req: Request, res: Response) => {
-  const { tenantId } = resolveRequestIdentity(req);
+  const { tenantId, userId, role } = resolveRequestIdentity(req);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  // Immediately acknowledge connection
-  res.write(`event: connected\ndata: ${JSON.stringify({ type: 'CONNECTED', tenantId, timestamp: new Date().toISOString() })}\n\n`);
+  // Immediately acknowledge connection with role metadata
+  res.write(`event: connected\ndata: ${JSON.stringify({ type: 'CONNECTED', tenantId, role, timestamp: new Date().toISOString() })}\n\n`);
 
-  const unregister = registerSseClient(tenantId, res);
+  const unregister = registerSseClient(tenantId, userId, role, res);
 
   // Heartbeat to keep connection open across reverse proxies and firewalls
   const heartbeatInterval = setInterval(() => {

@@ -623,6 +623,7 @@ const DATABASE_TABLE_DDL: string[] = [
     id SERIAL PRIMARY KEY,
     tenant_id INTEGER NOT NULL DEFAULT 1,
     user_id INTEGER NOT NULL DEFAULT 0,
+    user_role TEXT NOT NULL DEFAULT 'CASHIER',
     endpoint TEXT NOT NULL UNIQUE,
     p256dh TEXT NOT NULL,
     auth TEXT NOT NULL,
@@ -661,6 +662,7 @@ const DATABASE_TABLE_DDL: string[] = [
   `CREATE TABLE IF NOT EXISTS platform_notifications (
     id SERIAL PRIMARY KEY,
     tenant_id INTEGER NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    target_role TEXT NOT NULL DEFAULT 'ALL',
     title TEXT NOT NULL,
     message TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'INFO',
@@ -761,6 +763,7 @@ export function ensurePushSubscriptionsSchema(): Promise<void> {
           id SERIAL PRIMARY KEY,
           tenant_id INTEGER NOT NULL DEFAULT 1,
           user_id INTEGER NOT NULL DEFAULT 0,
+          user_role TEXT NOT NULL DEFAULT 'CASHIER',
           endpoint TEXT NOT NULL UNIQUE,
           p256dh TEXT NOT NULL,
           auth TEXT NOT NULL,
@@ -768,7 +771,9 @@ export function ensurePushSubscriptionsSchema(): Promise<void> {
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
+        ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS user_role TEXT NOT NULL DEFAULT 'CASHIER';
         CREATE INDEX IF NOT EXISTS push_subscriptions_tenant_idx ON public.push_subscriptions(tenant_id);
+        CREATE INDEX IF NOT EXISTS push_subscriptions_user_role_idx ON public.push_subscriptions(user_role);
       `);
     })().catch((error) => {
       pushSubscriptionsSchemaPromise = null;
@@ -787,6 +792,7 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
         CREATE TABLE IF NOT EXISTS public.platform_notifications (
           id SERIAL PRIMARY KEY,
           tenant_id INTEGER NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+          target_role TEXT NOT NULL DEFAULT 'ALL',
           title TEXT NOT NULL,
           message TEXT NOT NULL,
           type TEXT NOT NULL DEFAULT 'INFO',
@@ -796,6 +802,7 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
           expires_at TIMESTAMP NULL,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
+        ALTER TABLE public.platform_notifications ADD COLUMN IF NOT EXISTS target_role TEXT NOT NULL DEFAULT 'ALL';
         CREATE TABLE IF NOT EXISTS public.platform_notification_reads (
           id SERIAL PRIMARY KEY,
           notification_id INTEGER NOT NULL REFERENCES public.platform_notifications(id) ON DELETE CASCADE,
@@ -805,6 +812,7 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
           CONSTRAINT platform_notification_reads_unique UNIQUE(notification_id, tenant_id, user_id)
         );
         CREATE INDEX IF NOT EXISTS platform_notifications_tenant_idx ON public.platform_notifications(tenant_id);
+        CREATE INDEX IF NOT EXISTS platform_notifications_target_role_idx ON public.platform_notifications(target_role);
         CREATE INDEX IF NOT EXISTS platform_notifications_created_at_idx ON public.platform_notifications(created_at);
         CREATE INDEX IF NOT EXISTS platform_notification_reads_notif_idx ON public.platform_notification_reads(notification_id);
         CREATE INDEX IF NOT EXISTS platform_notification_reads_tenant_idx ON public.platform_notification_reads(tenant_id);

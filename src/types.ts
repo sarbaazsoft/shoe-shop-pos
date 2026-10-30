@@ -606,6 +606,7 @@ export type PlatformNotificationType = 'INFO' | 'WARNING' | 'SUCCESS' | 'URGENT'
 export interface PlatformNotification {
   id: number;
   tenantId?: number | null; // null for All Stores / Global Broadcast
+  targetRole?: 'ALL' | 'ADMIN' | 'CASHIER' | 'SUPERADMIN';
   storeName?: string; // e.g. "All Stores" or specific store name
   title: string;
   message: string;
@@ -619,4 +620,5 @@ export interface PlatformNotification {
   readCount?: number;
   isRead?: boolean;
 }
+
 

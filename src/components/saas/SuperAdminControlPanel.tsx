@@ -232,6 +232,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
   const [notifTargetTenantId, setNotifTargetTenantId] = useState<string>('ALL');
+  const [notifTargetRole, setNotifTargetRole] = useState<'ALL' | 'ADMIN' | 'CASHIER' | 'SUPERADMIN'>('ALL');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [notifType, setNotifType] = useState<PlatformNotificationType>('INFO');
@@ -282,6 +283,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
       const res = await api.superAdmin.sendNotification({
         tenantId,
+        targetRole: notifTargetRole,
         title: notifTitle.trim(),
         message: notifMessage.trim(),
         type: notifType,
@@ -299,6 +301,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       setNotifExpiryHours('0');
       setNotifType('INFO');
       setNotifTargetTenantId('ALL');
+      setNotifTargetRole('ALL');
       await loadNotifications();
     } catch (err: any) {
       setNotifError(err.message || 'Failed to send notification.');
@@ -407,6 +410,16 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
     notificationsList.forEach((notif) => {
       const titleLower = (notif.title || '').toLowerCase();
       const msgLower = (notif.message || '').toLowerCase();
+
+      // Exclude store owner welcome messages from SuperAdmin notifications dropdown
+      const isWelcome =
+        titleLower.includes('welcome') ||
+        msgLower.includes('welcome to sarbaazsoft') ||
+        msgLower.includes('thank you for choosing sarbaazsoft');
+      if (isWelcome) {
+        return;
+      }
+
       const isRenewal = titleLower.includes('renewal') || msgLower.includes('renewal');
       const isTrial = titleLower.includes('trial') || msgLower.includes('trial');
 
@@ -1826,10 +1839,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             </button>
 
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-purple-700 dark:text-purple-300 text-xs font-mono font-bold">
-                <Shield className="w-3.5 h-3.5" />
-                SuperAdmin
-              </span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                 {activeTab === 'dashboard' && 'SuperAdmin Executive Dashboard'}
                 {activeTab === 'stores' && 'Deployed Stores & Middleware Control'}
@@ -1867,17 +1876,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
           {/* Right: Actions, Notifications Dropdown, Tools Dropdown, Refresh, Theme, User Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Primary Action: Add Store */}
-            <button
-              type="button"
-              onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white text-xs font-bold shadow-xs shadow-purple-600/20 transition cursor-pointer shrink-0"
-              title="Add New Store Tenant"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Add Store</span>
-            </button>
-
             {/* Platform Tools Dropdown (Send Notification, Import Data, Export All Backup) */}
             <div ref={toolsMenuRef} className="relative shrink-0">
               <button
@@ -5843,6 +5841,37 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                     {notifTargetTenantId === 'ALL'
                       ? 'Every registered store on the platform will receive this announcement on their next login or live POS session.'
                       : `Only personnel and terminals belonging to '${stores.find((s) => String(s.id) === notifTargetTenantId)?.name || 'the selected store'}' will receive this alert.`}
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs">
+                    Target Role Isolation <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { value: 'ALL', label: 'All Roles', desc: 'Owners & Cashiers' },
+                      { value: 'ADMIN', label: 'Store Owners', desc: 'Admins only' },
+                      { value: 'CASHIER', label: 'Cashiers', desc: 'Counter staff only' },
+                      { value: 'SUPERADMIN', label: 'SuperAdmins', desc: 'Platform admins' },
+                    ].map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => setNotifTargetRole(r.value as any)}
+                        className={`p-2 rounded-xl border text-left cursor-pointer transition ${
+                          notifTargetRole === r.value
+                            ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 shadow-2xs font-bold'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="text-xs font-bold leading-tight">{r.label}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{r.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Strictly prevents cross-role notifications. E.g. Store Owner alerts will never be seen by cashiers or superadmins.
                   </p>
                 </div>
               </div>

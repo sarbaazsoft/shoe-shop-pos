@@ -564,6 +564,7 @@ export const api = {
       apiFetch<{ notifications: PlatformNotification[] }>('/superadmin/notifications'),
     sendNotification: (data: {
       tenantId?: number | null;
+      targetRole?: 'ALL' | 'ADMIN' | 'CASHIER' | 'SUPERADMIN';
       title: string;
       message: string;
       type?: PlatformNotificationType;

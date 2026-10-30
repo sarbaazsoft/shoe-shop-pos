@@ -2945,6 +2945,10 @@ router.post('/superadmin/notifications', requireAuth, requireSuperAdmin, async (
       }
     }
 
+    const rawTargetRole = String(req.body?.targetRole || 'ALL').toUpperCase();
+    const validRoles = ['ALL', 'ADMIN', 'CASHIER', 'SUPERADMIN'];
+    const targetRole = validRoles.includes(rawTargetRole) ? rawTargetRole : 'ALL';
+
     const rawType = String(req.body?.type || 'INFO').toUpperCase();
     const validTypes = ['INFO', 'WARNING', 'SUCCESS', 'URGENT'];
     const type = validTypes.includes(rawType) ? rawType : 'INFO';
@@ -2964,6 +2968,7 @@ router.post('/superadmin/notifications', requireAuth, requireSuperAdmin, async (
     const insertRes = await pgClient.query<{
       id: number;
       tenant_id: number | null;
+      target_role: string;
       title: string;
       message: string;
       type: string;
@@ -2974,18 +2979,19 @@ router.post('/superadmin/notifications', requireAuth, requireSuperAdmin, async (
       created_at: string;
     }>(
       `INSERT INTO platform_notifications (
-        tenant_id, title, message, type, action_url, action_label, created_by, expires_at, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        tenant_id, target_role, title, message, type, action_url, action_label, created_by, expires_at, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
       RETURNING *`,
-      [targetTenantId, title, message, type, actionUrl, actionLabel, currentUserId, expiresAt]
+      [targetTenantId, targetRole, title, message, type, actionUrl, actionLabel, currentUserId, expiresAt]
     );
 
     const row = insertRes.rows[0];
 
-    // Dispatch real-time SSE event & Web Push to subscribers
+    // Dispatch real-time SSE event & Web Push to subscribers with role isolation
     await notifyPlatformAnnouncement({
       id: row.id,
       tenantId: row.tenant_id,
+      targetRole: row.target_role as any,
       title: row.title,
       message: row.message,
       type: row.type,
@@ -2997,11 +3003,12 @@ router.post('/superadmin/notifications', requireAuth, requireSuperAdmin, async (
     return res.status(201).json({
       success: true,
       message: targetTenantId
-        ? `Custom notification sent to ${targetStoreName} successfully!`
-        : 'Custom notification broadcast to all stores successfully!',
+        ? `Custom notification sent to ${targetStoreName} (${targetRole}) successfully!`
+        : `Custom notification broadcast to all stores (${targetRole}) successfully!`,
       notification: {
         id: row.id,
         tenantId: row.tenant_id,
+        targetRole: row.target_role,
         storeName: targetStoreName,
         title: row.title,
         message: row.message,
@@ -3026,6 +3033,7 @@ router.get('/superadmin/notifications', requireAuth, requireSuperAdmin, async (_
     const notificationsRes = await pgClient.query<{
       id: number;
       tenant_id: number | null;
+      target_role: string;
       store_name: string | null;
       title: string;
       message: string;
@@ -3041,6 +3049,7 @@ router.get('/superadmin/notifications', requireAuth, requireSuperAdmin, async (_
       SELECT
         pn.id,
         pn.tenant_id,
+        COALESCE(pn.target_role, 'ALL') AS target_role,
         COALESCE(t.name, 'All Stores (Platform Broadcast)') AS store_name,
         pn.title,
         pn.message,
@@ -3055,6 +3064,7 @@ router.get('/superadmin/notifications', requireAuth, requireSuperAdmin, async (_
       FROM platform_notifications pn
       LEFT JOIN tenants t ON t.id = pn.tenant_id
       LEFT JOIN users u ON u.id = pn.created_by
+      WHERE pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
       ORDER BY pn.created_at DESC
       LIMIT 100
     `);
@@ -3062,6 +3072,7 @@ router.get('/superadmin/notifications', requireAuth, requireSuperAdmin, async (_
     const notifications = notificationsRes.rows.map((r) => ({
       id: r.id,
       tenantId: r.tenant_id,
+      targetRole: r.target_role,
       storeName: r.store_name,
       title: r.title,
       message: r.message,
