@@ -49,6 +49,7 @@ interface ArticleValidationState {
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   product,
+  currentUser,
   companySettings,
   onClose,
   onSuccess,
@@ -85,7 +86,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Business Type & Wholesale Configuration
   const isWholesaleStore =
-    String(effectiveSettings?.businessType || effectiveSettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+    String(
+      effectiveSettings?.businessType ||
+      effectiveSettings?.business_type ||
+      companySettings?.businessType ||
+      companySettings?.business_type ||
+      currentUser?.businessType ||
+      currentUser?.tenant?.business_type ||
+      ''
+    ).toUpperCase() === 'WHOLESALE';
 
   // Store-wide half-carton permission
   // Determination: Half-cartons are allowed if either the store setting is enabled
@@ -961,12 +970,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
       // Consolidated Product Pricing Payload:
       const payload: ProductFormValues = {
-        name: toTitleCaseTrimmed(productName) || cleanArticle,
+        name: isWholesaleStore ? (product?.name || cleanArticle) : (toTitleCaseTrimmed(productName) || cleanArticle),
         brand: finalBrand,
         category: finalCategory,
         article: cleanArticle,
         barcode: finalBarcodeToSave,
-        primaryImageUrl: primaryImageUrl.trim(),
+        primaryImageUrl: isWholesaleStore ? (product?.primaryImageUrl || '') : primaryImageUrl.trim(),
         description: description.trim(),
         costPrice: finalCostToSave,
         minPrice: finalMinToSave,
@@ -1192,57 +1201,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ========================================================= */}
           {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Product Image Section for Wholesale Stores (Standard upload, no AI suggestions) */}
-              {isWholesaleStore && (
-                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs dark:border-[#1A263D] dark:bg-[#0D1424]">
-                  <div className="mb-3 flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4 text-purple-600 dark:text-purple-300" />
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-white">
-                      Product Image <span className="font-normal normal-case text-gray-500">(optional)</span>
-                    </h5>
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                    {primaryImageUrl ? (
-                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
-                        <img src={primaryImageUrl} alt="Product preview" className="h-full w-full object-contain" />
-                        <button
-                          type="button"
-                          onClick={() => setPrimaryImageUrl('')}
-                          aria-label="Remove product image"
-                          className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black transition"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ) : null}
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-3 text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-purple-500/10">
-                        <Upload className="h-4 w-4" /> Upload product image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => {
-                            handleProductImageUpload(event.target.files?.[0]);
-                            event.currentTarget.value = '';
-                          }}
-                        />
-                      </label>
-                      <input
-                        type="url"
-                        value={primaryImageUrl.startsWith('data:') ? '' : primaryImageUrl}
-                        onChange={(event) => setPrimaryImageUrl(event.target.value)}
-                        placeholder="Or paste an image URL"
-                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <p className="text-[11px] text-gray-500 dark:text-slate-400">
-                        Images are resized to optimal dimensions before saving.
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              )}
-
               {/* Product Image & AI Vision Suggestor (Strictly for Retail Stores) */}
               {!isWholesaleStore && (
                 <section className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/40 via-white to-indigo-50/30 p-4 shadow-xs dark:border-purple-900/40 dark:from-[#0f172a] dark:via-[#0D1424] dark:to-purple-950/20">
@@ -1887,19 +1845,21 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                 )}
 
-                {/* Product Title / Display Name */}
-                <div>
-                  <label className="block font-semibold text-gray-700 dark:text-slate-300 mb-1">
-                    Product Title / Display Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={`e.g. ${currentBrandName ? currentBrandName + ' ' : ''}${article || 'Air Runner Shoes'}`}
-                    value={productName}
-                    onChange={(e) => setProductName(toTitleCaseLive(e.target.value))}
-                    className="capitalize w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-indigo-600 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 bg-white dark:bg-[#070B14] text-gray-900 dark:text-white"
-                  />
-                </div>
+                {/* Product Title / Display Name (Retail only - hidden for wholesale mode) */}
+                {!isWholesaleStore && (
+                  <div>
+                    <label className="block font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                      Product Title / Display Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={`e.g. ${currentBrandName ? currentBrandName + ' ' : ''}${article || 'Air Runner Shoes'}`}
+                      value={productName}
+                      onChange={(e) => setProductName(toTitleCaseLive(e.target.value))}
+                      className="capitalize w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-indigo-600 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 bg-white dark:bg-[#070B14] text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
 
                 {/* Auto-Assigned Standard Codes Summary */}
                 {article && (

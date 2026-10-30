@@ -1,0 +1,7 @@
+Hide the product image upload and product title fields specifically for wholesale store types in ProductFormModal.tsx:
+
+1. Wholesale Store Condition:
+   - Check if the store mode/type is wholesale.
+2. Conditional Rendering:
+   - Hide/exclude the "Product Title" and "Product Image" upload inputs when in wholesale mode.
+   - Ensure the form layout and remaining fields adjust smoothly without breaking grid alignment.
