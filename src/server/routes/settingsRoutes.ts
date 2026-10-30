@@ -71,7 +71,8 @@ async function ensureTenantSubscriptionPopulated(tenantId: number): Promise<any>
     let needsUpdate = false;
 
     const plan = normalizeSubscriptionPlan(t.subscription_plan || t.subscription_type || 'free_tier');
-    if (t.subscription_plan !== plan) {
+    const subType = normalizeSubscriptionType(plan);
+    if (t.subscription_plan !== plan || t.subscription_type !== subType) {
       needsUpdate = true;
     }
 
@@ -100,13 +101,14 @@ async function ensureTenantSubscriptionPopulated(tenantId: number): Promise<any>
       const updated = await pgClient.query(
         `UPDATE tenants
          SET subscription_plan = $1,
-             subscription_start_date = $2,
-             subscription_end_date = $3,
-             subscription_status = $4,
+             subscription_type = $2,
+             subscription_start_date = $3,
+             subscription_end_date = $4,
+             subscription_status = $5,
              updated_at = NOW()
-         WHERE id = $5
+         WHERE id = $6
          RETURNING *`,
-        [plan, startDt.toISOString(), endDt.toISOString(), subStatus, t.id]
+        [plan, subType, startDt.toISOString(), endDt.toISOString(), subStatus, t.id]
       );
       return updated.rows[0] || t;
     }
@@ -123,8 +125,19 @@ async function getPendingRenewalRequest(_tenantId: number): Promise<any | null> 
 }
 
 function buildSubscriptionInfo(tenantRow?: any, pendingRenewalRequest?: any | null) {
-  const subscriptionPlan = normalizeSubscriptionPlan(tenantRow?.subscription_plan || tenantRow?.subscription_type || 'free_tier');
-  const subscriptionType = normalizeSubscriptionType(tenantRow?.subscription_type || tenantRow?.subscription_plan || 'free_tier');
+  const subscriptionPlan = normalizeSubscriptionPlan(
+    tenantRow?.subscription_plan ||
+    tenantRow?.subscriptionPlan ||
+    tenantRow?.plan ||
+    tenantRow?.subscription_type ||
+    'free_tier'
+  );
+  const subscriptionType = normalizeSubscriptionType(
+    subscriptionPlan !== 'free_tier'
+      ? subscriptionPlan
+      : tenantRow?.subscription_type || tenantRow?.subscription_plan || 'free_tier'
+  );
+  const isTrial = subscriptionPlan === 'free_tier';
   const startDt = tenantRow?.subscription_start_date
     ? new Date(tenantRow.subscription_start_date)
     : new Date();
@@ -154,6 +167,8 @@ function buildSubscriptionInfo(tenantRow?: any, pendingRenewalRequest?: any | nu
     subscription_type: subscriptionType,
     subscriptionPlan,
     subscription_plan: subscriptionPlan,
+    isTrial,
+    is_trial: isTrial,
     startDate: startIso,
     subscriptionStartDate: startIso,
     subscription_start_date: startIso,
@@ -206,8 +221,11 @@ function formatSettingsResponse(s: any, tenantRow?: any, pendingRenewalRequest?:
     minSellingQuantity,
     min_selling_quantity: minSellingQuantity,
     allowHalfCarton,
-    allow_half_carton: allowHalfCarton,
     subscriptionPlan: subInfo.subscriptionPlan,
+    subscription_plan: subInfo.subscriptionPlan,
+    subscriptionType: subInfo.subscriptionType,
+    subscription_type: subInfo.subscriptionType,
+    isTrial: subInfo.isTrial,
     subscriptionStartDate: subInfo.subscriptionStartDate,
     subscriptionEndDate: subInfo.subscriptionEndDate,
     subscriptionStatus: subInfo.subscriptionStatus,

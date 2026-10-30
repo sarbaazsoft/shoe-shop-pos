@@ -1,0 +1,1 @@
+Fix subscription upgrade display: Ensure that once a store is upgraded from a free trial to a paid plan (6-month or yearly), the correct plan name is reflected in SettingView and across all UI locations instead of showing "Free Trial."

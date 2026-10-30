@@ -64,12 +64,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const currentPlanRaw =
     companySettings?.subscriptionPlan ||
     companySettings?.subscription_plan ||
-    companySettings?.subscriptionType ||
-    companySettings?.subscription_type ||
     currentUser?.subscriptionPlan ||
-    currentUser?.plan;
+    currentUser?.plan ||
+    companySettings?.subscriptionType ||
+    companySettings?.subscription_type;
 
-  const isFree = isFreeTrial(currentPlanRaw);
+  const isFree =
+    currentPlanRaw === '6_MONTHS' ||
+    currentPlanRaw === 'YEARLY' ||
+    currentPlanRaw === '6_months' ||
+    currentPlanRaw === '1_year'
+      ? false
+      : isFreeTrial(currentPlanRaw);
 
   // Renewal / Upgrade Modal state with Dynamic Templates
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);

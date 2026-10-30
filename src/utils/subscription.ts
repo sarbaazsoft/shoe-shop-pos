@@ -45,15 +45,27 @@ export function calculateDaysLeft(
   const diffDays = diffMs / msPerDay;
 
   const cleanPlan = String(plan || '').toLowerCase();
+  const isPaidPlan =
+    cleanPlan === '6_months' ||
+    cleanPlan === '6_month' ||
+    cleanPlan === 'six_months' ||
+    cleanPlan.startsWith('6_month') ||
+    cleanPlan === '1_year' ||
+    cleanPlan === 'yearly' ||
+    cleanPlan === 'year' ||
+    cleanPlan === '1year' ||
+    cleanPlan === 'one_year';
+
   const isFreeTier =
-    !plan ||
-    cleanPlan === 'free_tier' ||
-    cleanPlan === 'freetier' ||
-    cleanPlan === 'free' ||
-    cleanPlan === 'trial' ||
-    cleanPlan.includes('free') ||
-    cleanPlan.includes('trial') ||
-    diffDays <= 31; // Default 30-day trial window
+    !isPaidPlan &&
+    (!plan ||
+      cleanPlan === 'free_tier' ||
+      cleanPlan === 'freetier' ||
+      cleanPlan === 'free' ||
+      cleanPlan === 'trial' ||
+      cleanPlan.includes('free') ||
+      cleanPlan.includes('trial') ||
+      diffDays <= 31); // Default 30-day trial window
 
   if (isFreeTier) {
     // For a 30-day free tier:
@@ -131,6 +143,19 @@ export function isFreeTrial(
 ): boolean {
   if (!plan) return true;
   const clean = String(plan).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (
+    clean === '6_months' ||
+    clean === '6_month' ||
+    clean === 'six_months' ||
+    clean.startsWith('6_month') ||
+    clean === '1_year' ||
+    clean === 'yearly' ||
+    clean === 'year' ||
+    clean === '1year' ||
+    clean === 'one_year'
+  ) {
+    return false;
+  }
   return (
     clean === 'free_tier' ||
     clean === 'freetier' ||

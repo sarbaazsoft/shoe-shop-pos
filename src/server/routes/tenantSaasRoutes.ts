@@ -1382,21 +1382,24 @@ async function handleUpdateTenantSubscription(req: AuthenticatedRequest, res: Re
     }
 
     const finalTenantStatus = finalSubStatus === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
+    const finalSubType = normalizeSubscriptionType(finalPlan);
 
     const updatedRes = await pgClient.query(
       `UPDATE tenants
        SET name = $1,
            subscription_plan = $2,
-           subscription_start_date = $3,
-           subscription_end_date = $4,
-           subscription_status = $5,
-           status = $6,
+           subscription_type = $3,
+           subscription_start_date = $4,
+           subscription_end_date = $5,
+           subscription_status = $6,
+           status = $7,
            updated_at = NOW()
-       WHERE id = $7
+       WHERE id = $8
        RETURNING *`,
       [
         finalStoreName,
         finalPlan,
+        finalSubType,
         finalStartDate.toISOString(),
         finalEndDate.toISOString(),
         finalSubStatus,
@@ -1418,13 +1421,16 @@ async function handleUpdateTenantSubscription(req: AuthenticatedRequest, res: Re
     }
 
     const row = updatedRes.rows[0];
+    const resolvedPlan = normalizeSubscriptionPlan(row?.subscription_plan || finalPlan);
+    const resolvedType = normalizeSubscriptionType(row?.subscription_type || resolvedPlan);
     return res.json({
       success: true,
       tenant: {
         id: row.id,
         name: row.name,
         status: row.status,
-        subscriptionPlan: row.subscription_plan,
+        subscriptionPlan: resolvedPlan,
+        subscriptionType: resolvedType,
         subscriptionStartDate: new Date(row.subscription_start_date).toISOString(),
         subscriptionEndDate: new Date(row.subscription_end_date).toISOString(),
         subscriptionStatus: row.subscription_status,

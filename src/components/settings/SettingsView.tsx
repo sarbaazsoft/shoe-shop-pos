@@ -85,32 +85,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Store Subscription Info State
   const extractSubInfo = (src: any) => {
     const sub = src?.subscriptionInfo || src || {};
-    const subscriptionType = normalizeSubscriptionType(
-      sub?.subscriptionType ||
-        sub?.subscription_type ||
-        src?.subscriptionType ||
-        src?.subscription_type ||
-        sub?.subscriptionPlan ||
-        src?.subscriptionPlan ||
-        'free_tier'
-    );
-    const subscriptionPlan = normalizeSubscriptionPlan(
+    const rawPlan =
       sub?.subscriptionPlan ||
-        sub?.subscription_plan ||
-        src?.subscriptionPlan ||
-        src?.subscription_plan ||
-        subscriptionType
+      sub?.subscription_plan ||
+      src?.subscriptionPlan ||
+      src?.subscription_plan ||
+      sub?.plan ||
+      src?.plan;
+    const subscriptionPlan = normalizeSubscriptionPlan(
+      rawPlan || sub?.subscriptionType || sub?.subscription_type || src?.subscriptionType || src?.subscription_type
     );
-    const isTrial =
-      subscriptionPlan === 'free_tier' ||
-      subscriptionType === 'free_tier' ||
-      isFreeTrial(
-        sub?.subscriptionPlan ||
-          sub?.subscription_plan ||
-          src?.subscriptionPlan ||
-          src?.subscription_plan ||
-          subscriptionPlan
-      );
+    const subscriptionType = normalizeSubscriptionType(
+      subscriptionPlan !== 'free_tier'
+        ? subscriptionPlan
+        : sub?.subscriptionType || sub?.subscription_type || src?.subscriptionType || src?.subscription_type || 'free_tier'
+    );
+    const isTrial = subscriptionPlan === 'free_tier';
     const subscriptionStartDate =
       sub?.subscriptionStartDate ||
       sub?.subscription_start_date ||
@@ -446,16 +436,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
   // Active Free Trial Determination
-  const isTrialActive = Boolean(
-    (subscriptionInfo as any).isTrial ||
-    isFreeTrial(
-      subscriptionInfo.subscriptionPlan ||
-      formData.subscription_plan ||
-      companySettings?.subscriptionPlan ||
-      companySettings?.subscription_plan ||
-      companySettings?.subscriptionType
-    )
-  );
+  const effectiveSubPlan =
+    subscriptionInfo.subscriptionPlan ||
+    formData.subscription_plan ||
+    companySettings?.subscriptionPlan ||
+    companySettings?.subscription_plan;
+
+  const isTrialActive =
+    effectiveSubPlan === '6_MONTHS' ||
+    effectiveSubPlan === 'YEARLY' ||
+    String(effectiveSubPlan) === '6_months' ||
+    String(effectiveSubPlan) === '1_year'
+      ? false
+      : Boolean(
+          effectiveSubPlan === 'free_tier' ||
+          (subscriptionInfo as any).isTrial ||
+          isFreeTrial(effectiveSubPlan)
+        );
 
   // Receipt Logo Upload & Camera Capture State
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -1048,12 +1045,17 @@ setFormErrors(errors);
               <span className="font-mono font-bold">
                 {isTrialActive
                   ? '30-Day Free Trial'
-                  : (subscriptionInfo.subscriptionPlan ||
-                      formData.subscription_plan ||
-                      companySettings?.subscriptionPlan ||
-                      companySettings?.subscription_plan) === '6_MONTHS'
-                  ? '6 Months'
-                  : 'Yearly'}
+                  : (() => {
+                      const curPlan =
+                        subscriptionInfo.subscriptionPlan ||
+                        formData.subscription_plan ||
+                        companySettings?.subscriptionPlan ||
+                        companySettings?.subscription_plan;
+                      const cleanPlan = String(curPlan || '').toUpperCase();
+                      if (cleanPlan === '6_MONTHS' || cleanPlan === '6_MONTH') return '6 Months';
+                      if (cleanPlan === 'YEARLY' || cleanPlan === '1_YEAR') return 'Yearly';
+                      return getSubscriptionShortLabel(curPlan);
+                    })()}
               </span>
             </div>
           </div>

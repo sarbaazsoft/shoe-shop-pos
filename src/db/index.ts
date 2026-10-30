@@ -1071,9 +1071,19 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       return { rows: [tenant as unknown as T], rowCount: 1 };
     }
 
-    if (upper.includes('SET NAME = $1') && upper.includes('SUBSCRIPTION_PLAN = $2') && params.length >= 7) {
+    if (upper.includes('SET NAME = $1') && upper.includes('SUBSCRIPTION_PLAN = $2') && upper.includes('SUBSCRIPTION_TYPE = $3') && params.length >= 8) {
       tenant.name = String(params[0] || tenant.name);
       tenant.subscription_plan = String(params[1] || tenant.subscription_plan);
+      tenant.subscription_type = String(params[2] || (tenant.subscription_plan === '6_MONTHS' ? '6_months' : tenant.subscription_plan === 'YEARLY' ? '1_year' : 'free_tier'));
+      tenant.subscription_start_date = params[3] || tenant.subscription_start_date;
+      tenant.subscription_end_date = params[4] || tenant.subscription_end_date;
+      tenant.subscription_status = String(params[5] || tenant.subscription_status);
+      tenant.status = String(params[6] || tenant.status);
+    } else if (upper.includes('SET NAME = $1') && upper.includes('SUBSCRIPTION_PLAN = $2') && params.length >= 7) {
+      tenant.name = String(params[0] || tenant.name);
+      tenant.subscription_plan = String(params[1] || tenant.subscription_plan);
+      tenant.subscription_type =
+        tenant.subscription_plan === '6_MONTHS' ? '6_months' : tenant.subscription_plan === 'YEARLY' ? '1_year' : 'free_tier';
       tenant.subscription_start_date = params[2] || tenant.subscription_start_date;
       tenant.subscription_end_date = params[3] || tenant.subscription_end_date;
       tenant.subscription_status = String(params[4] || tenant.subscription_status);
@@ -1084,13 +1094,23 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         tenant.status = 'ACTIVE';
         tenant.onboarding_completed = true;
       }
+    } else if (upper.includes('SET SUBSCRIPTION_PLAN = $1') && upper.includes('SUBSCRIPTION_TYPE = $2') && params.length >= 6) {
+      tenant.subscription_plan = String(params[0] || tenant.subscription_plan);
+      tenant.subscription_type = String(params[1] || (tenant.subscription_plan === '6_MONTHS' ? '6_months' : tenant.subscription_plan === 'YEARLY' ? '1_year' : 'free_tier'));
+      tenant.subscription_start_date = params[2] || tenant.subscription_start_date;
+      tenant.subscription_end_date = params[3] || tenant.subscription_end_date;
+      tenant.subscription_status = String(params[4] || tenant.subscription_status);
     } else if (upper.includes('SET SUBSCRIPTION_PLAN = $1') && params.length === 5) {
       tenant.subscription_plan = String(params[0] || tenant.subscription_plan);
+      tenant.subscription_type =
+        tenant.subscription_plan === '6_MONTHS' ? '6_months' : tenant.subscription_plan === 'YEARLY' ? '1_year' : 'free_tier';
       tenant.subscription_start_date = params[1] || tenant.subscription_start_date;
       tenant.subscription_end_date = params[2] || tenant.subscription_end_date;
       tenant.subscription_status = String(params[3] || tenant.subscription_status);
     } else if (upper.includes('SET SUBSCRIPTION_PLAN = $1') && params.length === 4) {
       tenant.subscription_plan = String(params[0] || tenant.subscription_plan);
+      tenant.subscription_type =
+        tenant.subscription_plan === '6_MONTHS' ? '6_months' : tenant.subscription_plan === 'YEARLY' ? '1_year' : 'free_tier';
       tenant.subscription_start_date = params[1] || tenant.subscription_start_date;
       tenant.subscription_end_date = params[2] || tenant.subscription_end_date;
       tenant.subscription_status = 'ACTIVE';
