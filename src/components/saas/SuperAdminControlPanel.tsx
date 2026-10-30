@@ -1827,7 +1827,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#F8FAFC] dark:bg-[#0A0E1A]">
         {/* STICKY TOP HEADER BAR (Exact h-[3.6rem] aligned with Store Header.tsx) */}
         <header className="h-[3.6rem] sticky top-0 z-20 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-lg border-b border-indigo-500/20 px-3 sm:px-6 flex items-center justify-between gap-3 shrink-0 shadow-2xs transition-colors">
-          {/* Left: Mobile Menu Button + Active Section Title */}
+          {/* Left: Mobile Menu Button */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -1837,18 +1837,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             >
               <Menu className="w-5 h-5" />
             </button>
-
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
-                {activeTab === 'dashboard' && 'SuperAdmin Executive Dashboard'}
-                {activeTab === 'stores' && 'Deployed Stores & Middleware Control'}
-                {(activeTab === 'trials' || (activeTab as any) === 'requests') && '30-Day Free Trial Activations & Extensions'}
-                {activeTab === 'notifications' && 'Custom Announcements & Broadcast Notifications'}
-                {activeTab === 'reports' && 'Platform Reports, Top Revenue Stores & Top Products'}
-                {activeTab === 'manifests' && 'Scoped Tenant PWA Manifests'}
-                {activeTab === 'settings' && 'App & Environment Settings (app_settings)'}
-              </h2>
-            </div>
           </div>
 
           {/* Center: Quick Filter Search Input (aligned with Store Header Quick Search) */}

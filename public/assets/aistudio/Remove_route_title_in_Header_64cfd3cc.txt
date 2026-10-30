@@ -1,0 +1,1 @@
+Remove route title in Header: Remove the dynamic route title from Header.tsx when logged in as a SuperAdmin.

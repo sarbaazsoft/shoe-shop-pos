@@ -950,7 +950,7 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       <header className="px-4 border border-indigo-500/20 bg-white/95 dark:bg-white/10 backdrop-blur-lg shadow-lg transition-colors duration-500 sticky top-0 z-30 select-none text-slate-800 dark:text-slate-100 flex items-center justify-between gap-2.5 sm:gap-4 min-h-[3.6rem] py-1.5 no-print">
-      {/* LEFT: Mobile Menu Toggle Button & Global Search Bar close to hamburger menu */}
+      {/* LEFT: Mobile Menu Toggle Button & Global Search Bar (No dynamic route title displayed when logged in as SuperAdmin or store user) */}
       <div className="flex items-center gap-2 sm:gap-2.5 pl-0.5 sm:pl-1 min-w-0">
         {/* Mobile Menu Toggle Button (< lg) */}
         <button
