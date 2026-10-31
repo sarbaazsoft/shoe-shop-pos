@@ -385,6 +385,7 @@ const mockStore: Record<string, any[]> = {
   ],
   platform_notifications: [],
   platform_notification_reads: [],
+  pos_notification_dismissals: [],
 };
 
 let mockIdCounters: Record<string, number> = {
@@ -411,6 +412,7 @@ let mockIdCounters: Record<string, number> = {
   trial_activations: 1,
   platform_notifications: 1,
   platform_notification_reads: 1,
+  pos_notification_dismissals: 1,
 };
 
 function nextMockId(table: string): number {
@@ -717,7 +719,16 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       const role = params.length > 2 && params[2] !== null && params[2] !== undefined ? String(params[2]).toUpperCase() : 'CASHIER';
 
       const reads = mockStore.platform_notification_reads || [];
+      const nowMs = Date.now();
       const list = (mockStore.platform_notifications || []).filter((pn: any) => {
+        // Expiry check
+        if (pn.expires_at) {
+          const expTime = new Date(pn.expires_at).getTime();
+          if (!isNaN(expTime) && expTime <= nowMs) {
+            return false;
+          }
+        }
+
         const notifRole = (pn.target_role || 'ALL').toUpperCase();
         const notifTitle = (pn.title || '').toLowerCase();
         const notifMsg = (pn.message || '').toLowerCase();
@@ -753,7 +764,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         return notifRole === 'ALL';
       });
 
-      const rows = list.map((pn: any) => {
+      let rows = list.map((pn: any) => {
         const isRead = reads.some((r: any) => Number(r.notification_id) === Number(pn.id) && (Number(r.tenant_id) === tenantId || Number(r.user_id) === userId));
         return {
           ...pn,
@@ -763,6 +774,11 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
           store_name: pn.tenant_id ? (mockStore.tenants.find((t) => Number(t.id) === Number(pn.tenant_id))?.name || 'Store') : 'All Stores (Platform Broadcast)',
         };
       });
+
+      // Filter out dismissed if queried with NOT EXISTS
+      if (upper.includes('NOT EXISTS') && upper.includes('PLATFORM_NOTIFICATION_READS')) {
+        rows = rows.filter((r) => !r.is_read);
+      }
 
       return { rows: rows as unknown as T[], rowCount: rows.length };
     }
@@ -774,6 +790,27 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     }
 
     if (upper.startsWith('UPDATE')) {
+      if (upper.includes('EXPIRES_AT = NOW()')) {
+        const nowIso = new Date().toISOString();
+        const targetTid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
+        for (const pn of mockStore.platform_notifications || []) {
+          if (!targetTid || Number(pn.tenant_id) === targetTid || pn.target_role === 'SUPERADMIN') {
+            const title = (pn.title || '').toLowerCase();
+            const msg = (pn.message || '').toLowerCase();
+            if (
+              title.includes('renewal') ||
+              title.includes('subscription') ||
+              title.includes('free trial') ||
+              msg.includes('renewal') ||
+              msg.includes('subscription')
+            ) {
+              pn.expires_at = nowIso;
+            }
+          }
+        }
+        return { rows: [], rowCount: 1 };
+      }
+
       for (const pn of mockStore.platform_notifications || []) {
         const notifTitle = (pn.title || '').toLowerCase();
         if (notifTitle.includes('new free trial') || notifTitle.includes('renewal request')) {
@@ -800,6 +837,34 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         read_at: new Date().toISOString(),
       });
       return { rows: [], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  if (upper.includes('POS_NOTIFICATION_DISMISSALS')) {
+    if (!mockStore.pos_notification_dismissals) mockStore.pos_notification_dismissals = [];
+    if (upper.startsWith('INSERT INTO')) {
+      const tid = Number(params[0] || 1);
+      const uid = Number(params[1] || 0);
+      const itemType = String(params[2] || 'SALE');
+      const itemId = Number(params[3] || 0);
+      const existing = mockStore.pos_notification_dismissals.find(
+        (d) => d.tenant_id === tid && d.user_id === uid && d.item_type === itemType && d.item_id === itemId
+      );
+      if (!existing) {
+        mockStore.pos_notification_dismissals.push({
+          id: nextMockId('pos_notification_dismissals'),
+          tenant_id: tid,
+          user_id: uid,
+          item_type: itemType,
+          item_id: itemId,
+          dismissed_at: new Date().toISOString(),
+        });
+      }
+      return { rows: [], rowCount: 1 };
+    }
+    if (upper.startsWith('SELECT')) {
+      return { rows: (mockStore.pos_notification_dismissals || []) as unknown as T[], rowCount: mockStore.pos_notification_dismissals?.length || 0 };
     }
     return { rows: [], rowCount: 0 };
   }
@@ -1740,6 +1805,27 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     if (upper.includes('WHERE S.ID = $1') || upper.includes('WHERE ID = $1')) {
       const targetId = Number(params[0]);
       sList = sList.filter((s) => Number(s.id) === targetId);
+    } else {
+      const tid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
+      if (tid && (upper.includes('TENANT_ID = $1') || upper.includes('S.TENANT_ID = $1'))) {
+        sList = sList.filter((s: any) => Number(s.tenant_id) === tid);
+      }
+      const roleParam = params.find((p) => typeof p === 'string' && (p === 'CASHIER' || p === 'ADMIN' || p === 'SUPERADMIN'));
+      if (roleParam === 'CASHIER') {
+        const uid = params.length >= 2 && params[1] !== undefined ? Number(params[1]) : 0;
+        if (uid > 0) {
+          sList = sList.filter((s: any) => Number(s.created_by) === uid);
+        }
+      }
+      if (upper.includes("INTERVAL '48 HOURS'")) {
+        const cutoff = Date.now() - 48 * 3600 * 1000;
+        sList = sList.filter((s: any) => new Date(s.created_at || s.sale_date).getTime() >= cutoff);
+      }
+      if (upper.includes('NOT EXISTS') && upper.includes('POS_NOTIFICATION_DISMISSALS')) {
+        const dismissals = mockStore.pos_notification_dismissals || [];
+        const uid = params.length >= 2 ? Number(params[1]) : 0;
+        sList = sList.filter((s: any) => !dismissals.some((d: any) => d.item_type === 'SALE' && Number(d.item_id) === Number(s.id) && (Number(d.user_id) === uid || Number(d.user_id) === 0)));
+      }
     }
     return { rows: sList as unknown as T[], rowCount: sList.length };
   }
@@ -1909,6 +1995,31 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
 
   if (upper.startsWith('SELECT') && upper.includes('FROM CATEGORIES')) {
     return { rows: mockStore.categories as unknown as T[], rowCount: mockStore.categories.length };
+  }
+
+  if (upper.startsWith('SELECT') && upper.includes('FROM RETURNS')) {
+    let rList = [...(mockStore.returns || [])];
+    const tid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
+    if (tid && (upper.includes('TENANT_ID = $1') || upper.includes('R.TENANT_ID = $1'))) {
+      rList = rList.filter((r: any) => Number(r.tenant_id) === tid);
+    }
+    const roleParam = params.find((p) => typeof p === 'string' && (p === 'CASHIER' || p === 'ADMIN' || p === 'SUPERADMIN'));
+    if (roleParam === 'CASHIER') {
+      const uid = params.length >= 2 && params[1] !== undefined ? Number(params[1]) : 0;
+      if (uid > 0) {
+        rList = rList.filter((r: any) => Number(r.created_by) === uid);
+      }
+    }
+    if (upper.includes("INTERVAL '48 HOURS'")) {
+      const cutoff = Date.now() - 48 * 3600 * 1000;
+      rList = rList.filter((r: any) => new Date(r.created_at || r.return_date).getTime() >= cutoff);
+    }
+    if (upper.includes('NOT EXISTS') && upper.includes('POS_NOTIFICATION_DISMISSALS')) {
+      const dismissals = mockStore.pos_notification_dismissals || [];
+      const uid = params.length >= 2 ? Number(params[1]) : 0;
+      rList = rList.filter((r: any) => !dismissals.some((d: any) => d.item_type === 'RETURN' && Number(d.item_id) === Number(r.id) && (Number(d.user_id) === uid || Number(d.user_id) === 0)));
+    }
+    return { rows: rList as unknown as T[], rowCount: rList.length };
   }
 
   return { rows: [], rowCount: 0 };

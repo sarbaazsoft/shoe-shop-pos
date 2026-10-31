@@ -23,6 +23,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const visitKey = `pos_store_owner_visited_${tenantId}_${userId}`;
   const dismissKey = `pos_welcome_banner_dismissed_${tenantId}_${userId}`;
 
+  const [activeNotices, setActiveNotices] = useState<any[]>([]);
+
+  const loadNotices = async () => {
+    try {
+      const res = await api.notifications.grouped(5);
+      if (res && Array.isArray(res.notices)) {
+        setActiveNotices(res.notices);
+      }
+    } catch (err) {
+      console.warn('Dashboard active notices fetch:', err);
+    }
+  };
+
+  const handleDismissNotice = async (noticeId: number | string) => {
+    try {
+      setActiveNotices((prev) => prev.filter((n) => n.id !== noticeId));
+      await api.notifications.dismiss(noticeId, 'NOTICE');
+    } catch (err) {
+      console.error('Failed to dismiss notice from dashboard:', err);
+    }
+  };
+
   const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
     try {
       if (
@@ -326,6 +348,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   useEffect(() => {
     loadData();
+    loadNotices();
   }, []);
 
   const formattedDate = new Date().toLocaleDateString('en-US', {
@@ -427,6 +450,105 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* High-Priority Active Platform Notices Banner */}
+      {activeNotices.length > 0 && (
+        <div className="space-y-3" id="dashboard-active-notices-container">
+          {activeNotices.map((notice) => {
+            const isUrgent = notice.is_urgent || notice.type === 'URGENT' || notice.type === 'WARNING';
+            return (
+              <div
+                key={notice.id}
+                className={`p-4 rounded-2xl border transition-all shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                  isUrgent
+                    ? 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-orange-500/15 border-amber-400/50 dark:border-amber-500/40 dark:bg-amber-950/40 text-slate-900 dark:text-amber-100'
+                    : 'bg-gradient-to-r from-purple-500/15 via-indigo-500/10 to-blue-500/15 border-purple-300/50 dark:border-purple-500/40 dark:bg-purple-950/40 text-slate-900 dark:text-purple-100'
+                }`}
+              >
+                <div className="flex items-start gap-3.5 min-w-0 z-10">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs border ${
+                      isUrgent
+                        ? 'bg-amber-500 text-white border-amber-300/40'
+                        : 'bg-purple-600 text-white border-purple-400/40'
+                    }`}
+                  >
+                    {isUrgent ? (
+                      <AlertTriangle className="w-4 h-4 animate-pulse" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          isUrgent
+                            ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60'
+                            : 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60'
+                        }`}
+                      >
+                        {notice.type || 'Notice'}
+                      </span>
+                      {notice.created_at && (
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {new Date(notice.created_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white leading-snug">
+                      {notice.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-3xl whitespace-pre-line">
+                      {notice.message}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center flex-wrap gap-2.5 shrink-0 self-end md:self-center z-10">
+                  {notice.action_text && notice.action_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (notice.action_url?.startsWith('/')) {
+                          const tabName = notice.action_url.replace(/^\/(dashboard\/)?/, '');
+                          onNavigate(tabName || 'dashboard');
+                        } else if (notice.action_url?.includes('renew') || notice.action_url?.includes('upgrade')) {
+                          handleOpenUpgradeModal();
+                        } else {
+                          onNavigate(notice.action_url);
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 text-white ${
+                        isUrgent
+                          ? 'bg-amber-600 hover:bg-amber-500'
+                          : 'bg-purple-600 hover:bg-purple-500'
+                      }`}
+                    >
+                      <span>{notice.action_text}</span>
+                      <span>&rarr;</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleDismissNotice(notice.id)}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95"
+                    title="Dismiss this notice"
+                    aria-label="Dismiss notice"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Dismiss</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Context-Aware Store Owner Welcome Greeting Banner */}
       {showWelcomeBanner && (

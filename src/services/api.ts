@@ -1,7 +1,7 @@
 // Central API service with JWT token injection, tenant isolation, and offline catalog fallback
 import { cacheCatalogOffline, deleteCachedProductOffline, lookupCachedProductOffline, searchCachedProductsOffline } from '../utils/offlineDb.ts';
 import { transformKeysToCamelCase } from '../utils/caseTransformer.ts';
-import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult } from '../types.ts';
+import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult, GroupedNotificationsResponse, AllNotificationsResponse, HistoricalNotificationItem } from '../types.ts';
 
 const TOKEN_KEY = 'pos_auth_token';
 const ALT_TOKEN_KEY = 'shoe_pos_jwt_token';
@@ -1145,6 +1145,49 @@ export const api = {
   },
   notifications: {
     list: () => apiFetch('/notifications'),
+    grouped: (limit: number = 5) =>
+      apiFetch<GroupedNotificationsResponse>(`/notifications/grouped?limit=${limit}`),
+    all: (params?: {
+      page?: number;
+      limit?: number;
+      tab?: string;
+      category?: string;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: string;
+      unreadOnly?: boolean;
+    }) => {
+      const sp = new URLSearchParams();
+      if (params?.page) sp.set('page', String(params.page));
+      if (params?.limit) sp.set('limit', String(params.limit));
+      if (params?.tab) sp.set('tab', params.tab);
+      if (params?.category) sp.set('category', params.category);
+      if (params?.search) sp.set('search', params.search);
+      if (params?.sortBy) sp.set('sortBy', params.sortBy);
+      if (params?.sortOrder) sp.set('sortOrder', params.sortOrder);
+      if (params?.unreadOnly !== undefined) sp.set('unreadOnly', String(params.unreadOnly));
+      const qs = sp.toString() ? `?${sp.toString()}` : '';
+      return apiFetch<AllNotificationsResponse>(`/notifications/all${qs}`);
+    },
+    dismiss: (id: string | number, itemType?: string) =>
+      apiFetch<{ success: boolean; message: string }>(`/notifications/${encodeURIComponent(String(id))}/dismiss`, {
+        method: 'POST',
+        body: itemType ? { itemType } : {},
+      }),
+    dismissAll: (category?: string) =>
+      apiFetch<{ success: boolean; message: string }>('/notifications/dismiss-all', {
+        method: 'POST',
+        body: category ? { category } : {},
+      }),
+    markRead: (id: string | number, itemType?: string) =>
+      apiFetch<{ success: boolean; message: string }>(`/notifications/${encodeURIComponent(String(id))}/read`, {
+        method: 'POST',
+        body: itemType ? { itemType } : {},
+      }),
+    markAllRead: () =>
+      apiFetch<{ success: boolean; message: string }>('/notifications/mark-all-read', {
+        method: 'POST',
+      }),
     getVapidPublicKey: () => apiFetch<{ publicKey: string }>('/notifications/vapid-public-key'),
     subscribe: (subscription: any) =>
       apiFetch<{ success: boolean }>('/notifications/subscribe', { method: 'POST', body: { subscription } }),

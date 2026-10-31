@@ -336,6 +336,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Platform Announcements from SuperAdmin
   const [platformAnnouncements, setPlatformAnnouncements] = useState<PlatformNotification[]>([]);
   const [isDismissingAnnouncement, setIsDismissingAnnouncement] = useState<number | null>(null);
+  const [notifDropdownTab, setNotifDropdownTab] = useState<'notices' | 'notifications'>('notices');
 
   // Web Push API & Live POS Push Notification State
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
@@ -538,13 +539,13 @@ export const Header: React.FC<HeaderProps> = ({
     isFetchingNotifsRef.current = true;
     try {
       setIsLoadingNotifs(true);
-      const res = (await api.notifications.list()) as any;
+      const res = await api.notifications.grouped(5);
       if (res) {
         if (Array.isArray(res.notifications)) {
           setNotifications(res.notifications);
         }
-        if (Array.isArray(res.announcements)) {
-          setPlatformAnnouncements(res.announcements);
+        if (Array.isArray(res.notices)) {
+          setPlatformAnnouncements(res.notices);
         }
       }
     } catch {
@@ -604,13 +605,22 @@ export const Header: React.FC<HeaderProps> = ({
     });
   };
 
-  const handleDismissAnnouncement = async (id: number) => {
+  const handleDismissActivity = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      await api.notifications.dismiss(id);
+    } catch (err) {
+      console.warn('Failed to dismiss activity:', err);
+    }
+  };
+
+  const handleDismissAnnouncement = async (id: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       setIsDismissingAnnouncement(id);
-      setPlatformAnnouncements((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, isRead: true } : a))
-      );
-      await api.notifications.dismissAnnouncement(id);
+      setPlatformAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      await api.notifications.dismiss(id, 'NOTICE');
     } catch (err) {
       console.error('Failed to dismiss announcement:', err);
     } finally {
@@ -620,10 +630,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleDismissAllAnnouncements = async () => {
     try {
-      setPlatformAnnouncements((prev) =>
-        prev.map((a) => ({ ...a, isRead: true }))
-      );
-      await api.notifications.dismissAllAnnouncements();
+      setPlatformAnnouncements([]);
+      setNotifications([]);
+      await api.notifications.dismissAll();
     } catch (err) {
       console.error('Failed to dismiss all announcements:', err);
     }
@@ -1511,39 +1520,81 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
 
-                {/* Unified Notifications Column (Notices & Store Activity) */}
-                <div className="max-h-[320px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
-                  {unifiedNotifications.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 dark:text-purple-300/60">
-                      <Bell className="w-5 h-5 mx-auto mb-1.5 opacity-40 stroke-[1.8] text-purple-500 dark:text-purple-300" />
-                      <p className="text-xs font-semibold dark:text-purple-200">No notifications</p>
-                      <p className="text-[10px] mt-0.5 dark:text-purple-300/60">All store registers and platform notices are up to date</p>
-                    </div>
-                  ) : (
-                    unifiedNotifications.map((item) => {
-                      if (item.kind === 'ANNOUNCEMENT') {
-                        const a = item.raw;
-                        const isUnread = !item.isRead;
+                {/* Tabbed Dropdown Selector with Live Badge Counts */}
+                <div className="flex items-center gap-1 p-1 mb-2 bg-slate-100 dark:bg-purple-950/60 rounded-xl border border-slate-200/80 dark:border-purple-800/40">
+                  <button
+                    type="button"
+                    onClick={() => setNotifDropdownTab('notices')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      notifDropdownTab === 'notices'
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>Notices</span>
+                    {unreadAnnouncementsCount > 0 && (
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
+                        notifDropdownTab === 'notices'
+                          ? 'bg-purple-800 text-white'
+                          : 'bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+                      }`}>
+                        {unreadAnnouncementsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNotifDropdownTab('notifications')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      notifDropdownTab === 'notifications'
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>Notifications</span>
+                    {unreadPosCount > 0 && (
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
+                        notifDropdownTab === 'notifications'
+                          ? 'bg-purple-800 text-white'
+                          : 'bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+                      }`}>
+                        {unreadPosCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Tab Content Container - Strictly Capped at Max 5 Visible Items */}
+                <div className="max-h-[300px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
+                  {notifDropdownTab === 'notices' ? (
+                    visibleAnnouncements.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 dark:text-purple-300/60">
+                        <Info className="w-5 h-5 mx-auto mb-1.5 opacity-40 stroke-[1.8] text-purple-500 dark:text-purple-300" />
+                        <p className="text-xs font-semibold dark:text-purple-200">No active notices</p>
+                        <p className="text-[10px] mt-0.5 dark:text-purple-300/60">Platform announcements and system alerts are all caught up</p>
+                      </div>
+                    ) : (
+                      visibleAnnouncements.slice(0, 5).map((a) => {
+                        const isUnread = !a.isRead;
                         const details = getNoticeTypeDetails(a.type);
 
                         return (
                           <div
-                            key={item.id}
+                            key={`notice-${a.id}`}
                             className={`p-2.5 rounded-xl border transition ${
                               isUnread
                                 ? details.cardBorderClass
                                 : 'bg-white/60 dark:bg-[#120726]/50 border-slate-200/80 dark:border-purple-900/30 opacity-75'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-1 mb-1.5">
+                            <div className="flex items-center justify-between gap-1 mb-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                {/* Clear Label & Type Badge */}
                                 <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${details.badgeClass}`}>
                                   {details.icon}
                                   <span>{details.label}</span>
                                 </span>
 
-                                {/* Scope badge */}
                                 <span className="text-[8.5px] font-medium text-slate-500 dark:text-purple-300/70 flex items-center gap-0.5">
                                   {!a.tenantId ? (
                                     <>
@@ -1553,32 +1604,26 @@ export const Header: React.FC<HeaderProps> = ({
                                   ) : (
                                     <>
                                       <Store className="w-2.5 h-2.5 text-indigo-500" />
-                                      <span>Direct Store Alert</span>
+                                      <span>Direct Alert</span>
                                     </>
                                   )}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[9px] text-slate-400 dark:text-purple-300/70">
-                                  {formatAnnouncementTime(item.createdAt)}
-                                </span>
-                                {isUnread && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 ring-2 ring-rose-200 dark:ring-rose-900/50" />
-                                )}
-                              </div>
+                              <span className="text-[9px] text-slate-400 dark:text-purple-300/70">
+                                {formatAnnouncementTime(a.createdAt)}
+                              </span>
                             </div>
 
                             <div className="font-bold text-xs text-slate-900 dark:text-purple-100 leading-snug">
-                              {item.title}
+                              {a.title}
                             </div>
 
-                            <div className="text-[11px] text-slate-600 dark:text-purple-200/90 mt-1 whitespace-pre-line leading-relaxed">
-                              {String(item.message || '').replace(new RegExp('^' + String(item.title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '').trim() || item.message}
+                            <div className="text-[11px] text-slate-600 dark:text-purple-200/90 mt-1 whitespace-pre-line leading-relaxed line-clamp-2">
+                              {String(a.message || '').replace(new RegExp('^' + String(a.title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '').trim() || a.message}
                             </div>
 
-                            {/* Action Link & Dismissal */}
-                            <div className="mt-2.5 pt-1.5 border-t border-slate-200/60 dark:border-purple-800/40 flex items-center justify-between gap-2">
+                            <div className="mt-2 pt-1.5 border-t border-slate-200/60 dark:border-purple-800/40 flex items-center justify-between gap-2">
                               {a.actionUrl ? (
                                 <a
                                   href={a.actionUrl}
@@ -1586,95 +1631,92 @@ export const Header: React.FC<HeaderProps> = ({
                                   rel="noreferrer"
                                   className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
                                 >
-                                  <span>{a.actionLabel || 'Visit Action Link'}</span>
+                                  <span>{a.actionLabel || 'View Link'}</span>
                                   <ExternalLink className="w-2.5 h-2.5" />
                                 </a>
                               ) : (
                                 <span className="text-[9.5px] text-slate-400 dark:text-purple-300/60">
-                                  From SuperAdmin
+                                  System Notice
                                 </span>
                               )}
 
-                              {isUnread ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDismissAnnouncement(a.id)}
-                                  disabled={isDismissingAnnouncement === a.id}
-                                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-purple-900/60 hover:bg-slate-100 dark:hover:bg-purple-800/60 text-slate-700 dark:text-purple-200 border border-slate-200 dark:border-purple-700/60 flex items-center gap-1 cursor-pointer transition active:scale-95 shadow-2xs"
-                                  title="Acknowledge notice"
-                                >
-                                  <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
-                                  <span>{isDismissingAnnouncement === a.id ? 'Saving...' : 'Acknowledge'}</span>
-                                </button>
-                              ) : (
-                                <span className="text-[9.5px] font-medium text-slate-400 dark:text-purple-300/60 flex items-center gap-1">
-                                  <CheckCheck className="w-3 h-3 text-emerald-500" />
-                                  <span>Read</span>
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDismissAnnouncement(a.id, e)}
+                                disabled={isDismissingAnnouncement === a.id}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-purple-900/60 hover:bg-slate-100 dark:hover:bg-purple-800/60 text-slate-700 dark:text-purple-200 border border-slate-200 dark:border-purple-700/60 flex items-center gap-1 cursor-pointer transition active:scale-95 shadow-2xs"
+                                title="Dismiss notice"
+                              >
+                                <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>{isDismissingAnnouncement === a.id ? 'Saving...' : 'Dismiss'}</span>
+                              </button>
                             </div>
                           </div>
                         );
-                      } else {
-                        // Store Activity Item
-                        const isRead = item.isRead;
-                        const details = getActivityTypeDetails(item.type, item.title);
+                      })
+                    )
+                  ) : (
+                    // POS Operational Activity Tab
+                    notifications.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 dark:text-purple-300/60">
+                        <ShoppingBag className="w-5 h-5 mx-auto mb-1.5 opacity-40 stroke-[1.8] text-purple-500 dark:text-purple-300" />
+                        <p className="text-xs font-semibold dark:text-purple-200">No operational alerts</p>
+                        <p className="text-[10px] mt-0.5 dark:text-purple-300/60">No counter checkout or return events within the last 48 hours</p>
+                      </div>
+                    ) : (
+                      notifications.slice(0, 5).map((n) => {
+                        const details = getActivityTypeDetails(n.type, n.title);
 
                         return (
                           <div
-                            key={item.id}
-                            onClick={() => handleActivityClick(item)}
-                            className={`p-2.5 rounded-xl border transition cursor-pointer ${
-                              !isRead
-                                ? 'bg-purple-50/70 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800/60 hover:bg-purple-100/60 dark:hover:bg-purple-900/40'
-                                : 'bg-white/60 dark:bg-[#120726]/50 border-slate-200/80 dark:border-purple-900/30 opacity-75 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-purple-950/20'
-                            }`}
+                            key={n.id}
+                            onClick={() => handleActivityClick({ raw: n, rawId: n.rawId || n.id, title: n.title, message: n.message, actionTab: n.actionTab })}
+                            className="p-2.5 rounded-xl border border-purple-200/90 dark:border-purple-800/60 bg-purple-50/70 dark:bg-purple-950/30 hover:bg-purple-100/60 dark:hover:bg-purple-900/40 transition cursor-pointer"
                           >
-                            <div className="flex items-center justify-between gap-1 mb-1.5">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {/* Clear Label & Type Badge */}
-                                <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${details.badgeClass}`}>
-                                  {details.icon}
-                                  <span>Activity • {details.label}</span>
-                                </span>
-                              </div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${details.badgeClass}`}>
+                                {details.icon}
+                                <span>{details.label}</span>
+                              </span>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[9px] text-slate-400 dark:text-purple-300/70">
-                                  {formatAnnouncementTime(item.createdAt)}
-                                </span>
-                                {!isRead && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 ring-2 ring-purple-200 dark:ring-purple-900/50" />
-                                )}
-                              </div>
+                              <span className="text-[9px] text-slate-400 dark:text-purple-300/70">
+                                {formatAnnouncementTime(n.timestamp || n.created_at || n.sale_date)}
+                              </span>
                             </div>
 
                             <div className="font-bold text-xs text-slate-900 dark:text-purple-100 leading-snug">
-                              {item.title}
+                              {n.title}
                             </div>
 
                             <div className="text-[11px] text-slate-600 dark:text-purple-200/90 mt-1 whitespace-pre-line leading-relaxed">
-                              {String(item.message || '').replace(new RegExp('^' + String(item.title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '').trim() || item.message}
+                              {n.message}
                             </div>
 
                             <div className="mt-2 pt-1.5 border-t border-slate-200/60 dark:border-purple-800/40 flex items-center justify-between text-[10px]">
-                              <span className="font-medium text-purple-600 dark:text-purple-300 flex items-center gap-1">
+                              <span className="font-semibold text-purple-600 dark:text-purple-300 flex items-center gap-1">
                                 <span>{details.actionText}</span>
                                 <span>&rarr;</span>
                               </span>
-                              <span className="text-[9px] text-slate-400 dark:text-purple-300/60">
-                                {isRead ? 'Acknowledged' : 'Click to inspect'}
-                              </span>
+
+                              <button
+                                type="button"
+                                onClick={(e) => handleDismissActivity(n.id, e)}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white dark:bg-purple-900/60 hover:bg-slate-100 dark:hover:bg-purple-800/60 text-slate-700 dark:text-purple-200 border border-slate-200 dark:border-purple-700/60 flex items-center gap-1 cursor-pointer transition active:scale-95 shadow-2xs"
+                                title="Dismiss notification"
+                              >
+                                <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>Dismiss</span>
+                              </button>
                             </div>
                           </div>
                         );
-                      }
-                    })
+                      })
+                    )
                   )}
                 </div>
 
-                {/* Unified Notifications Footer */}
-                <div className="px-2.5 py-1.5 border-t border-slate-100 dark:border-purple-800/40 mt-1.5 flex items-center justify-between text-[11px]">
+                {/* Sticky Footer with View All Notifications Link & Mark All Read */}
+                <div className="px-2.5 py-2 border-t border-slate-100 dark:border-purple-800/40 mt-1.5 flex items-center justify-between text-[11px] sticky bottom-0 bg-white/95 dark:bg-[#120726]/95 backdrop-blur-md">
                   {unreadCount > 0 ? (
                     <button
                       type="button"
@@ -1682,29 +1724,26 @@ export const Header: React.FC<HeaderProps> = ({
                         e.stopPropagation();
                         handleMarkAllNotificationsRead();
                       }}
-                      className="text-purple-600 dark:text-purple-200 hover:text-purple-700 dark:hover:text-white hover:bg-purple-50/40 dark:hover:bg-purple-500/25 px-1.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer font-medium transition-colors text-[10px]"
+                      className="text-purple-600 dark:text-purple-200 hover:text-purple-700 dark:hover:text-white hover:bg-purple-50/40 dark:hover:bg-purple-500/25 px-1.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer font-semibold transition-colors text-[10px]"
                     >
-                      <CheckCheck className="w-2.5 h-2.5" />
-                      Mark all as read
+                      <CheckCheck className="w-3 h-3" />
+                      <span>Mark all as read</span>
                     </button>
                   ) : (
-                    <span className="text-slate-400 dark:text-purple-300/70 text-[9px]">All caught up</span>
+                    <span className="text-slate-400 dark:text-purple-300/70 text-[9.5px]">All caught up</span>
                   )}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9.5px] font-semibold text-slate-400 dark:text-purple-300/60">
-                      {unifiedNotifications.length} {unifiedNotifications.length === 1 ? 'Alert' : 'Alerts'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onTabChange?.('inventory');
-                        setShowNotifications(false);
-                      }}
-                      className="text-slate-500 dark:text-purple-300 hover:text-slate-800 dark:hover:text-purple-100 cursor-pointer font-medium text-[10px]"
-                    >
-                      View Stock &rarr;
-                    </button>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNotifications(false);
+                      onTabChange?.('notifications');
+                    }}
+                    className="text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-white cursor-pointer font-bold text-[10.5px] flex items-center gap-1 hover:underline"
+                  >
+                    <span>View All Notifications</span>
+                    <span>&rarr;</span>
+                  </button>
                 </div>
               </motion.div>
             )}

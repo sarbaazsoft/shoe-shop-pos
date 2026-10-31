@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
@@ -1581,6 +1581,10 @@ async function handleUpdateTenantSubscription(req: AuthenticatedRequest, res: Re
         );
     }
 
+    if (finalSubStatus === 'ACTIVE') {
+      await clearSubscriptionAlertsOnRenewal(tenantId);
+    }
+
     const row = updatedRes.rows[0];
     const resolvedPlan = normalizeSubscriptionPlan(row?.subscription_plan || finalPlan);
     const resolvedType = normalizeSubscriptionType(row?.subscription_type || resolvedPlan);
@@ -2466,6 +2470,7 @@ router.post('/superadmin/trial-activations/:id/extend', requireAuth, requireSupe
          WHERE id = $2`,
         [newEndDate.toISOString(), trial.tenant_id]
       );
+      await clearSubscriptionAlertsOnRenewal(trial.tenant_id);
     }
 
     return res.json({

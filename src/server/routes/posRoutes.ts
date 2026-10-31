@@ -643,6 +643,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           netDifference,
           customerName: customerDisplayName,
           cashierName: cashierDisplayName,
+          cashierId: user.id,
           itemsSummary: `Old: ${oldItemsStr} ➔ New: ${newItemsStr}`,
           exchangeDetails: {
             oldItems: oldItemsStr,
@@ -667,6 +668,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           totalAmount: totalAmountDue,
           customerName: customerDisplayName,
           cashierName: cashierDisplayName,
+          cashierId: user.id,
           itemsSummary,
           deepLinkUrl: `/?tab=reports&viewInvoice=${encodeURIComponent(invoiceNumber)}`,
           timestamp: new Date().toISOString(),

@@ -24,6 +24,7 @@ import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
 import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel.tsx';
 import { TenantOnboardingWizard } from './components/saas/TenantOnboardingWizard.tsx';
 import { InstallationWizard } from './components/saas/InstallationWizard.tsx';
+import { NotificationsView } from './components/notifications/NotificationsView.tsx';
 import { ShieldAlert } from 'lucide-react';
 import type { ActiveExchange, TenantInfo } from './types.ts';
 
@@ -39,7 +40,7 @@ type SaasRouteMode =
 
 const APP_TAB_ROUTES = new Set([
   'dashboard', 'pos', 'inventory', 'ledger', 'purchases', 'suppliers',
-  'returns', 'customers', 'reports', 'settings', 'assistant',
+  'returns', 'customers', 'reports', 'settings', 'assistant', 'notifications',
 ]);
 
 function appPathForTab(tab: string): string {
@@ -106,7 +107,10 @@ function detectInitialRouteFromLocation(): {
     return { mode: 'TENANT_ONBOARDING', tenantIdParam, isAuthRoute };
   }
 
-  const pathTab = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  let pathTab = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  if (pathTab === 'dashboard/notifications') {
+    pathTab = 'notifications';
+  }
   const queryTab = searchParams.get('tab')?.toLowerCase() || '';
   const requestedTab = APP_TAB_ROUTES.has(pathTab) ? pathTab : queryTab;
   if (requestedTab && APP_TAB_ROUTES.has(requestedTab)) {
@@ -1378,6 +1382,14 @@ export default function App() {
                       {currentTab === 'assistant' && (
                         <SammiAssistantView
                           storeName={effectiveStoreName}
+                          currentUser={currentUser}
+                          companySettings={companySettings}
+                          onNavigateTab={(tab) => handleTabChange(tab)}
+                        />
+                      )}
+
+                      {currentTab === 'notifications' && (
+                        <NotificationsView
                           currentUser={currentUser}
                           companySettings={companySettings}
                           onNavigateTab={(tab) => handleTabChange(tab)}

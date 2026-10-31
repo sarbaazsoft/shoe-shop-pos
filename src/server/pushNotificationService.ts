@@ -204,6 +204,7 @@ export async function notifyPosAction(
   // 1. Deliver to active browser dashboard sessions via Server-Sent Events (SSE)
   // CRITICAL: SuperAdmin NEVER receives store POS notifications (prevent cross-role leakage).
   // Only deliver to matching tenant store sessions with permitted roles (ADMIN and/or CASHIER).
+  // Cashiers ONLY receive real-time alerts for operations they performed themselves.
   const sseMessage = `event: pos_action\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const client of sseClients) {
     if (
@@ -211,6 +212,9 @@ export async function notifyPosAction(
       client.role !== 'SUPERADMIN' &&
       allowedRoles.includes(client.role as any)
     ) {
+      if (client.role === 'CASHIER' && payload.cashierId && client.userId !== payload.cashierId) {
+        continue;
+      }
       try {
         client.res.write(sseMessage);
       } catch {
@@ -230,8 +234,10 @@ export async function notifyPosAction(
       endpoint: string;
       p256dh: string;
       auth: string;
+      user_role: string;
+      user_id: number;
     }>(
-      `SELECT endpoint, p256dh, auth
+      `SELECT endpoint, p256dh, auth, user_role, user_id
        FROM public.push_subscriptions
        WHERE tenant_id = $1
          AND UPPER(user_role) = ANY($2)
@@ -264,6 +270,11 @@ export async function notifyPosAction(
     });
 
     const sendPromises = subsRes.rows.map(async (row) => {
+      // Cashiers only receive Web Push notifications for their own transactions
+      if (String(row.user_role).toUpperCase() === 'CASHIER' && payload.cashierId && Number(row.user_id) !== Number(payload.cashierId)) {
+        return;
+      }
+
       const pushSub: webpush.PushSubscription = {
         endpoint: row.endpoint,
         keys: {

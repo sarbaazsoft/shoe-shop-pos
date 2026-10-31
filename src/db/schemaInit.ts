@@ -251,6 +251,7 @@ export const REQUIRED_DATABASE_TABLES = [
   'app_settings',
   'platform_notifications',
   'platform_notification_reads',
+  'pos_notification_dismissals',
 ] as const;
 
 export const DATABASE_ENUM_DDL: string[] = [
@@ -680,6 +681,15 @@ const DATABASE_TABLE_DDL: string[] = [
     read_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT platform_notification_reads_unique UNIQUE(notification_id, tenant_id, user_id)
   )`,
+  `CREATE TABLE IF NOT EXISTS pos_notification_dismissals (
+    id SERIAL PRIMARY KEY,
+    tenant_id INTEGER NOT NULL DEFAULT 1,
+    user_id INTEGER NOT NULL DEFAULT 0,
+    item_type TEXT NOT NULL DEFAULT 'SALE',
+    item_id INTEGER NOT NULL,
+    dismissed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT pos_notification_dismissals_unique UNIQUE(tenant_id, user_id, item_type, item_id)
+  )`,
 ];
 
 const DATABASE_INDEX_DDL: string[] = [
@@ -817,6 +827,17 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS platform_notification_reads_notif_idx ON public.platform_notification_reads(notification_id);
         CREATE INDEX IF NOT EXISTS platform_notification_reads_tenant_idx ON public.platform_notification_reads(tenant_id);
 
+        CREATE TABLE IF NOT EXISTS public.pos_notification_dismissals (
+          id SERIAL PRIMARY KEY,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          user_id INTEGER NOT NULL DEFAULT 0,
+          item_type TEXT NOT NULL DEFAULT 'SALE',
+          item_id INTEGER NOT NULL,
+          dismissed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          CONSTRAINT pos_notification_dismissals_unique UNIQUE(tenant_id, user_id, item_type, item_id)
+        );
+        CREATE INDEX IF NOT EXISTS pos_notification_dismissals_idx ON public.pos_notification_dismissals(tenant_id, user_id, item_type);
+
         UPDATE public.platform_notifications
         SET target_role = 'SUPERADMIN', tenant_id = NULL
         WHERE target_role != 'SUPERADMIN'
@@ -834,6 +855,33 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
     });
   }
   return platformNotificationsSchemaPromise;
+}
+
+/**
+ * Automatically clears subscription and renewal alerts upon renewal or trial extension
+ * by setting expires_at = NOW().
+ */
+export async function clearSubscriptionAlertsOnRenewal(tenantId: number): Promise<void> {
+  const cleanId = Number(tenantId) || 1;
+  try {
+    await pgClient.query(
+      `UPDATE platform_notifications
+       SET expires_at = NOW()
+       WHERE (tenant_id = $1 OR target_role = 'SUPERADMIN')
+         AND (
+           title ILIKE '%Renewal Request%'
+           OR title ILIKE '%Subscription%'
+           OR title ILIKE '%Free Trial%'
+           OR message ILIKE '%renewal%'
+           OR message ILIKE '%subscription%'
+           OR message ILIKE '%free tier store registered%'
+         )
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+      [cleanId]
+    );
+  } catch (err) {
+    console.warn('Could not clear subscription alerts on renewal:', err);
+  }
 }
 
 /** Migrates legacy Khata history and ensures the unified customer ledger exists. */

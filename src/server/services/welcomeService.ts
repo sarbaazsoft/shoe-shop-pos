@@ -69,8 +69,8 @@ export async function sendWelcomeMsg(
   await ensurePlatformNotificationsSchema();
   const notifRes = await pgClient.query<{ id: number; created_at: string }>(
     `INSERT INTO platform_notifications (
-       tenant_id, target_role, title, message, type, action_url, action_label, created_at
-     ) VALUES ($1, 'ADMIN', $2, $3, 'SUCCESS', $4, 'Open POS Terminal', NOW())
+       tenant_id, target_role, title, message, type, action_url, action_label, expires_at, created_at
+     ) VALUES ($1, 'ADMIN', $2, $3, 'SUCCESS', $4, 'Open POS Terminal', NOW() + INTERVAL '14 days', NOW())
      RETURNING id, created_at`,
     [
       cleanTenantId,
@@ -187,8 +187,8 @@ export async function sendStaffWelcomeNotification(
     await ensurePlatformNotificationsSchema();
     const notifRes = await pgClient.query<{ id: number; created_at: string }>(
       `INSERT INTO platform_notifications (
-         tenant_id, target_role, title, message, type, action_url, action_label, created_at
-       ) VALUES ($1, $2, $3, $4, 'SUCCESS', $5, 'Launch POS Terminal (F9)', NOW())
+         tenant_id, target_role, title, message, type, action_url, action_label, expires_at, created_at
+       ) VALUES ($1, $2, $3, $4, 'SUCCESS', $5, 'Launch POS Terminal (F9)', NOW() + INTERVAL '14 days', NOW())
        RETURNING id, created_at`,
       [
         cleanTenantId,

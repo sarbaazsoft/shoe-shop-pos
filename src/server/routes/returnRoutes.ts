@@ -313,6 +313,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =
         totalAmount: totalRefundAmount,
         customerName: sale.customer_name || 'Walk-in Customer',
         cashierName: cashierDisplayName,
+        cashierId: req.user!.id,
         itemsSummary,
         deepLinkUrl: `/?tab=returns&viewReturn=${encodeURIComponent(returnNumber)}&invoice=${encodeURIComponent(sale.invoice_number)}`,
         timestamp: new Date().toISOString(),

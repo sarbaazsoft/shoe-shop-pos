@@ -659,4 +659,67 @@ export interface PlatformNotification {
   isRead?: boolean;
 }
 
+export interface PosOperationalNotification {
+  id: string; // e.g. "sale-101"
+  rawId: number;
+  itemType: 'SALE' | 'RETURN' | 'EXCHANGE' | 'COUNTER_EVENT' | string;
+  type: string;
+  title: string;
+  message: string;
+  totalAmount?: number;
+  invoiceNumber?: string;
+  returnNumber?: string;
+  deepLinkUrl?: string;
+  actionTab?: string;
+  createdAt: string;
+  timestamp: string;
+  isRead?: boolean;
+}
+
+export interface GroupedNotificationsResponse {
+  notices: PlatformNotification[];
+  notifications: PosOperationalNotification[];
+  unreadNoticesCount: number;
+  unreadNotificationsCount: number;
+  totalUnread: number;
+  limit: number;
+}
+
+export interface HistoricalNotificationItem {
+  id: string;
+  rawId: number;
+  kind: 'NOTICE' | 'OPERATIONAL';
+  itemType: string;
+  type: string;
+  title: string;
+  message: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  deepLinkUrl?: string;
+  totalAmount?: number;
+  invoiceNumber?: string;
+  returnNumber?: string;
+  tenantId?: number | null;
+  targetRole?: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  isRead: boolean;
+}
+
+export interface AllNotificationsResponse {
+  items: HistoricalNotificationItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  stats: {
+    totalNotices: number;
+    totalOperational: number;
+    unreadNotices: number;
+    unreadOperational: number;
+  };
+}
+
 
