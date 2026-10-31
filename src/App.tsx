@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { api, getAuthToken, setAuthSession, removeAuthToken, revokeSessionOnServer, setActiveTenantId, getActiveTenantId } from './services/api.ts';
+import { api, getAuthToken, setAuthSession, removeAuthToken, clearAllSessionState, revokeSessionOnServer, setActiveTenantId, getActiveTenantId } from './services/api.ts';
 import { Header } from './components/common/Header.tsx';
 import { Sidebar } from './components/common/Sidebar.tsx';
 import { PosTerminal } from './components/pos/PosTerminal.tsx';
@@ -156,8 +156,17 @@ export default function App() {
 
   const [companySettings, setCompanySettings] = useState<any | null>(() => {
     try {
+      const token = localStorage.getItem('pos_auth_token') || localStorage.getItem('shoe_pos_jwt_token');
+      if (!token || token === 'null' || token === 'undefined') return null;
+      const storedUserRaw = localStorage.getItem('pos_current_user') || localStorage.getItem('shoe_pos_user');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
       const stored = localStorage.getItem('cached_company_settings');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      if (storedUser?.tenantId && parsed?.tenantId && Number(parsed.tenantId) !== Number(storedUser.tenantId)) {
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -165,6 +174,8 @@ export default function App() {
 
   const [cachedStoreName, setCachedStoreName] = useState<string>(() => {
     try {
+      const token = localStorage.getItem('pos_auth_token') || localStorage.getItem('shoe_pos_jwt_token');
+      if (!token || token === 'null' || token === 'undefined') return '';
       return localStorage.getItem('cached_store_name') || '';
     } catch {
       return '';
@@ -200,21 +211,61 @@ export default function App() {
     Boolean(tenantIdParam) && !isRequestedTenantVerified && !tenantIdNotice
   );
 
-  // Auth routes must never inherit a previous session's cached store branding.
-  // For an explicit store URL, only the tenant-directory-verified target is trusted;
-  // for generic /auth or /login routes, use neutral branding until a store is selected.
-  const suppressCachedTenantBranding = initialRoute.isAuthRoute || Boolean(tenantIdParam);
-  const effectiveStoreName = tenantIdParam && !isRequestedTenantVerified
-    ? ''
-    : storeLoginTarget?.name ||
-      activeTenant?.name ||
-      (!suppressCachedTenantBranding
-        ? companySettings?.name ||
-          companySettings?.company_name ||
-          companySettings?.companyName ||
-          cachedStoreName ||
-          ''
-        : '');
+  const currentTargetTenantId = Number(
+    activeTenant?.id ||
+    currentUser?.tenantId ||
+    (tenantIdParam ? Number(tenantIdParam) : null) ||
+    getActiveTenantId() ||
+    0
+  );
+
+  const effectiveStoreName = (() => {
+    if (saasMode === 'SUPERADMIN') return 'POS SaaS C-Panel';
+    if (saasMode === 'LANDING' && !globalLoginOpen && !tenantIdParam) return 'SarbaazSoft Shoe POS';
+
+    if (
+      saasMode === 'TENANT_ACTIVE' ||
+      saasMode === 'TENANT_ONBOARDING' ||
+      saasMode === 'TENANT_SUSPENDED' ||
+      saasMode === 'TENANT_EXPIRED'
+    ) {
+      if (activeTenant?.name && (!currentTargetTenantId || Number(activeTenant.id) === currentTargetTenantId)) {
+        return activeTenant.name;
+      }
+      if (currentUser?.tenantName || currentUser?.storeName) {
+        if (!currentTargetTenantId || Number(currentUser.tenantId) === currentTargetTenantId) {
+          return currentUser.tenantName || currentUser.storeName;
+        }
+      }
+      if (currentTargetTenantId) {
+        const found = availableTenants.find((t) => Number(t.id) === currentTargetTenantId);
+        if (found?.name) return found.name;
+      }
+      if (
+        companySettings &&
+        currentTargetTenantId &&
+        Number(companySettings.tenantId || companySettings.tenant_id) === currentTargetTenantId
+      ) {
+        const csName = companySettings.name || companySettings.company_name || companySettings.companyName;
+        if (csName) return csName;
+      }
+      if (cachedStoreName && currentTargetTenantId && Number(getActiveTenantId()) === currentTargetTenantId) {
+        return cachedStoreName;
+      }
+      return currentTargetTenantId ? `Store #${currentTargetTenantId}` : '';
+    }
+
+    if (tenantIdParam && !isRequestedTenantVerified) {
+      return '';
+    }
+    if (storeLoginTarget?.name) {
+      return storeLoginTarget.name;
+    }
+    if (activeTenant?.name) {
+      return activeTenant.name;
+    }
+    return '';
+  })();
 
   // Name shown for the app: the store name for tenants (same as the PWA name), with
   // fixed names for the landing page and the SuperAdmin panel.
@@ -423,19 +474,22 @@ export default function App() {
       }
 
       if (settingsRes?.settings) {
-        setCompanySettings(settingsRes.settings);
-        try {
-          localStorage.setItem('cached_company_settings', JSON.stringify(settingsRes.settings));
-        } catch {}
-        const resolvedName =
-          settingsRes.settings.name ||
-          settingsRes.settings.company_name ||
-          settingsRes.settings.companyName;
-        if (resolvedName) {
-          setCachedStoreName(resolvedName);
+        const incomingTenantId = Number(settingsRes.settings.tenantId || settingsRes.settings.tenant_id);
+        if (!tenantIdForInit || !incomingTenantId || incomingTenantId === Number(tenantIdForInit)) {
+          setCompanySettings(settingsRes.settings);
           try {
-            localStorage.setItem('cached_store_name', resolvedName);
+            localStorage.setItem('cached_company_settings', JSON.stringify(settingsRes.settings));
           } catch {}
+          const resolvedName =
+            settingsRes.settings.name ||
+            settingsRes.settings.company_name ||
+            settingsRes.settings.companyName;
+          if (resolvedName) {
+            setCachedStoreName(resolvedName);
+            try {
+              localStorage.setItem('cached_store_name', resolvedName);
+            } catch {}
+          }
         }
       }
 
@@ -638,10 +692,51 @@ export default function App() {
     }
 
     if (target.mode === 'TENANT') {
-      const selected = availableTenants.find((tenant) => Number(tenant.id) === Number(target.tenantId)) || activeTenant;
-      const targetId = selected?.id || target.tenantId;
+      const targetId = Number(target.tenantId);
       if (!targetId) return;
-      if (selected) setActiveTenant(selected);
+
+      const matchingTenant = availableTenants.find((tenant) => Number(tenant.id) === targetId);
+      const isSameTenant = Number(activeTenant?.id) === targetId;
+      const selected = matchingTenant || (isSameTenant ? activeTenant : null);
+
+      // Clear any stale login target
+      setStoreLoginTarget(null);
+
+      // Reset stale store settings immediately when switching stores
+      if (companySettings && Number(companySettings.tenantId || companySettings.tenant_id) !== targetId) {
+        setCompanySettings(null);
+        try {
+          localStorage.removeItem('cached_company_settings');
+        } catch {}
+      }
+
+      if (selected) {
+        setActiveTenant(selected);
+        if (selected.name) {
+          setCachedStoreName(selected.name);
+          try {
+            localStorage.setItem('cached_store_name', selected.name);
+          } catch {}
+        }
+      } else {
+        const fallbackName = currentUser?.tenantName || currentUser?.storeName || `Store #${targetId}`;
+        const minimalTenant: TenantInfo = {
+          id: targetId,
+          name: fallbackName,
+          status: 'ACTIVE',
+          subscriptionStatus: 'ACTIVE',
+          subscriptionPlan: 'free_tier',
+          businessType: 'RETAIL',
+          pricingMode: 'FIXED',
+          logoUrl: '/pwa-512x512.png',
+          currency: 'PKR',
+          onboardingCompleted: true,
+          appPath: '/dashboard',
+        };
+        setActiveTenant(minimalTenant);
+        setCachedStoreName(fallbackName);
+      }
+
       setActiveTenantId(targetId);
       setSaasMode('TENANT_ACTIVE');
       window.history.pushState({}, '', target.authenticated || isSuperAdmin ? appPathForTab(currentTab) : `/?tenantId=${encodeURIComponent(targetId)}`);
@@ -812,18 +907,14 @@ export default function App() {
       String(currentUser?.originalRole || currentUser?.role || '').toUpperCase() === 'SUPERADMIN';
 
     revokeSessionOnServer();
-    removeAuthToken();
+    clearAllSessionState();
     setActiveTenantId(null);
-    try {
-      localStorage.removeItem('pos_current_user');
-    } catch {}
-    try {
-      // Drop any per-session hand-off data so the next person on a shared device does not inherit it.
-      ['pending_pos_product', 'pending_edit_product', 'pending_purchase_product', 'pending_barcode_product'].forEach(
-        (key) => sessionStorage.removeItem(key)
-      );
-    } catch {}
     setCurrentUser(null);
+    setCompanySettings(null);
+    setCachedStoreName('');
+    setActiveExchangeForPos(null);
+    setSelectedSupplierForPurchase(null);
+    setTenantIdNotice('');
     setCurrentTab('dashboard');
 
     // Go straight to the login screen: /?tenantId=<currentLogoutID>
@@ -834,6 +925,9 @@ export default function App() {
       if (tenant) {
         setActiveTenant(tenant);
         setStoreLoginTarget(tenant);
+      } else {
+        setActiveTenant(null);
+        setStoreLoginTarget(null);
       }
       setActiveTenantId(currentLogoutID);
       setTenantIdNotice('');
@@ -1008,6 +1102,19 @@ export default function App() {
               setStoreLoginTarget(null);
             }}
             onSuccess={(user) => {
+              setStoreLoginTarget(null);
+              const userTenantId = Number(user?.tenantId);
+
+              // If switching stores, purge previous company settings immediately
+              if (companySettings && Number(companySettings.tenantId || companySettings.tenant_id) !== userTenantId) {
+                setCompanySettings(null);
+                setCachedStoreName('');
+                try {
+                  localStorage.removeItem('cached_company_settings');
+                  localStorage.removeItem('cached_store_name');
+                } catch {}
+              }
+
               const role = String(user?.role || '').toUpperCase();
               const authUser = {
                 ...user,
@@ -1026,17 +1133,41 @@ export default function App() {
                 setCurrentTab('dashboard');
               }
               if (role === 'SUPERADMIN') {
+                setActiveTenant(null);
+                setActiveTenantId(null);
                 setGlobalLoginOpen(false);
                 handleNavigateDomain({ mode: 'SUPERADMIN' });
                 return;
               }
-              if (user?.tenantId) {
+              if (userTenantId) {
+                const matchingTenant = availableTenants.find((t) => Number(t.id) === userTenantId);
+                const storeName = matchingTenant?.name || user?.tenantName || user?.storeName || `Store #${userTenantId}`;
+                const newTenant: TenantInfo = matchingTenant || {
+                  id: userTenantId,
+                  name: storeName,
+                  status: user?.status || 'ACTIVE',
+                  subscriptionStatus: user?.subscriptionStatus || 'ACTIVE',
+                  subscriptionPlan: user?.subscriptionPlan || 'free_tier',
+                  businessType: user?.businessType || 'RETAIL',
+                  pricingMode: user?.pricingMode || 'FIXED',
+                  logoUrl: '/pwa-512x512.png',
+                  currency: user?.currency || 'PKR',
+                  onboardingCompleted: user?.onboardingCompleted ?? true,
+                  appPath: '/dashboard',
+                };
+                setActiveTenant(newTenant);
+                setActiveTenantId(userTenantId);
+                setCachedStoreName(storeName);
+                try {
+                  localStorage.setItem('cached_store_name', storeName);
+                } catch {}
+
                 setGlobalLoginOpen(false);
                 if (user?.onboardingCompleted === false && role === 'ADMIN') {
-                  handleNavigateDomain({ mode: 'ONBOARDING', tenantId: Number(user.tenantId), authenticated: true });
+                  handleNavigateDomain({ mode: 'ONBOARDING', tenantId: userTenantId, authenticated: true });
                   return;
                 }
-                handleNavigateDomain({ mode: 'TENANT', tenantId: Number(user.tenantId), authenticated: true });
+                handleNavigateDomain({ mode: 'TENANT', tenantId: userTenantId, authenticated: true });
                 return;
               }
               setGlobalLoginOpen(false);
@@ -1168,7 +1299,7 @@ export default function App() {
         <>
           {isInitializing ? (
             <PublicLayout
-              storeName={effectiveStoreName}
+              storeName={effectiveStoreName || 'Store Workspace'}
               badgeText="Connecting..."
               badgeVariant="connecting"
               subtitle="Powered by SarbaazSoft Shoe POS"
@@ -1182,16 +1313,16 @@ export default function App() {
                   <div className="w-7 h-7 border-3 border-white border-t-transparent rounded-full animate-spin" />
                 </div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  {effectiveStoreName}
+                  {effectiveStoreName || 'Store Workspace'}
                 </h2>
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
-                  Loading {effectiveStoreName} Workspace...
+                  {effectiveStoreName ? `Loading ${effectiveStoreName} Workspace...` : 'Loading Store Workspace...'}
                 </p>
               </div>
             </PublicLayout>
           ) : !currentUser ? (
             <PublicLayout
-              storeName={effectiveStoreName}
+              storeName={effectiveStoreName || 'Store Workspace'}
               badgeText="Store sign-in"
               badgeVariant="connecting"
               subtitle="Powered by SarbaazSoft Shoe POS"
@@ -1203,7 +1334,10 @@ export default function App() {
               </div>
             </PublicLayout>
           ) : (
-            <div className="saas-panel flex w-full min-h-screen bg-[#F8FAFC] dark:bg-[#0A0E1A] text-slate-900 dark:text-slate-100 transition-colors">
+            <div
+              key={`tenant-app-${activeTenant?.id || currentUser?.tenantId || 'none'}-${currentUser?.id || 'anon'}`}
+              className="saas-panel flex w-full min-h-screen bg-[#F8FAFC] dark:bg-[#0A0E1A] text-slate-900 dark:text-slate-100 transition-colors"
+            >
               <Sidebar
                 currentTab={currentTab}
                 onTabChange={(tab) => handleTabChange(tab)}
@@ -1236,7 +1370,7 @@ export default function App() {
                 <main className="flex-1 min-w-0 overflow-x-hidden bg-[#F8FAFC] dark:bg-[#0A0E1A] transition-colors">
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={`${activeTenant?.id || 'default'}-${currentTab}`}
+                      key={`view-${activeTenant?.id || currentUser?.tenantId || 'default'}-${currentUser?.id || 'anon'}-${currentTab}`}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}

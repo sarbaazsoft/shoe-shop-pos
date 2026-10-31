@@ -1,7 +1,7 @@
 import { pgClient } from '../../db/index.ts';
 import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
-import { sendWelcomeEmail, sendStaffWelcomeEmail } from '../mailer.ts';
+import { sendWelcomeEmail, sendStaffWelcomeEmail } from '../utils/email.ts';
 
 export interface SendWelcomeMsgResult {
   success: boolean;

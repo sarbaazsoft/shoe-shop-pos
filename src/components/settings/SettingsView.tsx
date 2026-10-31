@@ -610,20 +610,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Overall settings refresh state & guards
-  // Application & Environment Settings (PostgreSQL app_settings table)
   const [appSettingsForm, setAppSettingsForm] = useState<Record<string, string>>({
-    EMAIL_WEBHOOK_URL: '',
-    GMAIL_APP_PASSWORD: '',
-    GMAIL_USER: '',
     RESEND_API_KEY: '',
-    RESEND_FROM: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>',
+    RESEND_FROM: 'SarbaazSoft Shoe POS <noreply@sarbaazsoft.com>',
+    EMAIL_WEBHOOK_URL: '',
     RESEND_WEBHOOK_URL: '',
-    SMTP_FROM: 'SarbaazSoft Shoe POS Security <no-reply@sarbaazsoft.com>',
-    SMTP_HOST: '',
-    SMTP_PASS: '',
-    SMTP_PORT: '587',
-    SMTP_SECURE: 'false',
-    SMTP_USER: '',
     VAPID_PUBLIC_KEY: '',
     VAPID_PRIVATE_KEY: '',
     VAPID_SUBJECT: 'mailto:support@sarbaazsoft.com',
@@ -971,7 +962,7 @@ setFormErrors(errors);
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-purple-200/80 font-medium mt-0.5">
               {isSuperAdmin
-                ? 'Global email services (Resend API keys, SMTP), Web Push credentials, and system environment policies'
+                ? 'Global transactional email services (Resend API keys), Web Push credentials, and system environment policies'
                 : isStoreAdmin
                 ? 'Store profile, cashier staff access, receipt & label printers, and store policies'
                 : 'Receipt & barcode label printer configuration, USB hardware, and silent printing setup'}
@@ -2583,7 +2574,7 @@ setFormErrors(errors);
                   </span>
                 </h3>
                 <p className="text-slate-500 dark:text-purple-200/70 text-xs mt-0.5 font-normal">
-                  Configure email delivery (Resend API keys, SMTP credentials), Web Push notification keys, and system environment policies dynamically.
+                  Configure transactional email delivery (Resend API key &amp; verified sender), Web Push notification keys, and system environment policies dynamically.
                 </p>
               </div>
             </div>
@@ -2610,7 +2601,7 @@ setFormErrors(errors);
             </div>
           </div>
 
-          {/* CATEGORY 2: EMAIL & SMTP DELIVERY */}
+          {/* CATEGORY 2: RESEND TRANSACTIONAL EMAIL DELIVERY */}
           <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-5">
             <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-purple-900/40">
               <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 flex items-center justify-center shrink-0">
@@ -2618,157 +2609,22 @@ setFormErrors(errors);
               </div>
               <div>
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Email &amp; SMTP Delivery (Category: <span className="font-mono text-blue-600 dark:text-blue-400">email</span>)
+                  Email Delivery via Resend (Category: <span className="font-mono text-blue-600 dark:text-blue-400">email</span>)
                 </h4>
                 <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                  Configure SMTP server credentials, Gmail App Passwords, Resend HTTPS delivery, and custom webhooks for password resets.
+                  Configure Resend API credentials, verified sender address, and optional notification webhooks for password resets and transactional emails.
                 </p>
               </div>
             </div>
 
-            {/* Sub-section: Standard SMTP */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider block">
-                  Standard SMTP Server Configuration
-                </span>
-                <span className="text-[11px] text-slate-400">Standard RFC 5321</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP Host (SMTP_HOST)
-                  </label>
-                  <input
-                    type="text"
-                    value={appSettingsForm.SMTP_HOST ?? ''}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_HOST: e.target.value }))}
-                    placeholder="smtp.gmail.com or mail.domain.com"
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP Port (SMTP_PORT)
-                  </label>
-                  <input
-                    type="text"
-                    value={appSettingsForm.SMTP_PORT ?? '587'}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_PORT: e.target.value }))}
-                    placeholder="587"
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP SSL/TLS (SMTP_SECURE)
-                  </label>
-                  <select
-                    value={String(appSettingsForm.SMTP_SECURE || 'false').toLowerCase()}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_SECURE: e.target.value }))}
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white"
-                  >
-                    <option value="false">false (STARTTLS / Port 587)</option>
-                    <option value="true">true (Direct SSL / Port 465)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP Username / User (SMTP_USER)
-                  </label>
-                  <input
-                    type="text"
-                    value={appSettingsForm.SMTP_USER ?? ''}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_USER: e.target.value }))}
-                    placeholder="user@domain.com"
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP Password (SMTP_PASS)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={revealedSecrets.SMTP_PASS ? 'text' : 'password'}
-                      value={appSettingsForm.SMTP_PASS ?? ''}
-                      onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_PASS: e.target.value }))}
-                      placeholder="••••••••••••"
-                      className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleSecretVisibility('SMTP_PASS')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                    >
-                      {revealedSecrets.SMTP_PASS ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    SMTP Sender Address (SMTP_FROM)
-                  </label>
-                  <input
-                    type="text"
-                    value={appSettingsForm.SMTP_FROM ?? ''}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SMTP_FROM: e.target.value }))}
-                    placeholder="SarbaazSoft Security <no-reply@sarbaazsoft.com>"
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Sub-section: Gmail App Passwords & Resend API */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-3">
               <span className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider block">
-                Gmail &amp; Resend HTTPS Integrations
+                Resend HTTPS Configuration
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Gmail User (GMAIL_USER)
-                  </label>
-                  <input
-                    type="text"
-                    value={appSettingsForm.GMAIL_USER ?? ''}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, GMAIL_USER: e.target.value }))}
-                    placeholder="your-store@gmail.com"
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Gmail App Password (GMAIL_APP_PASSWORD)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={revealedSecrets.GMAIL_APP_PASSWORD ? 'text' : 'password'}
-                      value={appSettingsForm.GMAIL_APP_PASSWORD ?? ''}
-                      onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, GMAIL_APP_PASSWORD: e.target.value }))}
-                      placeholder="16-character App Password (e.g. abcd efgh ijkl mnop)"
-                      className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleSecretVisibility('GMAIL_APP_PASSWORD')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                    >
-                      {revealedSecrets.GMAIL_APP_PASSWORD ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Resend Email Key
+                    Resend API Key (RESEND_API_KEY)
                   </label>
                   <div className="relative">
                     <input
@@ -2790,20 +2646,20 @@ setFormErrors(errors);
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Resend Sender Address
+                    Verified Sender Address (RESEND_FROM)
                   </label>
                   <input
                     type="text"
                     value={appSettingsForm.RESEND_FROM ?? ''}
                     onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, RESEND_FROM: e.target.value }))}
-                    placeholder="SarbaazSoft Shoe POS Security <onboarding@resend.dev>"
+                    placeholder="SarbaazSoft Shoe POS <noreply@sarbaazsoft.com>"
                     className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Email Notification Webhook
+                    Email Notification Webhook (EMAIL_WEBHOOK_URL)
                   </label>
                   <input
                     type="text"
@@ -2816,7 +2672,7 @@ setFormErrors(errors);
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Email Delivery Webhook
+                    Resend Delivery Webhook (RESEND_WEBHOOK_URL)
                   </label>
                   <input
                     type="text"

@@ -91,8 +91,45 @@ export function setAuthSession(token: string, user: any) {
   localStorage.setItem(ALT_USER_KEY, JSON.stringify(user));
 }
 
-export function clearAuthSession() {
+export function clearAllSessionState(): void {
   removeAuthToken();
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem(ACTIVE_TENANT_ID_KEY);
+      localStorage.removeItem('cached_company_settings');
+      localStorage.removeItem('cached_store_name');
+      localStorage.removeItem('pos_read_notifications');
+      localStorage.removeItem('pos_superadmin_read_notifs');
+      localStorage.removeItem('sammi_chat_history');
+      localStorage.removeItem('pos_barcode_tag_options');
+      localStorage.removeItem('pos_last_synced_at');
+      localStorage.removeItem('pos_welcome_partner_dismissed');
+
+      // Clear any tenant-scoped or user-scoped cache keys without removing device preferences like pos_theme or remembered accounts
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.startsWith('pos_welcome_partner_dismissed_') ||
+          key.startsWith('pos_dashboard_visited_') ||
+          key.startsWith('cached_company_settings') ||
+          key.startsWith('cached_store_name') ||
+          key.startsWith('pos_read_notifs_')
+        )) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {}
+  }
+
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.clear();
+    } catch {}
+  }
+}
+
+export function clearAuthSession() {
+  clearAllSessionState();
 }
 
 /**

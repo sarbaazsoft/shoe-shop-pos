@@ -9,7 +9,7 @@ import { generateToken, requireAuth, requireAdmin, extractTokenFromRequest, revo
 import type { AuthenticatedRequest, AuthUser } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { recordTenantMiddlewarePresence, removeTenantMiddlewarePresence } from '../middleware/tenantMiddleware.ts';
-import { sendPasswordResetEmail } from '../mailer.ts';
+import { sendPasswordResetEmail } from '../utils/email.ts';
 
 const router = Router();
 
