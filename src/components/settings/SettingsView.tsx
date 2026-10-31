@@ -26,37 +26,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   initialTab,
 }) => {
   const userRole = (currentUser?.role || '').toUpperCase();
-  const isPlatformOwner = userRole === 'SUPERADMIN';
-  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPERADMIN';
+  const isSuperAdmin = userRole === 'SUPERADMIN';
+  const isPlatformOwner = isSuperAdmin;
+  const isStoreAdmin = userRole === 'ADMIN';
   const isCashier = userRole === 'CASHIER';
+  const isAdmin = isStoreAdmin;
 
-  // Role-based active tab initialization:
+  // Strict role-based active tab initialization:
+  // - Platform Owner (SUPERADMIN): strictly restricted to app-level configs ('app_settings', 'backup', 'install')
+  // - Store Owner (ADMIN): store management tabs ('store', 'users', 'printers')
   // - Cashiers: strictly constrained to 'printers'
-  // - Store Owner (ADMIN): defaults to 'store', can switch to 'store', 'users', 'printers'
-  // - Platform Owner (SUPERADMIN): can access all tabs including 'app_settings', 'backup', 'install'
   const [activeTab, setActiveTab] = useState<'store' | 'users' | 'app_settings' | 'printers' | 'backup' | 'install'>(() => {
-    if (!isAdmin) {
+    if (isSuperAdmin) {
+      if (initialTab && ['app_settings', 'backup', 'install'].includes(initialTab)) {
+        return initialTab;
+      }
+      return 'app_settings';
+    }
+    if (isCashier) {
       return 'printers';
     }
-    if (initialTab) {
-      if (['app_settings', 'backup', 'install'].includes(initialTab) && !isPlatformOwner) {
-        return 'store';
-      }
+    // Store Admin (ADMIN)
+    if (initialTab && ['store', 'users', 'printers'].includes(initialTab)) {
       return initialTab;
     }
     return 'store';
   });
 
   const handleSelectTab = (tab: 'store' | 'users' | 'app_settings' | 'printers' | 'backup' | 'install') => {
-    if (!isAdmin) {
+    if (isSuperAdmin) {
+      if (['app_settings', 'backup', 'install'].includes(tab)) {
+        setActiveTab(tab);
+      } else {
+        setActiveTab('app_settings');
+      }
+      return;
+    }
+    if (isCashier) {
       setActiveTab('printers');
       return;
     }
-    if (!isPlatformOwner && ['app_settings', 'backup', 'install'].includes(tab)) {
+    // Store Admin (ADMIN)
+    if (['store', 'users', 'printers'].includes(tab)) {
+      setActiveTab(tab);
+    } else {
       setActiveTab('store');
-      return;
     }
-    setActiveTab(tab);
   };
 
   const { containerRef: settingsTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeTab, {
@@ -65,22 +80,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (isSuperAdmin) {
+      if (!['app_settings', 'backup', 'install'].includes(activeTab)) {
+        setActiveTab(initialTab && ['app_settings', 'backup', 'install'].includes(initialTab) ? initialTab : 'app_settings');
+      }
+    } else if (isCashier) {
       if (activeTab !== 'printers') {
         setActiveTab('printers');
       }
-    } else if (['app_settings', 'backup', 'install'].includes(activeTab) && !isPlatformOwner) {
-      setActiveTab('store');
-    } else if (initialTab) {
-      if (!isAdmin) {
-        setActiveTab('printers');
-      } else if (['app_settings', 'backup', 'install'].includes(initialTab) && !isPlatformOwner) {
-        setActiveTab('store');
-      } else {
-        setActiveTab(initialTab);
+    } else {
+      // Store Admin (ADMIN)
+      if (!['store', 'users', 'printers'].includes(activeTab)) {
+        setActiveTab(initialTab && ['store', 'users', 'printers'].includes(initialTab) ? initialTab : 'store');
       }
     }
-  }, [isAdmin, isPlatformOwner, initialTab]);
+  }, [isSuperAdmin, isStoreAdmin, isCashier, initialTab]);
 
   // Store Subscription Info State
   const extractSubInfo = (src: any) => {
@@ -598,8 +612,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Overall settings refresh state & guards
   // Application & Environment Settings (PostgreSQL app_settings table)
   const [appSettingsForm, setAppSettingsForm] = useState<Record<string, string>>({
-    INVOICE_PREFIX: 'INV-',
-    PURCHASE_PREFIX: 'PUR-',
     EMAIL_WEBHOOK_URL: '',
     GMAIL_APP_PASSWORD: '',
     GMAIL_USER: '',
@@ -687,24 +699,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const isRefreshingInstallRef = useRef(false);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isStoreAdmin) {
       loadUsers();
-      if (isPlatformOwner) {
-        loadInstallStatus();
-        loadAppSettings();
-      }
-    }
-  }, [isAdmin, isPlatformOwner]);
-
-  useEffect(() => {
-    if (activeTab === 'users' && isAdmin) {
-      loadUsers();
-    } else if (activeTab === 'install' && isPlatformOwner) {
+    } else if (isSuperAdmin) {
       loadInstallStatus();
-    } else if (activeTab === 'app_settings' && isPlatformOwner && !hasLoadedAppSettingsRef.current) {
       loadAppSettings();
     }
-  }, [activeTab, isAdmin, isPlatformOwner]);
+  }, [isStoreAdmin, isSuperAdmin]);
+
+  useEffect(() => {
+    if (activeTab === 'users' && isStoreAdmin) {
+      loadUsers();
+    } else if (activeTab === 'install' && isSuperAdmin) {
+      loadInstallStatus();
+    } else if (activeTab === 'app_settings' && isSuperAdmin && !hasLoadedAppSettingsRef.current) {
+      loadAppSettings();
+    }
+  }, [activeTab, isStoreAdmin, isSuperAdmin]);
 
   const loadInstallStatus = async () => {
     if (isRefreshingInstallRef.current) return;
@@ -952,11 +963,17 @@ setFormErrors(errors);
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              {isAdmin ? 'System Settings & Store Configuration' : 'Hardware & Printer Settings'}
+              {isSuperAdmin
+                ? 'Application & Platform Configuration'
+                : isStoreAdmin
+                ? 'Store Settings & Configuration'
+                : 'Hardware & Printer Settings'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-purple-200/80 font-medium mt-0.5">
-              {isAdmin
-                ? 'Store profile, cashier staff access, receipt & label printers, data backup, and system setup'
+              {isSuperAdmin
+                ? 'Global email services (Resend API keys, SMTP), Web Push credentials, and system environment policies'
+                : isStoreAdmin
+                ? 'Store profile, cashier staff access, receipt & label printers, and store policies'
                 : 'Receipt & barcode label printer configuration, USB hardware, and silent printing setup'}
             </p>
           </div>
@@ -964,7 +981,9 @@ setFormErrors(errors);
           <div className="flex items-center space-x-2.5">
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-purple-950/60 border border-slate-200 dark:border-purple-800/70 text-xs font-semibold text-slate-700 dark:text-purple-200 shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-purple-300" />
-              <span className="font-medium text-xs">System &bull;</span>
+              <span className="font-medium text-xs">
+                {isSuperAdmin ? 'SuperAdmin •' : isStoreAdmin ? 'Store Admin •' : 'Cashier •'}
+              </span>
               <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 Online
@@ -976,7 +995,7 @@ setFormErrors(errors);
               onClick={handleGlobalRefresh}
               disabled={isRefreshingAll}
               className="btn-outline-landing px-3.5 py-2.5 bg-slate-100 dark:bg-purple-500/20 hover:bg-slate-200 dark:hover:bg-purple-500/30 text-slate-700 dark:text-purple-200 dark:hover:text-white border border-slate-200 dark:border-purple-400/40 dark:shadow-[0_0_14px_rgba(147,51,234,0.2)] font-bold rounded-xl text-xs transition cursor-pointer flex items-center space-x-1.5 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-              title={isRefreshingAll ? "Reloading settings..." : "Reload store settings"}
+              title={isRefreshingAll ? "Reloading settings..." : "Reload settings"}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-blue-600 dark:text-purple-300 ${isRefreshingAll ? 'animate-spin' : ''}`} />
               <span>{isRefreshingAll ? 'Refreshing...' : 'Refresh'}</span>
@@ -984,112 +1003,112 @@ setFormErrors(errors);
           </div>
         </div>
 
-        {/* Store Subscription Header Strip */}
-        <div className="pt-3 border-t border-slate-200/80 dark:border-purple-800/50 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Subscription Status */}
-            {(() => {
-              const rawStatus = String(
-                subscriptionInfo.subscriptionStatus ||
-                  formData.subscription_status ||
-                  companySettings?.subscriptionStatus ||
-                  companySettings?.subscription_status ||
-                  'ACTIVE'
-              ).toUpperCase();
-              const isExpired = rawStatus === 'EXPIRED';
-              const isSuspended = rawStatus === 'SUSPENDED';
-              const statusDisplay = isExpired
-                ? 'EXPIRED'
-                : isSuspended
-                ? 'SUSPENDED'
-                : isTrialActive
-                ? 'FREE TRIAL'
-                : rawStatus;
-              return (
-                <div
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold border ${
-                    isExpired
-                      ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-                      : isSuspended
-                      ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
-                      : isTrialActive
-                      ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
-                      : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
+        {/* Store Subscription Header Strip (Strictly Store Admin Only) */}
+        {isStoreAdmin && (
+          <div className="pt-3 border-t border-slate-200/80 dark:border-purple-800/50 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Subscription Status */}
+              {(() => {
+                const rawStatus = String(
+                  subscriptionInfo.subscriptionStatus ||
+                    formData.subscription_status ||
+                    companySettings?.subscriptionStatus ||
+                    companySettings?.subscription_status ||
+                    'ACTIVE'
+                ).toUpperCase();
+                const isExpired = rawStatus === 'EXPIRED';
+                const isSuspended = rawStatus === 'SUSPENDED';
+                const statusDisplay = isExpired
+                  ? 'EXPIRED'
+                  : isSuspended
+                  ? 'SUSPENDED'
+                  : isTrialActive
+                  ? 'FREE TRIAL'
+                  : rawStatus;
+                return (
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold border ${
                       isExpired
-                        ? 'bg-amber-500'
+                        ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
                         : isSuspended
-                        ? 'bg-rose-500'
+                        ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
                         : isTrialActive
-                        ? 'bg-indigo-500 animate-pulse'
-                        : 'bg-emerald-500'
+                        ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
+                        : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
                     }`}
-                  />
-                  <span>Status: {statusDisplay}</span>
-                </div>
-              );
-            })()}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isExpired
+                          ? 'bg-amber-500'
+                          : isSuspended
+                          ? 'bg-rose-500'
+                          : isTrialActive
+                          ? 'bg-indigo-500 animate-pulse'
+                          : 'bg-emerald-500'
+                      }`}
+                    />
+                    <span>Status: {statusDisplay}</span>
+                  </div>
+                );
+              })()}
 
-            {/* Subscription Plan */}
-            <div
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold border ${
-                isTrialActive
-                  ? 'bg-indigo-50/70 dark:bg-indigo-950/50 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-200'
-                  : 'bg-purple-50/70 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 text-purple-700 dark:text-purple-200'
-              }`}
-            >
-              <span>Plan:</span>
-              <span className="font-mono font-bold">
-                {isTrialActive
-                  ? '30-Day Free Trial'
-                  : (() => {
-                      const curPlan =
-                        subscriptionInfo.subscriptionPlan ||
-                        formData.subscription_plan ||
-                        companySettings?.subscriptionPlan ||
-                        companySettings?.subscription_plan;
-                      const cleanPlan = String(curPlan || '').toUpperCase();
-                      if (cleanPlan === '6_MONTHS' || cleanPlan === '6_MONTH') return '6 Months';
-                      if (cleanPlan === 'YEARLY' || cleanPlan === '1_YEAR') return 'Yearly';
-                      return getSubscriptionShortLabel(curPlan);
-                    })()}
-              </span>
-            </div>
-          </div>
-
-          {/* Subscription Expiry Date & Renew Subscription Action */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-purple-800/60 text-slate-700 dark:text-purple-200 font-mono">
-              <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-              <span className="text-[11px] font-sans font-bold text-slate-400 dark:text-purple-300/70 uppercase">
-                Expires:
-              </span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {(() => {
-                  const rawEnd =
-                    subscriptionInfo.subscriptionEndDate ||
-                    formData.subscription_end_date ||
-                    companySettings?.subscriptionEndDate ||
-                    companySettings?.subscription_end_date;
-                  if (!rawEnd) return 'Active License';
-                  const d = new Date(rawEnd);
-                  if (Number.isNaN(d.getTime())) return String(rawEnd);
-                  return d.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  });
-                })()}
-              </span>
-              <span className="text-[10px] font-sans font-semibold text-purple-600 dark:text-purple-300 ml-1">
-                ({subscriptionInfo.daysRemaining}d left)
-              </span>
+              {/* Subscription Plan */}
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold border ${
+                  isTrialActive
+                    ? 'bg-indigo-50/70 dark:bg-indigo-950/50 border-indigo-200/80 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-200'
+                    : 'bg-purple-50/70 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 text-purple-700 dark:text-purple-200'
+                }`}
+              >
+                <span>Plan:</span>
+                <span className="font-mono font-bold">
+                  {isTrialActive
+                    ? '30-Day Free Trial'
+                    : (() => {
+                        const curPlan =
+                          subscriptionInfo.subscriptionPlan ||
+                          formData.subscription_plan ||
+                          companySettings?.subscriptionPlan ||
+                          companySettings?.subscription_plan;
+                        const cleanPlan = String(curPlan || '').toUpperCase();
+                        if (cleanPlan === '6_MONTHS' || cleanPlan === '6_MONTH') return '6 Months';
+                        if (cleanPlan === 'YEARLY' || cleanPlan === '1_YEAR') return 'Yearly';
+                        return getSubscriptionShortLabel(curPlan);
+                      })()}
+                </span>
+              </div>
             </div>
 
-            {isAdmin && (
+            {/* Subscription Expiry Date & Renew Subscription Action */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-purple-800/60 text-slate-700 dark:text-purple-200 font-mono">
+                <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="text-[11px] font-sans font-bold text-slate-400 dark:text-purple-300/70 uppercase">
+                  Expires:
+                </span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {(() => {
+                    const rawEnd =
+                      subscriptionInfo.subscriptionEndDate ||
+                      formData.subscription_end_date ||
+                      companySettings?.subscriptionEndDate ||
+                      companySettings?.subscription_end_date;
+                    if (!rawEnd) return 'Active License';
+                    const d = new Date(rawEnd);
+                    if (Number.isNaN(d.getTime())) return String(rawEnd);
+                    return d.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    });
+                  })()}
+                </span>
+                <span className="text-[10px] font-sans font-semibold text-purple-600 dark:text-purple-300 ml-1">
+                  ({subscriptionInfo.daysRemaining}d left)
+                </span>
+              </div>
+
               <button
                 id="settings-header-renew-subscription-btn"
                 type="button"
@@ -1107,9 +1126,9 @@ setFormErrors(errors);
                     : 'Renew Subscription'}
                 </span>
               </button>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </motion.div>
 
       {/* Settings Tab Menu - Responsive Scrollable Underline Navigation */}
@@ -1121,7 +1140,7 @@ setFormErrors(errors);
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         className="bg-white dark:bg-[#131B2E] px-3 sm:px-5 rounded-2xl border border-slate-200 dark:border-purple-900/60 shadow-sm transition-colors flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar scrollbar-none tab-scrollbar-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden border-b border-b-slate-200/90 dark:border-b-purple-900/80"
       >
-        {isAdmin && (
+        {isStoreAdmin && (
           <button
             id="settings-tab-store"
             type="button"
@@ -1146,7 +1165,7 @@ setFormErrors(errors);
           </button>
         )}
 
-        {isAdmin && (
+        {isStoreAdmin && (
           <button
             id="settings-tab-users"
             type="button"
@@ -1180,7 +1199,7 @@ setFormErrors(errors);
           </button>
         )}
 
-        {isPlatformOwner && (
+        {isSuperAdmin && (
           <button
             id="settings-tab-app-settings"
             type="button"
@@ -1205,30 +1224,32 @@ setFormErrors(errors);
           </button>
         )}
 
-        <button
-          id="settings-tab-printers"
-          type="button"
-          data-active={activeTab === 'printers'}
-          data-tab="printers"
-          onClick={() => handleSelectTab('printers')}
-          className={`tab-underline-link relative px-3.5 sm:px-4 py-3.5 text-xs sm:text-sm font-semibold transition-colors duration-300 flex items-center space-x-2 whitespace-nowrap cursor-pointer shrink-0 ${
-            activeTab === 'printers'
-              ? 'active text-purple-600 dark:text-purple-400 font-bold'
-              : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300'
-          }`}
-        >
-          <Printer className={`w-4 h-4 transition-colors duration-200 ${activeTab === 'printers' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
-          <span>Hardware &amp; Printers</span>
-          {activeTab === 'printers' && (
-            <motion.div
-              layoutId="settingsActiveUnderline"
-              className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 shadow-[0_2px_8px_rgba(147,51,234,0.45)] pointer-events-none z-10"
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-            />
-          )}
-        </button>
+        {!isSuperAdmin && (
+          <button
+            id="settings-tab-printers"
+            type="button"
+            data-active={activeTab === 'printers'}
+            data-tab="printers"
+            onClick={() => handleSelectTab('printers')}
+            className={`tab-underline-link relative px-3.5 sm:px-4 py-3.5 text-xs sm:text-sm font-semibold transition-colors duration-300 flex items-center space-x-2 whitespace-nowrap cursor-pointer shrink-0 ${
+              activeTab === 'printers'
+                ? 'active text-purple-600 dark:text-purple-400 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300'
+            }`}
+          >
+            <Printer className={`w-4 h-4 transition-colors duration-200 ${activeTab === 'printers' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
+            <span>Hardware &amp; Printers</span>
+            {activeTab === 'printers' && (
+              <motion.div
+                layoutId="settingsActiveUnderline"
+                className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 shadow-[0_2px_8px_rgba(147,51,234,0.45)] pointer-events-none z-10"
+                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              />
+            )}
+          </button>
+        )}
 
-        {isPlatformOwner && (
+        {isSuperAdmin && (
           <button
             id="settings-tab-backup"
             type="button"
@@ -1253,7 +1274,7 @@ setFormErrors(errors);
           </button>
         )}
 
-        {isPlatformOwner && (
+        {isSuperAdmin && (
           <button
             id="settings-tab-install"
             type="button"
@@ -1282,8 +1303,8 @@ setFormErrors(errors);
         <div className="tab-end-spacer shrink-0 w-8 sm:w-10 h-1 pointer-events-none self-stretch" aria-hidden="true" role="presentation" />
       </motion.div>
 
-      {/* TAB 1: STORE & INVOICE SETTINGS */}
-      {isAdmin && activeTab === 'store' && (
+      {/* TAB 1: STORE & INVOICE SETTINGS (Store Admin Only) */}
+      {isStoreAdmin && activeTab === 'store' && (
         <form onSubmit={handleSaveSettings} className="space-y-5">
           {settingsSuccess && (
             <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center space-x-3 shadow-xs">
@@ -2226,8 +2247,8 @@ setFormErrors(errors);
         </form>
       )}
 
-      {/* TAB 2: USERS & CASHIER APPROVALS */}
-      {activeTab === 'users' && isAdmin && (
+      {/* TAB 2: USERS & CASHIER APPROVALS (Store Admin Only) */}
+      {activeTab === 'users' && isStoreAdmin && (
         <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-5 transition-colors">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-100 dark:border-purple-900/40 gap-3">
             <div className="flex items-center space-x-3">
@@ -2524,7 +2545,7 @@ setFormErrors(errors);
       )}
 
       {/* TAB: APPLICATION & ENVIRONMENT CONFIG (PostgreSQL app_settings table) */}
-      {isPlatformOwner && activeTab === 'app_settings' && (
+      {isSuperAdmin && activeTab === 'app_settings' && (
         <form onSubmit={handleSaveAppSettings} className="space-y-6">
           {appSettingsSuccess && (
             <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center space-x-3 shadow-xs">
@@ -2562,7 +2583,7 @@ setFormErrors(errors);
                   </span>
                 </h3>
                 <p className="text-slate-500 dark:text-purple-200/70 text-xs mt-0.5 font-normal">
-                  Configure document prefixes, email delivery, notification alerts, and system policies dynamically.
+                  Configure email delivery (Resend API keys, SMTP credentials), Web Push notification keys, and system environment policies dynamically.
                 </p>
               </div>
             </div>
@@ -2586,67 +2607,6 @@ setFormErrors(errors);
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSavingAppSettings ? 'Saving...' : 'Save All Settings'}</span>
               </button>
-            </div>
-          </div>
-
-          {/* CATEGORY 1: BILLING & DOCUMENT PREFIXES */}
-          <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-4">
-            <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-purple-900/40">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50 flex items-center justify-center shrink-0">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Billing Configuration (Category: <span className="font-mono text-purple-600 dark:text-purple-400">billing</span>)
-                </h4>
-                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                  Automated prefix codes prepended to sales invoice numbers and purchase receipts.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  Customer Sales Invoice Prefix (INVOICE_PREFIX)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={appSettingsForm.INVOICE_PREFIX ?? 'INV-'}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, INVOICE_PREFIX: e.target.value }))}
-                    placeholder="INV-"
-                    className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-600"
-                  />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>Default: <code className="font-mono text-purple-600 dark:text-purple-400 font-bold">INV-</code></span>
-                  <span className="font-mono font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40">
-                    Live Sample: {(appSettingsForm.INVOICE_PREFIX || 'INV-').trim()}000101
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  Supplier Purchase Order Prefix (PURCHASE_PREFIX)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={appSettingsForm.PURCHASE_PREFIX ?? 'PUR-'}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, PURCHASE_PREFIX: e.target.value }))}
-                    placeholder="PUR-"
-                    className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-600"
-                  />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>Default: <code className="font-mono text-purple-600 dark:text-purple-400 font-bold">PUR-</code></span>
-                  <span className="font-mono font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40">
-                    Live Sample: {(appSettingsForm.PURCHASE_PREFIX || 'PUR-').trim()}000045
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -3020,15 +2980,15 @@ setFormErrors(errors);
         </form>
       )}
 
-      {/* TAB 3: HARDWARE & PRINTERS */}
-      {activeTab === 'printers' && (
+      {/* TAB 4: HARDWARE & PRINTERS (Store Admin & Cashiers) */}
+      {!isSuperAdmin && activeTab === 'printers' && (
         <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm transition-colors">
           <PrinterHardwareSettings />
         </div>
       )}
 
       {/* Fallback Guard: Cashiers attempting to access unauthorized non-printer tabs */}
-      {!isAdmin && activeTab !== 'printers' && (
+      {isCashier && activeTab !== 'printers' && (
         <div className="p-8 text-center bg-white dark:bg-[#131B2E] rounded-2xl border border-amber-200 dark:border-amber-900/60 shadow-sm max-w-xl mx-auto my-6">
           <ShieldAlert className="w-10 h-10 text-amber-600 dark:text-amber-400 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Store Configuration Access Restricted</h3>
@@ -3045,19 +3005,37 @@ setFormErrors(errors);
         </div>
       )}
 
-      {/* Fallback Guard: Non-Platform Owners (Store Owner or Cashier) attempting to access system configuration */}
-      {!isPlatformOwner && (activeTab === 'app_settings' || activeTab === 'backup' || activeTab === 'install') && (
+      {/* Fallback Guard: Store Admins or Cashiers attempting to access system configuration */}
+      {!isSuperAdmin && (activeTab === 'app_settings' || activeTab === 'backup' || activeTab === 'install') && (
         <div className="p-8 text-center bg-white dark:bg-[#131B2E] rounded-2xl border border-rose-200 dark:border-rose-900/60 shadow-sm max-w-xl mx-auto my-6">
           <Lock className="w-10 h-10 text-rose-600 dark:text-rose-400 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-900 dark:text-white">System Configuration Restricted</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-            Application settings, data backups, and security management are strictly reserved for Platform Administrators.
+            Application settings, data backups, and security management are strictly reserved for Platform SuperAdministrators.
           </p>
         </div>
       )}
 
+      {/* Fallback Guard: SuperAdmin attempting to access store tabs */}
+      {isSuperAdmin && (activeTab === 'store' || activeTab === 'users' || activeTab === 'printers') && (
+        <div className="p-8 text-center bg-white dark:bg-[#131B2E] rounded-2xl border border-purple-200 dark:border-purple-900/60 shadow-sm max-w-xl mx-auto my-6">
+          <Sliders className="w-10 h-10 text-purple-600 dark:text-purple-400 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">Store Management Restricted</h3>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+            Store shop profile, cashier approvals, and hardware printers are managed within individual store tenants. SuperAdmin access is strictly restricted to application-level configurations.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab('app_settings')}
+            className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold cursor-pointer"
+          >
+            Open App &amp; Environment Config
+          </button>
+        </div>
+      )}
+
       {/* TAB: DATABASE BACKUP & SAFETY RESTORE */}
-      {activeTab === 'backup' && isPlatformOwner && (
+      {activeTab === 'backup' && isSuperAdmin && (
         <DataBackupRestore
           currentUser={currentUser}
           companySettings={companySettings}
@@ -3066,7 +3044,7 @@ setFormErrors(errors);
       )}
 
       {/* TAB 5: SERVER INSTALLER & ROUTE LOCKDOWN */}
-      {isPlatformOwner && activeTab === 'install' && (
+      {isSuperAdmin && activeTab === 'install' && (
         <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-6 transition-colors">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 dark:border-purple-900/40 pb-4 gap-4">
             <div className="flex items-center space-x-3">

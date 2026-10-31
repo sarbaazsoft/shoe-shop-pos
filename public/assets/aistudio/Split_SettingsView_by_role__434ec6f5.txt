@@ -1,0 +1,1 @@
+Split SettingsView by role & align APIs: Restrict SuperAdmin SettingView to only app-level configurations (e.g., Resend API keys), removing store management tabs (purchase prefix, staff, hardware printers). Align codebase middlewares and API endpoints to match this separation.

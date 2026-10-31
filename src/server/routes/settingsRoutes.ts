@@ -287,6 +287,10 @@ router.get('/subscription', async (req: Request, res: Response) => {
 // POST /api/settings/renew-subscription - Store Owner triggers a subscription extension request to SuperAdmin
 router.post('/renew-subscription', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (req.user?.role === 'SUPERADMIN') {
+      return res.status(403).json({ error: 'SuperAdmin cannot request store subscription renewal. Only store owners can request renewals.' });
+    }
+
     await ensureSettingsPricingColumns();
     const tenantId = await resolvePublicOrAuthTenantId(req);
     const tenantRow = await ensureTenantSubscriptionPopulated(tenantId);
@@ -378,14 +382,24 @@ router.post('/renew-subscription', requireAuth, requireAdmin, async (req: Authen
   }
 });
 
+// Helper to filter app-level settings (exclude store-level billing prefixes)
+function filterAppLevelSettings(data: { byKey: Record<string, string>; grouped: Record<string, any[]> }) {
+  const { billing, ...appOnlyGrouped } = data.grouped;
+  const appOnlyByKey = { ...data.byKey };
+  delete appOnlyByKey.INVOICE_PREFIX;
+  delete appOnlyByKey.PURCHASE_PREFIX;
+  return {
+    appSettings: appOnlyByKey,
+    appSettingsGrouped: appOnlyGrouped,
+  };
+}
+
 // GET /api/settings/app, /api/settings/system, /api/settings/global, /api/settings/root - Exclusively Platform Owner
 router.get(['/app', '/system', '/global', '/root', '/system-settings'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const appSettingsData = await getAllAppSettings(req.user?.role);
-    res.json({
-      appSettings: appSettingsData.byKey,
-      appSettingsGrouped: appSettingsData.grouped,
-    });
+    const filtered = filterAppLevelSettings(appSettingsData);
+    res.json(filtered);
   } catch (err: any) {
     const status = err.statusCode || 500;
     res.status(status).json({ error: 'Failed to fetch app settings: ' + err.message });
@@ -399,12 +413,16 @@ router.put(['/app', '/system', '/global', '/root', '/system-settings'], requireA
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ error: 'appSettings payload object is required.' });
     }
+    // Remove store-level prefixes if sent
+    delete updates.INVOICE_PREFIX;
+    delete updates.PURCHASE_PREFIX;
+
     await updateAppSettings(updates, req.user?.role);
     const allAppSettings = await getAllAppSettings(req.user?.role);
+    const filtered = filterAppLevelSettings(allAppSettings);
     return res.json({
       message: 'Application settings updated successfully.',
-      appSettings: allAppSettings.byKey,
-      appSettingsGrouped: allAppSettings.grouped,
+      ...filtered,
     });
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -419,12 +437,15 @@ router.post(['/app', '/system', '/global', '/root', '/system-settings'], require
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ error: 'appSettings payload object is required.' });
     }
+    delete updates.INVOICE_PREFIX;
+    delete updates.PURCHASE_PREFIX;
+
     await updateAppSettings(updates, req.user?.role);
     const allAppSettings = await getAllAppSettings(req.user?.role);
+    const filtered = filterAppLevelSettings(allAppSettings);
     return res.json({
       message: 'Application settings updated successfully.',
-      appSettings: allAppSettings.byKey,
-      appSettingsGrouped: allAppSettings.grouped,
+      ...filtered,
     });
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -439,12 +460,15 @@ router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requir
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ error: 'appSettings payload object is required.' });
     }
+    delete updates.INVOICE_PREFIX;
+    delete updates.PURCHASE_PREFIX;
+
     await updateAppSettings(updates, req.user?.role);
     const allAppSettings = await getAllAppSettings(req.user?.role);
+    const filtered = filterAppLevelSettings(allAppSettings);
     return res.json({
       message: 'Application settings updated successfully.',
-      appSettings: allAppSettings.byKey,
-      appSettingsGrouped: allAppSettings.grouped,
+      ...filtered,
     });
   } catch (err: any) {
     const status = err.statusCode || 500;
@@ -452,32 +476,15 @@ router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requir
   }
 });
 
-// GET /api/settings - Public or Authenticated to get company settings (query scoped: root appSettings only returned to Platform Owner)
+// GET /api/settings - Store settings (scoped strictly to store tenant; does not leak app-level secrets)
 router.get('/', async (req: Request, res: Response) => {
   try {
     await ensureSettingsPricingColumns();
     const tenantId = await resolvePublicOrAuthTenantId(req);
 
-    // Query Scoping: Check if requesting client is verified Platform Owner (SUPERADMIN)
-    const customToken = typeof req.headers['x-auth-token'] === 'string' ? req.headers['x-auth-token'].trim() : '';
-    const authHeader = req.headers.authorization;
-    const rawToken = customToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : '');
-    let isPlatformOwner = false;
-    if (rawToken) {
-      try {
-        const decoded: any = jwt.verify(rawToken, JWT_SECRET);
-        if (String(decoded?.role || '').toUpperCase() === 'SUPERADMIN') {
-          isPlatformOwner = true;
-        }
-      } catch (_) {}
-    }
-
-    const [result, tenantRow, appSettingsData] = await Promise.all([
+    const [result, tenantRow] = await Promise.all([
       pgClient.query('SELECT * FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenantId]),
       ensureTenantSubscriptionPopulated(tenantId),
-      isPlatformOwner
-        ? getAllAppSettings('SUPERADMIN').catch(() => ({ byKey: {}, grouped: { billing: [], email: [], notifications: [], system: [] }, items: [] }))
-        : Promise.resolve({ byKey: {}, grouped: { billing: [], email: [], notifications: [], system: [] }, items: [] }),
     ]);
     const pendingRenewal = await getPendingRenewalRequest(tenantRow?.id || tenantId);
 
@@ -488,16 +495,12 @@ router.get('/', async (req: Request, res: Response) => {
       }
       return res.json({
         settings: formatSettingsResponse(fallback.rows[0], tenantRow, pendingRenewal),
-        appSettings: isPlatformOwner ? appSettingsData.byKey : {},
-        appSettingsGrouped: isPlatformOwner ? appSettingsData.grouped : { billing: [], email: [], notifications: [], system: [] },
       });
     }
 
     const s: any = result.rows[0];
     res.json({
       settings: formatSettingsResponse(s, tenantRow, pendingRenewal),
-      appSettings: isPlatformOwner ? appSettingsData.byKey : {},
-      appSettingsGrouped: isPlatformOwner ? appSettingsData.grouped : { billing: [], email: [], notifications: [], system: [] },
     });
   } catch (err: any) {
     const fallbackSub = buildSubscriptionInfo(null);
@@ -533,13 +536,11 @@ router.get('/', async (req: Request, res: Response) => {
         pricingPolicyLocked: false,
         pricing_policy_locked: false,
       },
-      appSettings: {},
-      appSettingsGrouped: { billing: [], email: [], notifications: [], system: [] },
     });
   }
 });
 
-// POST/PUT/PATCH /api/settings - Update Company and/or App Settings
+// POST/PUT/PATCH /api/settings - Update Store Company Settings
 const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) => {
   try {
     await ensureSettingsPricingColumns();
@@ -547,7 +548,7 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const userRole = String(req.user?.role || '').toUpperCase();
     const isPlatformOwner = userRole === 'SUPERADMIN';
 
-    // Cashiers and Managers cannot alter settings -> 403 Forbidden
+    // Cashiers and Managers cannot alter store settings -> 403 Forbidden
     if (userRole === 'CASHIER' || userRole === 'MANAGER') {
       return res.status(403).json({
         error: `Forbidden: ${userRole === 'CASHIER' ? 'Cashier' : 'Manager'} role is not authorized to modify settings.`,
@@ -555,46 +556,14 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       });
     }
 
-    // Extract any app_settings updates
-    const knownSettingKeys = new Set(APP_SETTINGS_DEFAULTS.map((d) => d.key));
-    let appSettingsUpdates: Record<string, any> = {};
-    if (req.body.appSettings && typeof req.body.appSettings === 'object') {
-      appSettingsUpdates = { ...req.body.appSettings };
-    }
-    for (const [key, val] of Object.entries(req.body)) {
-      if (knownSettingKeys.has(key)) {
-        appSettingsUpdates[key] = val;
-      }
-    }
+    const tenantId = extractStrictTenantId(req);
 
-    const hasAppSettingsUpdates = Object.keys(appSettingsUpdates).length > 0;
-
-    // Reject non-Platform Owner attempts to mutate root system settings -> 403 Forbidden
-    if (hasAppSettingsUpdates && !isPlatformOwner) {
-      return res.status(403).json({
-        error: 'Forbidden: Modifying root system settings and global configuration is exclusively restricted to the Platform Owner (SuperAdmin).',
-        code: 'FORBIDDEN_PLATFORM_OWNER_REQUIRED',
+    // SuperAdmin without a store tenant attempting to modify store settings
+    if (isPlatformOwner && tenantId <= 0) {
+      return res.status(400).json({
+        error: 'SuperAdmin must configure application-level settings via /api/settings/app.',
+        code: 'USE_APP_SETTINGS_ENDPOINT',
       });
-    }
-
-    // Reject non-Platform Owner attempts to mutate root store configurations -> 403 Forbidden
-    const rootConfigKeys = [
-      'business_type', 'businessType',
-      'pricing_mode', 'pricingMode',
-      'min_selling_quantity', 'minSellingQuantity',
-      'allow_half_carton', 'allowHalfCarton',
-      'pricing_policy_locked', 'pricingPolicyLocked',
-    ];
-    const attemptsRootMutation = rootConfigKeys.some((k) => req.body[k] !== undefined && req.body[k] !== null);
-    if (attemptsRootMutation && !isPlatformOwner) {
-      return res.status(403).json({
-        error: 'Forbidden: Root store configurations (business type, pricing mode, minimum carton quantities) can only be modified by the Platform Owner (SuperAdmin).',
-        code: 'FORBIDDEN_PLATFORM_OWNER_REQUIRED',
-      });
-    }
-
-    if (hasAppSettingsUpdates) {
-      await updateAppSettings(appSettingsUpdates, req.user?.role);
     }
 
     const companyName = (req.body.company_name || req.body.companyName || req.body.name || '').trim();
@@ -602,17 +571,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const companyEmail = (req.body.company_email || req.body.companyEmail || req.body.email || '').trim();
     const companyAddress = (req.body.company_address || req.body.companyAddress || req.body.address || '').trim();
 
-    // If request only updated app_settings and didn't provide company profile fields, return early
-    if (!companyName && hasAppSettingsUpdates) {
-      const allAppSettings = await getAllAppSettings(req.user?.role);
-      return res.json({
-        message: 'Application settings updated successfully.',
-        appSettings: allAppSettings.byKey,
-        appSettingsGrouped: allAppSettings.grouped,
-      });
-    }
-
-    const tenantId = extractStrictTenantId(req);
     const strn = (req.body.strn || '').trim();
     const taxId = (req.body.tax_id || req.body.taxId || req.body.taxNumber || req.body.tax_number || '').trim();
     const website = (req.body.website || '').trim();
@@ -794,16 +752,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     }
 
     const populatedTenantRow = await ensureTenantSubscriptionPopulated(tenantId);
-    const allAppSettings = isPlatformOwner
-      ? await getAllAppSettings('SUPERADMIN')
-      : { byKey: {}, grouped: { billing: [], email: [], notifications: [], system: [] } };
-
     const s: any = updateRes.rows[0];
     res.json({
       message: 'Settings updated successfully.',
       settings: formatSettingsResponse(s, populatedTenantRow),
-      appSettings: isPlatformOwner ? allAppSettings.byKey : {},
-      appSettingsGrouped: isPlatformOwner ? allAppSettings.grouped : { billing: [], email: [], notifications: [], system: [] },
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update settings: ' + err.message });
@@ -823,11 +775,15 @@ router.post('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.put('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.patch('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 
-// --- USER MANAGEMENT (Admin Only, Strictly scoped to req.user.tenantId) ---
+// --- USER MANAGEMENT (Store Admin Only, Strictly scoped to store tenant) ---
 
 router.get('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userRole = String(req.user?.role || '').toUpperCase();
     const tenantId = extractStrictTenantId(req);
+    if (userRole === 'SUPERADMIN' && tenantId <= 0) {
+      return res.json({ users: [] });
+    }
     const result = await pgClient.query(
       "SELECT id, tenant_id, name, email, phone, avatar_url, role, status, created_at, updated_at FROM users WHERE tenant_id = $1 AND role != 'SUPERADMIN' ORDER BY id ASC",
       [tenantId]
@@ -840,7 +796,11 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest
 
 const handleUpdateUserStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userRole = String(req.user?.role || '').toUpperCase();
     const tenantId = extractStrictTenantId(req);
+    if (userRole === 'SUPERADMIN' && tenantId <= 0) {
+      return res.status(400).json({ error: 'Store tenant context required to manage users.' });
+    }
     const targetUserId = parseInt(req.params.id, 10);
     const { status } = req.body;
 
@@ -876,7 +836,11 @@ router.patch('/users/:id/status', requireAuth, requireAdmin, handleUpdateUserSta
 
 const handleUpdateUserRole = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userRole = String(req.user?.role || '').toUpperCase();
     const tenantId = extractStrictTenantId(req);
+    if (userRole === 'SUPERADMIN' && tenantId <= 0) {
+      return res.status(400).json({ error: 'Store tenant context required to manage users.' });
+    }
     const targetUserId = parseInt(req.params.id, 10);
     const { role } = req.body;
 
@@ -911,7 +875,11 @@ router.patch('/users/:id/role', requireAuth, requireAdmin, handleUpdateUserRole)
 
 router.post('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userRole = String(req.user?.role || '').toUpperCase();
     const tenantId = extractStrictTenantId(req);
+    if (userRole === 'SUPERADMIN' && tenantId <= 0) {
+      return res.status(400).json({ error: 'Store tenant context required. SuperAdmin must specify or navigate to a store tenant to manage cashiers.' });
+    }
     const { name, email, password, phone, role, status } = req.body;
 
     if (!name || !name.trim()) {
