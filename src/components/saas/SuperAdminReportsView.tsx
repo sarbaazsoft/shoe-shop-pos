@@ -4,14 +4,16 @@ import { TrendingUp, DollarSign, ShoppingBag, Award, Receipt, RotateCw, Search, 
 import { StatCard, triggerStatRecount } from '../common/StatCard';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab';
-import type { SuperAdminStoreRow, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminRecentTransaction } from '../../types';
+import type { SuperAdminStoreRow, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminRecentTransaction, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminReportsViewProps {
   stores: SuperAdminStoreRow[];
   totalTrials?: number;
   reportProducts: SuperAdminReportProduct[];
   reportCategories: SuperAdminReportBreakdown[];
-  reportBrands: SuperAdminReportBreakdown[];
+  reportBrands?: SuperAdminReportBreakdown[];
+  subscriptionPlans?: TenantPlanBreakdown[];
+  expiringTenants?: ExpiringTenantAlert[];
   recentTransactions: SuperAdminRecentTransaction[];
   loading: boolean;
   onRefresh: () => void;
@@ -996,24 +998,24 @@ export const SuperAdminReportsView: React.FC<SuperAdminReportsViewProps> = ({
                 )}
               </div>
 
-              {/* Categories & Brands Mini Summary */}
+              {/* Tenant SaaS Health & Subscription Tier Mini Summary */}
               <div className="mt-4 pt-3 border-t border-slate-100 dark:border-purple-800/60 grid grid-cols-2 gap-2 text-[11px]">
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60">
                   <span className="text-slate-500 dark:text-purple-200/80 flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-purple-500" />
-                    Top Category:
+                    SaaS Active Rate:
                   </span>
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[100px]">
-                    {reportCategories[0]?.name || 'Footwear'}
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[110px]">
+                    {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 100}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60">
                   <span className="text-slate-500 dark:text-purple-200/80 flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-sky-500" />
-                    Top Brand:
+                    Top SaaS Plan:
                   </span>
-                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[100px]">
-                    {reportBrands[0]?.name || 'Brand'}
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[110px]">
+                    {yearlyCount >= sixMonthCount ? 'Yearly (1 Year)' : '6-Months'}
                   </span>
                 </div>
               </div>

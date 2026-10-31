@@ -567,10 +567,14 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                  Category Breakdown
+                  {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+                    ? 'Tenant SaaS Plans'
+                    : 'Category Breakdown'}
                 </h2>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Footwear demand &amp; stock share by line
+                  {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+                    ? 'Subscription tier distribution & adoption'
+                    : 'Footwear demand & stock share by line'}
                 </p>
               </div>
             </div>
@@ -580,7 +584,7 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
                 onClick={() =>
                   onNavigate(
                     variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
-                      ? 'reports'
+                      ? 'stores'
                       : 'inventory'
                   )
                 }
@@ -588,7 +592,7 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
               >
                 <span>
                   {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
-                    ? 'Top Products'
+                    ? 'Stores'
                     : 'Catalog'}
                 </span>
                 <ArrowUpRight className="w-3 h-3" />
@@ -640,7 +644,9 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
                   <div className="flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400">
                     <span className="truncate">{cat.subtitle}</span>
                     <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 shrink-0 ml-2">
-                      {cat.stockUnits} pairs in stock
+                      {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+                        ? `${cat.stockUnits || cat.productCount || 0} stores`
+                        : `${cat.stockUnits} pairs in stock`}
                     </span>
                   </div>
                 </div>
@@ -652,15 +658,19 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
         <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-1 font-medium">
             <Footprints className="w-3.5 h-3.5 text-purple-500" />
-            Assortment Mix
+            {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+              ? 'SaaS Tier Adoption'
+              : 'Assortment Mix'}
           </span>
           <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-            {categoryBreakdown.reduce((s, c) => s + (c.stockUnits || 0), 0)} Total Pairs
+            {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+              ? `${categoryBreakdown.reduce((s, c) => s + (c.productCount || c.stockUnits || 0), 0)} Total Tenants`
+              : `${categoryBreakdown.reduce((s, c) => s + (c.stockUnits || 0), 0)} Total Pairs`}
           </span>
         </div>
       </div>
 
-      {/* CARD 3: INVENTORY CLEARANCE */}
+      {/* CARD 3: INVENTORY CLEARANCE / SAAS RETENTION */}
       <div className="app-card p-5 flex flex-col justify-between border border-slate-200/90 dark:border-purple-800/60 shadow-2xs transition-colors">
         <div>
           <div className="flex items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100 dark:border-slate-800/80">
@@ -670,10 +680,14 @@ export const RetailShoeMetrics: React.FC<RetailShoeMetricsProps> = ({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                  Inventory Clearance
+                  {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+                    ? 'Tenant SaaS Health & Retention'
+                    : 'Inventory Clearance'}
                 </h2>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Sell-through rate &amp; shelf turnover
+                  {variant === 'superadmin-dashboard' || variant === 'superadmin-reports'
+                    ? 'Active tenant uptime, onboarding & retention'
+                    : 'Sell-through rate & shelf turnover'}
                 </p>
               </div>
             </div>

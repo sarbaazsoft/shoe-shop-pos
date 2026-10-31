@@ -164,6 +164,44 @@ export interface SuperAdminReportBreakdown {
   revenue?: number;
 }
 
+export interface TenantPlanBreakdown {
+  plan: SubscriptionPlan;
+  label: string;
+  count: number;
+  percentage: number;
+  activeCount: number;
+  expiringCount: number;
+}
+
+export interface ExpiringTenantAlert {
+  id: number;
+  name: string;
+  ownerEmail: string;
+  ownerPhone?: string;
+  subscriptionPlan: SubscriptionPlan;
+  subscriptionEndDate: string;
+  daysLeft: number;
+  subscriptionStatus: SubscriptionStatus;
+  status: TenantStatus;
+}
+
+export interface TenantSaaSHealthMetrics {
+  totalStores: number;
+  activeStores: number;
+  expiringSoonStores: number;
+  expiredStores: number;
+  suspendedStores: number;
+  activeTrials: number;
+  totalTrials: number;
+  onlineStores: number;
+  onboardedStores: number;
+  retailStores: number;
+  wholesaleStores: number;
+  totalPlatformRevenue: number;
+  totalInvoicesCount: number;
+  totalStaffAccounts: number;
+}
+
 export interface StoreRequestRecord {
   id: number;
   storeName: string;

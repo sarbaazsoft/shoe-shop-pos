@@ -425,6 +425,7 @@ export const api = {
   // SuperAdmin Control Panel Endpoints
   superAdmin: {
     getOverview: () => apiFetch('/superadmin/overview'),
+    getSaaSMetrics: () => apiFetch('/superadmin/saas-metrics'),
     getTrialActivations: (params?: { search?: string; status?: string }) => {
       const q = new URLSearchParams();
       if (params?.search) q.set('search', params.search);

@@ -6,7 +6,7 @@ import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificatio
 import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
-import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence } from '../middleware/tenantMiddleware.ts';
+import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getOnlineTenantCount, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
 
 const router = Router();
 
@@ -1026,30 +1026,7 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
       `)
       .catch(() => ({ rows: [] }));
 
-    const topBrandsRes = await pgClient
-      .query<{
-        name: string;
-        product_count: string;
-        total_stock: string;
-        units_sold: string;
-        total_revenue: string;
-      }>(`
-        SELECT
-          COALESCE(NULLIF(TRIM(p.brand), ''), 'Unbranded') AS name,
-          COUNT(DISTINCT p.id)::text AS product_count,
-          COALESCE(SUM(DISTINCT p.total_stock), 0)::text AS total_stock,
-          COALESCE(SUM(si.quantity), 0)::text AS units_sold,
-          COALESCE(SUM(si.subtotal), 0)::text AS total_revenue
-        FROM products p
-        JOIN tenants t ON t.id = p.tenant_id
-        LEFT JOIN sale_items si ON si.product_id = p.id AND si.tenant_id = p.tenant_id
-        WHERE p.active = true
-        GROUP BY COALESCE(NULLIF(TRIM(p.brand), ''), 'Unbranded')
-        ORDER BY COALESCE(SUM(si.subtotal), 0) DESC, COUNT(DISTINCT p.id) DESC
-        LIMIT 10
-      `)
-      .catch(() => ({ rows: [] }));
-
+    // Tenant SaaS Subscription Plans Breakdown & Health
     const stores = storesRes.rows.map((s) => {
       const endDateIso = s.subscription_end_date ? new Date(s.subscription_end_date).toISOString() : '';
       const startDateIso = s.subscription_start_date ? new Date(s.subscription_start_date).toISOString() : '';
@@ -1109,9 +1086,95 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
 
     const totalPlatformRevenue = stores.reduce((sum, st) => sum + st.totalSales, 0);
     const totalPlatformProducts = stores.reduce((sum, st) => sum + st.productCount, 0);
+    const totalPlatformInvoices = stores.reduce((sum, st) => sum + st.salesCount, 0);
+    const totalStaffAccounts = stores.reduce((sum, st) => sum + st.staffCount, 0);
+
     const activeStoresCount = stores.filter((st) => st.status === 'ACTIVE' && st.subscriptionStatus === 'ACTIVE').length;
     const suspendedStoresCount = stores.filter((st) => st.status === 'SUSPENDED' || st.subscriptionStatus === 'SUSPENDED').length;
     const expiredStoresCount = stores.filter((st) => st.subscriptionStatus === 'EXPIRED').length;
+    const expiringSoonStores = stores.filter((st) => st.daysLeft !== null && st.daysLeft !== undefined && st.daysLeft <= 30 && st.daysLeft >= 0 && st.subscriptionStatus !== 'SUSPENDED');
+    const expiringSoonCount = expiringSoonStores.length;
+    const onlineStoresCount = stores.filter((st) => st.isOnline).length;
+    const onboardedStoresCount = stores.filter((st) => st.onboardingCompleted).length;
+    const retailStoresCount = stores.filter((st) => st.businessType === 'RETAIL').length;
+    const wholesaleStoresCount = stores.filter((st) => st.businessType === 'WHOLESALE').length;
+
+    // Tenant SaaS Subscription Plans Breakdown
+    const planCounts: Record<string, { count: number; active: number; expiring: number }> = {
+      YEARLY: { count: 0, active: 0, expiring: 0 },
+      '6_MONTHS': { count: 0, active: 0, expiring: 0 },
+      TRIAL: { count: 0, active: 0, expiring: 0 },
+    };
+
+    for (const st of stores) {
+      const planKey = st.subscriptionPlan === 'YEARLY' ? 'YEARLY' : st.subscriptionPlan === '6_MONTHS' ? '6_MONTHS' : 'TRIAL';
+      if (!planCounts[planKey]) planCounts[planKey] = { count: 0, active: 0, expiring: 0 };
+      planCounts[planKey].count++;
+      if (st.status === 'ACTIVE' && st.subscriptionStatus === 'ACTIVE') {
+        planCounts[planKey].active++;
+      }
+      if (st.daysLeft !== null && st.daysLeft !== undefined && st.daysLeft <= 30 && st.daysLeft >= 0 && st.subscriptionStatus !== 'SUSPENDED') {
+        planCounts[planKey].expiring++;
+      }
+    }
+
+    const subscriptionPlans = [
+      {
+        plan: 'YEARLY',
+        label: 'Yearly Plan (1 Year)',
+        count: planCounts.YEARLY.count,
+        percentage: Math.round((planCounts.YEARLY.count / Math.max(1, stores.length)) * 100),
+        activeCount: planCounts.YEARLY.active,
+        expiringCount: planCounts.YEARLY.expiring,
+      },
+      {
+        plan: '6_MONTHS',
+        label: '6-Months Plan',
+        count: planCounts['6_MONTHS'].count,
+        percentage: Math.round((planCounts['6_MONTHS'].count / Math.max(1, stores.length)) * 100),
+        activeCount: planCounts['6_MONTHS'].active,
+        expiringCount: planCounts['6_MONTHS'].expiring,
+      },
+      {
+        plan: 'TRIAL',
+        label: '30-Day Free Trial',
+        count: planCounts.TRIAL.count,
+        percentage: Math.round((planCounts.TRIAL.count / Math.max(1, stores.length)) * 100),
+        activeCount: planCounts.TRIAL.active,
+        expiringCount: planCounts.TRIAL.expiring,
+      },
+    ];
+
+    const expiringTenants = expiringSoonStores
+      .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
+      .map((st) => ({
+        id: st.id,
+        name: st.name,
+        ownerEmail: st.ownerEmail,
+        ownerPhone: st.ownerPhone,
+        subscriptionPlan: st.subscriptionPlan,
+        subscriptionEndDate: st.subscriptionEndDate,
+        daysLeft: st.daysLeft ?? 0,
+        subscriptionStatus: st.subscriptionStatus,
+        status: st.status,
+      }));
+
+    const saasMetrics = {
+      totalStores: stores.length,
+      activeStores: activeStoresCount,
+      expiringSoonStores: expiringSoonCount,
+      expiredStores: expiredStoresCount,
+      suspendedStores: suspendedStoresCount,
+      activeTrials: activeTrialsCount,
+      totalTrials: trialsRes.rows.length,
+      onlineStores: onlineStoresCount,
+      onboardedStores: onboardedStoresCount,
+      retailStores: retailStoresCount,
+      wholesaleStores: wholesaleStoresCount,
+      totalPlatformRevenue,
+      totalInvoicesCount: totalPlatformInvoices,
+      totalStaffAccounts,
+    };
 
     const topProducts = topProductsRes.rows.map((r) => ({
       id: r.id,
@@ -1133,14 +1196,6 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
     }));
 
     const topCategories = topCategoriesRes.rows.map((r) => ({
-      name: r.name,
-      productCount: parseInt(r.product_count || '0', 10),
-      totalStock: parseInt(r.total_stock || '0', 10),
-      unitsSold: parseInt(r.units_sold || '0', 10),
-      totalRevenue: parseFloat(r.total_revenue || '0'),
-    }));
-
-    const topBrands = topBrandsRes.rows.map((r) => ({
       name: r.name,
       productCount: parseInt(r.product_count || '0', 10),
       totalStock: parseInt(r.total_stock || '0', 10),
@@ -1178,27 +1233,133 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
       metrics: {
         totalStores: stores.length,
         activeStores: activeStoresCount,
+        expiringSoonStores: expiringSoonCount,
         suspendedStores: suspendedStoresCount,
         expiredStores: expiredStoresCount,
         pendingRequests: 0,
         activeTrials: activeTrialsCount,
         totalTrials: trialsRes.rows.length,
+        onlineStores: onlineStoresCount,
+        onboardedStores: onboardedStoresCount,
         totalPlatformRevenue,
         totalPlatformProducts,
+        totalInvoicesCount: totalPlatformInvoices,
       },
+      saasMetrics,
+      subscriptionPlans,
+      expiringTenants,
       stores,
       storeRequests: [],
       trialActivations: trialsRes.rows,
       reports: {
         topProducts,
         topCategories,
-        topBrands,
+        topBrands: [],
+        subscriptionPlans,
+        expiringTenants,
         sevenDaySales,
         recentTransactions,
       },
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to load SuperAdmin overview: ' + err.message });
+  }
+});
+
+/**
+ * 4B. SUPERADMIN DEDICATED SAAS & SUBSCRIPTION TELEMETRY ENDPOINT (`GET /api/superadmin/saas-metrics`)
+ * Provides tenant-centric subscription distribution, churn risk, and live presence telemetry.
+ */
+router.get('/superadmin/saas-metrics', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    await ensureSaasControlPlane();
+    await syncExpiredTenantSubscriptions();
+    const presence = getTenantPresenceStats();
+
+    const storesRes = await pgClient.query<{
+      id: number;
+      name: string;
+      status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED';
+      subscription_plan: string;
+      subscription_type?: string;
+      subscription_start_date: string;
+      subscription_end_date: string;
+      subscription_status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
+      onboarding_completed: boolean;
+      created_at: string;
+      business_type: 'RETAIL' | 'WHOLESALE';
+      owner_email: string;
+      owner_phone: string;
+      sales_count: string;
+      total_sales_revenue: string;
+      staff_count: string;
+      product_count: string;
+    }>(`
+      SELECT 
+        t.id, t.name, t.status, t.subscription_plan, t.subscription_type,
+        t.subscription_start_date, t.subscription_end_date, t.subscription_status,
+        t.onboarding_completed, t.created_at,
+        COALESCE(cs.business_type::text, 'RETAIL') AS business_type,
+        COALESCE(u.email, cs.email, '') AS owner_email,
+        COALESCE(u.phone, cs.phone, '') AS owner_phone,
+        (SELECT COUNT(*) FROM sales s WHERE s.tenant_id = t.id)::text as sales_count,
+        (SELECT COALESCE(SUM(s.total_amount), 0) FROM sales s WHERE s.tenant_id = t.id)::text as total_sales_revenue,
+        (SELECT COUNT(*) FROM users u2 WHERE u2.tenant_id = t.id AND u2.role != 'SUPERADMIN')::text as staff_count,
+        (SELECT COUNT(*) FROM products p WHERE p.tenant_id = t.id AND p.active = true)::text as product_count
+      FROM tenants t
+      LEFT JOIN company_settings cs ON cs.tenant_id = t.id
+      LEFT JOIN LATERAL (
+        SELECT email, phone FROM users WHERE tenant_id = t.id AND role = 'ADMIN' ORDER BY id ASC LIMIT 1
+      ) u ON true
+      ORDER BY t.id ASC
+    `);
+
+    const stores = storesRes.rows.map((s) => {
+      const endDateIso = s.subscription_end_date ? new Date(s.subscription_end_date).toISOString() : '';
+      const isDateExpired = endDateIso && new Date(endDateIso).getTime() < Date.now();
+      let subStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' = (String(s.subscription_status || 'ACTIVE').toUpperCase() as any);
+      if (s.status === 'SUSPENDED') subStatus = 'SUSPENDED';
+      else if (isDateExpired) subStatus = 'EXPIRED';
+
+      const isOnline = s.status === 'ACTIVE' && subStatus === 'ACTIVE' && isTenantOnlineInMiddleware(s.id, s.status, subStatus);
+      return {
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        businessType: s.business_type,
+        subscriptionPlan: normalizeSubscriptionPlan(s.subscription_plan),
+        subscriptionEndDate: endDateIso,
+        subscriptionStatus: subStatus,
+        daysLeft: calculateDaysLeft(endDateIso, new Date(), s.subscription_plan),
+        isOnline,
+        ownerEmail: s.owner_email,
+        ownerPhone: s.owner_phone,
+        salesCount: parseInt(s.sales_count || '0', 10),
+        totalSales: parseFloat(s.total_sales_revenue || '0'),
+        staffCount: parseInt(s.staff_count || '0', 10),
+        productCount: parseInt(s.product_count || '0', 10),
+      };
+    });
+
+    const activeStores = stores.filter((s) => s.status === 'ACTIVE' && s.subscriptionStatus === 'ACTIVE');
+    const suspendedStores = stores.filter((s) => s.status === 'SUSPENDED' || s.subscriptionStatus === 'SUSPENDED');
+    const expiredStores = stores.filter((s) => s.subscriptionStatus === 'EXPIRED');
+    const expiringSoon = stores.filter((s) => s.daysLeft !== null && s.daysLeft !== undefined && s.daysLeft <= 30 && s.daysLeft >= 0 && s.subscriptionStatus !== 'SUSPENDED');
+
+    return res.json({
+      totalTenants: stores.length,
+      activeTenants: activeStores.length,
+      expiringSoonTenants: expiringSoon.length,
+      expiredTenants: expiredStores.length,
+      suspendedTenants: suspendedStores.length,
+      onlineTenantsCount: stores.filter((s) => s.isOnline).length,
+      presenceTelemetry: presence,
+      tenants: stores,
+      expiringTenants: expiringSoon,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to load SaaS metrics: ' + err.message });
   }
 });
 

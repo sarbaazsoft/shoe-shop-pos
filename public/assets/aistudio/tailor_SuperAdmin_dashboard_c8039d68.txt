@@ -1,0 +1,1 @@
+tailor SuperAdmin dashboard & align APIs: Update the SuperAdmin dashboard to focus on tenant SaaS metrics rather than catalog brands, and align the corresponding backend middlewares and API endpoints to support this tenant-centric structure.

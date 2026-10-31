@@ -97,7 +97,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader(
       'Access-Control-Expose-Headers',
-      'X-SaaS-Mode, X-Tenant-Id, X-Tenant-Status, X-Subscription-Status'
+      'X-SaaS-Mode, X-Tenant-Id, X-Tenant-Status, X-Subscription-Status, X-Subscription-Plan'
     );
     res.setHeader('Vary', 'Origin, Host, X-Tenant-Id');
   }
