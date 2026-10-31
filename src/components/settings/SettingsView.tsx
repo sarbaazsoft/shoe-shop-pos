@@ -615,6 +615,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     RESEND_FROM: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>',
     EMAIL_WEBHOOK_URL: '',
     RESEND_WEBHOOK_URL: '',
+    REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL: 'true',
     VAPID_PUBLIC_KEY: '',
     VAPID_PRIVATE_KEY: '',
     VAPID_SUBJECT: 'mailto:support@sarbaazsoft.com',
@@ -2668,6 +2669,9 @@ setFormErrors(errors);
                       {revealedSecrets.RESEND_API_KEY ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
+                  <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
+                    Stored directly in the database <code>app_settings</code> table. Takes effect immediately without editing <code>.env</code> or restarting the server.
+                  </p>
                 </div>
 
                 <div>
@@ -2710,6 +2714,60 @@ setFormErrors(errors);
                     placeholder="https://api.yourdomain.com/webhooks/resend"
                     className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                   />
+                </div>
+              </div>
+
+              {/* REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL TOGGLE */}
+              <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Require Email Verification for Free Trial Registrations
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 max-w-xl">
+                    When enabled (<strong>true</strong>), new free trial registrants must verify their email address before access is granted. When disabled (<strong>false</strong>), the server bypasses sending the activation email, immediately activates the account, and signs the user in automatically upon trial signup.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
+                    (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true' ? 'Active (Required)' : 'Bypassed (Instant)'}
+                  </span>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'}
+                    onClick={() => {
+                      const current = (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true';
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL: current ? 'false' : 'true',
+                      }));
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                      (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
+                        ? 'bg-purple-600'
+                        : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 

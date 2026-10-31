@@ -81,13 +81,12 @@ export function resolveSenderAddress(
   customFrom?: string,
   settings?: Record<string, string>
 ): string {
-  // CRITICAL REQUIREMENT: Database root app_settings must strictly take precedence over .env
+  // CRITICAL REQUIREMENT: Database root app_settings table is the single source of truth
   const candidate = (
     customFrom ||
     settings?.RESEND_FROM ||
     getCachedAppSetting('RESEND_FROM') ||
-    process.env.RESEND_FROM ||
-    ''
+    DEFAULT_FROM_ADDRESS
   ).trim();
 
   const parsed = parseSenderAddress(candidate);
@@ -115,11 +114,10 @@ export interface SendEmailResult {
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
   const settings = (await getAllAppSettings().catch(() => ({ byKey: {} as Record<string, string> }))).byKey;
   
-  // Database root app_settings strictly takes precedence over .env
+  // Database root app_settings is the single authoritative source of truth
   const apiKey = (
     settings.RESEND_API_KEY ||
     getCachedAppSetting('RESEND_API_KEY') ||
-    process.env.RESEND_API_KEY ||
     ''
   ).trim();
 
@@ -127,8 +125,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     opts.from ||
     settings.RESEND_FROM ||
     getCachedAppSetting('RESEND_FROM') ||
-    process.env.RESEND_FROM ||
-    ''
+    DEFAULT_FROM_ADDRESS
   ).trim();
 
   const parsedSender = parseSenderAddress(rawFromCandidate);
@@ -576,7 +573,90 @@ export async function sendStaffWelcomeEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Test Email Configuration Utility
+// 4. Free Trial Email Verification & Activation Email
+// ---------------------------------------------------------------------------
+
+export interface SendTrialActivationEmailOptions {
+  to: string;
+  userName?: string;
+  storeName?: string;
+  activationToken: string;
+  activationLink: string;
+  expiresAt: Date;
+}
+
+export async function sendTrialActivationEmail(
+  opts: SendTrialActivationEmailOptions
+): Promise<SendEmailResult> {
+  const store = opts.storeName || 'SarbaazSoft Shoe POS';
+  const name = opts.userName || opts.to;
+  const subject = `Activate your Free Trial Store — ${store}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activate Your Free Trial Account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f172a;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:560px;background-color:#1e293b;border:1px solid #334155;border-radius:16px;overflow:hidden;box-shadow:0 20px 25px -5px rgba(0,0,0,0.4);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#7e22ce 0%,#2563eb 100%);padding:28px 32px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;">SarbaazSoft Shoe POS</h1>
+              <p style="margin:6px 0 0;color:#e9d5ff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">
+                Free Trial Email Verification
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 12px;color:#f8fafc;font-size:18px;">Hello, ${name}!</h2>
+              <p style="margin:0 0 20px;color:#94a3b8;font-size:14px;line-height:1.6;">
+                Thank you for signing up for a 30-day free trial on <strong>${store}</strong>. Please verify your email address to activate your account and start using your Point of Sale terminal.
+              </p>
+              <div style="text-align:center;margin:28px 0;">
+                <a href="${opts.activationLink}" style="display:inline-block;background:linear-gradient(135deg,#9333ea 0%,#4f46e5 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 14px rgba(147,51,234,0.4);">
+                  Activate Free Trial Account
+                </a>
+              </div>
+              <div style="background-color:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px 16px;margin:24px 0;">
+                <p style="margin:0 0 6px;color:#cbd5e1;font-size:11px;font-weight:600;text-transform:uppercase;">
+                  Instant Activation Token:
+                </p>
+                <code style="color:#a855f7;font-family:monospace;font-size:13px;word-break:break-all;">
+                  ${opts.activationToken}
+                </code>
+              </div>
+              <p style="margin:0;color:#64748b;font-size:12px;">
+                This link expires in 24 hours. If you did not create this account, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const text = `Hello ${name}!\n\nPlease activate your free trial account on ${store} by opening the following link:\n\n${opts.activationLink}\n\nActivation Token: ${opts.activationToken}\n\nExpires in 24 hours.`;
+
+  return sendEmail({
+    to: opts.to,
+    subject,
+    html,
+    text,
+    tags: [{ name: 'category', value: 'free_trial_activation' }],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 5. Test Email Configuration Utility
 // ---------------------------------------------------------------------------
 
 export interface TestEmailDiagnostics {
@@ -595,8 +675,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
   const rawFromCandidate = (
     settings.RESEND_FROM ||
     getCachedAppSetting('RESEND_FROM') ||
-    process.env.RESEND_FROM ||
-    ''
+    DEFAULT_FROM_ADDRESS
   ).trim();
 
   const parsedSender = parseSenderAddress(rawFromCandidate);

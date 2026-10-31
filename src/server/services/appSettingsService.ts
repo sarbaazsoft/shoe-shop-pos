@@ -56,6 +56,13 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     description: 'Optional Resend delivery webhook URL',
     isSecret: false,
   },
+  {
+    key: 'REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL',
+    defaultValue: 'true',
+    category: 'email',
+    description: 'Require email verification for new free trial registrations before access is activated',
+    isSecret: false,
+  },
 
   // 3. Notifications Group
   {
@@ -147,8 +154,9 @@ export async function ensureAppSettingsSchema(): Promise<void> {
 
       // Seed all default settings if not already present
       for (const def of APP_SETTINGS_DEFAULTS) {
-        // Check if there is an existing environment variable to migrate seamlessly
-        const envVal = process.env[def.key]?.trim();
+        // Email settings are purely configured via SettingView in PostgreSQL app_settings
+        const isEmailCat = def.category === 'email';
+        const envVal = !isEmailCat ? process.env[def.key]?.trim() : undefined;
         const initialVal = envVal !== undefined && envVal !== '' ? envVal : def.defaultValue;
 
         await pgClient.query(
@@ -194,44 +202,64 @@ export async function loadAppSettingsCache(): Promise<void> {
 
 /**
  * Dynamic asynchronous getter for an app setting with fallback value.
+ * PostgreSQL app_settings table is the primary and authoritative source of truth.
+ * Email settings (RESEND_API_KEY, RESEND_FROM, etc.) are strictly read from app_settings, never from .env.
  */
 export async function getAppSetting(key: string, fallback?: string): Promise<string> {
   if (!cacheLoaded) {
     await loadAppSettingsCache();
   }
-  const cached = settingsCache.get(key);
-  if (cached !== undefined && cached !== '') {
-    return cached;
+  const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
+  const isEmailCategory = def?.category === 'email' || key.startsWith('RESEND_') || key.startsWith('EMAIL_');
+
+  if (settingsCache.has(key)) {
+    const cached = settingsCache.get(key)!;
+    if (cached !== '' || isEmailCategory) {
+      return cached;
+    }
   }
+
+  // Email configurations must NEVER read from static environment flags
+  if (isEmailCategory) {
+    if (key === 'RESEND_API_KEY') return '';
+    return fallback ?? def?.defaultValue ?? '';
+  }
+
   const envVal = process.env[key]?.trim();
   if (envVal !== undefined && envVal !== '') {
     return envVal;
   }
-  const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
-  if (key === 'RESEND_API_KEY') return '';
   return fallback ?? def?.defaultValue ?? '';
 }
 
 /**
  * Synchronous getter for hot paths (e.g. middleware, request headers).
- * If cache is loaded, returns the cached value.
- * If cache is not loaded yet, falls back to process.env or default while initiating background cache load.
+ * If cache is loaded, returns the cached value from PostgreSQL app_settings.
+ * Email configurations (RESEND_API_KEY, RESEND_FROM, etc.) are strictly read from app_settings, never from .env.
  */
 export function getCachedAppSetting(key: string, fallback?: string): string {
+  const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
+  const isEmailCategory = def?.category === 'email' || key.startsWith('RESEND_') || key.startsWith('EMAIL_');
+
   if (settingsCache.has(key)) {
     const val = settingsCache.get(key)!;
-    if (val !== '') return val;
+    if (val !== '' || isEmailCategory) return val;
   }
   if (!cacheLoaded) {
     // Initiate background load without awaiting
     loadAppSettingsCache().catch(() => {});
   }
+
+  // Email configurations must NEVER read from static environment flags
+  if (isEmailCategory) {
+    if (key === 'RESEND_API_KEY') return '';
+    return fallback ?? def?.defaultValue ?? '';
+  }
+
   const envVal = process.env[key]?.trim();
   if (envVal !== undefined && envVal !== '') {
     return envVal;
   }
-  const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
-  if (key === 'RESEND_API_KEY') return '';
   return fallback ?? def?.defaultValue ?? '';
 }
 

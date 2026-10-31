@@ -9,7 +9,8 @@ import { generateToken, requireAuth, requireAdmin, extractTokenFromRequest, revo
 import type { AuthenticatedRequest, AuthUser } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { recordTenantMiddlewarePresence, removeTenantMiddlewarePresence } from '../middleware/tenantMiddleware.ts';
-import { sendPasswordResetEmail } from '../utils/email.ts';
+import { sendPasswordResetEmail, sendTrialActivationEmail } from '../utils/email.ts';
+import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
 const router = Router();
 
@@ -416,27 +417,49 @@ router.all('/logout', (req: Request, res: Response) => {
   return res.status(200).json({ success: true, message: 'Logged out successfully.' });
 });
 
-// Registration uses the shared route and an optional tenantId selector.
+// Ensure email verification tokens table
+let emailVerificationSchemaVerified = false;
+async function ensureEmailVerificationSchema() {
+  if (emailVerificationSchemaVerified) return;
+  try {
+    await pgClient.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id SERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    emailVerificationSchemaVerified = true;
+  } catch (err) {
+    console.warn('Could not ensure email_verification_tokens table:', err);
+  }
+}
+
+// Registration / Free Trial Signup Handler
 const handleStoreRegister = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, phone } = req.body;
+    await ensureSaasControlPlane();
+    await ensureEmailVerificationSchema();
+    const { name, email, password, phone, role } = req.body || {};
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
-    if (password.length < 6) {
+    if (String(password).length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
 
     const confirmPassword = req.body.confirmPassword || req.body.confirm_password;
-    if (confirmPassword !== undefined && password !== confirmPassword) {
+    if (confirmPassword !== undefined && String(password) !== String(confirmPassword)) {
       return res.status(400).json({ error: 'Passwords do not match.' });
     }
 
     const targetTenant = await resolveTargetTenant(req);
     const tenantId = targetTenant?.id || 1;
-
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = String(email).trim().toLowerCase();
 
     const existing = await pgClient.query(
       'SELECT id FROM users WHERE LOWER(BTRIM(email)) = LOWER(BTRIM($1)) LIMIT 1',
@@ -445,23 +468,117 @@ const handleStoreRegister = async (req: Request, res: Response) => {
     if (existing.rows.length > 0) {
       return res.status(409).json({
         code: 'EMAIL_ALREADY_EXISTS',
-        error: 'This email is already in use. Please use a different email address.',
+        error: 'This email is already in use. Please use a different email address or log in.',
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Check SuperAdmin toggle setting in app_settings table
+    const requireEmailVerification =
+      getCachedAppSetting('REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', 'true') === 'true';
+    const initialStatus = requireEmailVerification ? 'PENDING' : 'APPROVED';
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
     const userPhone = typeof phone === 'string' ? phone.trim() : '';
+    const assignedRole = (role || 'ADMIN').toUpperCase() === 'CASHIER' ? 'CASHIER' : 'ADMIN';
 
     const result = await pgClient.query(
-      `INSERT INTO users (tenant_id, name, email, phone, password_hash, quick_password, role, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'CASHIER', 'PENDING') 
+      `INSERT INTO users (tenant_id, name, email, phone, password_hash, quick_password, role, status, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
        RETURNING id, tenant_id, name, email, phone, role, status`,
-      [tenantId, name.trim(), cleanEmail, userPhone, passwordHash, password]
+      [tenantId, String(name).trim(), cleanEmail, userPhone, passwordHash, String(password), assignedRole, initialStatus]
     );
 
-    res.status(201).json({
-      message: 'Registration submitted successfully. Your account is pending Admin approval before you can log in.',
-      user: result.rows[0],
+    const createdUser: any = result.rows[0];
+
+    // CASE 1: Verification is bypassed (REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL = false)
+    // Bypass sending the activation email and immediately activate and log in the user
+    if (!requireEmailVerification) {
+      const authUser: AuthUser = {
+        id: createdUser.id,
+        tenantId: createdUser.tenant_id,
+        name: createdUser.name,
+        email: createdUser.email,
+        phone: createdUser.phone || '',
+        avatarUrl: createdUser.avatar_url || '',
+        role: createdUser.role,
+        status: 'APPROVED',
+      };
+      const token = generateToken(authUser);
+      return res.status(201).json({
+        success: true,
+        verified: true,
+        active: true,
+        token,
+        user: authUser,
+        tenantId: createdUser.tenant_id,
+        message: 'Account registered and activated successfully. Welcome to SarbaazSoft!',
+      });
+    }
+
+    // CASE 2: Verification is required (REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL = true)
+    // Create verification token and dispatch activation email
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pgClient.query(
+      'DELETE FROM email_verification_tokens WHERE user_id = $1',
+      [createdUser.id]
+    ).catch(() => {});
+
+    await pgClient.query(
+      'INSERT INTO email_verification_tokens (tenant_id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)',
+      [tenantId, createdUser.id, verificationToken, expiresAt]
+    ).catch(() => {});
+
+    const requestOrigin =
+      (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+      (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+      `${req.protocol}://${req.get('host')}`;
+
+    const activationLink = `${requestOrigin.replace(/\/+$/, '')}/?verificationToken=${verificationToken}&email=${encodeURIComponent(cleanEmail)}&tenantId=${tenantId}`;
+
+    const mailResult = await sendTrialActivationEmail({
+      to: cleanEmail,
+      userName: String(name).trim(),
+      storeName: targetTenant?.name || 'SarbaazSoft Shoe POS',
+      activationToken: verificationToken,
+      activationLink,
+      expiresAt,
+    }).catch((err) => ({
+      delivered: false,
+      provider: 'resend' as const,
+      error: err?.message || String(err),
+    }));
+
+    if (mailResult.delivered) {
+      return res.status(201).json({
+        success: true,
+        verified: false,
+        active: false,
+        requiresVerification: true,
+        emailSent: true,
+        user: createdUser,
+        tenantId: createdUser.tenant_id,
+        message: `Registration submitted! An activation email has been sent to ${cleanEmail}. Please verify your email to log in.`,
+      });
+    }
+
+    // Smart Fallback when email fails or is unconfigured:
+    console.warn(`[Trial Activation Email Issue] Email to ${cleanEmail} could not be delivered: ${mailResult.error || 'Unknown error'}`);
+    console.info(`🔑 [SuperAdmin Diagnostic Log] Instant Free Trial Verification Token for ${cleanEmail}: ${verificationToken} | Link: ${activationLink}`);
+
+    return res.status(201).json({
+      success: true,
+      verified: false,
+      active: false,
+      requiresVerification: true,
+      emailSent: false,
+      verificationToken,
+      verificationLink: activationLink,
+      warning: mailResult.error || 'Email could not be delivered to inbox.',
+      message: `Registration submitted. Note: Email service returned: "${mailResult.error || 'unconfigured'}". You can use the instant verification token or link below to activate your account.`,
+      user: createdUser,
+      tenantId: createdUser.tenant_id,
     });
   } catch (err: any) {
     console.error('Registration error:', err);
@@ -474,8 +591,68 @@ const handleStoreRegister = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Registration failed: ' + err.message });
   }
 };
+
 router.all('/register', handleStoreRegister);
 router.all('/signup', handleStoreRegister);
+router.all('/trial-signup', handleStoreRegister);
+router.all('/trial-register', handleStoreRegister);
+
+// GET & POST /api/auth/verify-email - Verify email address and activate user account
+router.all('/verify-email', async (req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    await ensureEmailVerificationSchema();
+    const token = String(req.query.token || req.body?.token || req.query.verificationToken || '').trim();
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required.' });
+    }
+
+    const tokenRes = await pgClient.query(
+      `SELECT evt.id, evt.user_id, evt.tenant_id, evt.expires_at,
+              u.id as user_id, u.tenant_id, u.name, u.email, u.phone, u.avatar_url, u.role, u.status
+       FROM email_verification_tokens evt
+       JOIN users u ON u.id = evt.user_id
+       WHERE LOWER(BTRIM(evt.token)) = LOWER(BTRIM($1))
+       LIMIT 1`,
+      [token]
+    );
+
+    if (tokenRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired verification token.' });
+    }
+
+    const row: any = tokenRes.rows[0];
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ error: 'This verification token has expired. Please request a new activation link.' });
+    }
+
+    await pgClient.query('UPDATE users SET status = $1, updated_at = NOW() WHERE id = $2', ['APPROVED', row.user_id]);
+    await pgClient.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [row.user_id]).catch(() => {});
+
+    const authUser: AuthUser = {
+      id: row.user_id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone || '',
+      avatarUrl: row.avatar_url || '',
+      role: row.role,
+      status: 'APPROVED',
+    };
+    const sessionToken = generateToken(authUser);
+
+    return res.json({
+      success: true,
+      verified: true,
+      active: true,
+      token: sessionToken,
+      user: authUser,
+      message: 'Email verified successfully! Your account is now active and logged in.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Email verification failed: ' + err.message });
+  }
+});
 
 // Get current user profile
 router.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -748,8 +925,10 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
       });
     }
 
-    // Delivery failed (e.g. Resend unverified domain, invalid key, or network issue)
+    // Delivery failed or email service unconfigured (e.g. missing API key or unverified domain)
+    // Soft error returned with instant verification token/link in Super Admin diagnostic logs so users are never permanently locked out
     console.warn(`[Password Reset Delivery Issue] Email to ${user.email} could not be delivered: ${mailResult.error || 'Unknown error'}`);
+    console.info(`🔑 [SuperAdmin Diagnostic Log] Instant Verification / Password Reset Token for ${user.email}: ${resetToken} | Direct Link: ${resetLink}`);
     return res.json({
       success: true,
       emailSent: false,
@@ -759,7 +938,7 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
       resetLink,
       expiresAt: expiresAt.toISOString(),
       warning: mailResult.error || 'Email could not be delivered to inbox.',
-      message: `Password reset link created. Note: Email delivery returned: "${mailResult.error || 'delivery failed'}". You can use the verification token directly below to reset your password.`,
+      message: `Password reset link created. Note: Email service returned: "${mailResult.error || 'delivery failed'}". You can use the instant verification token or link directly below to complete verification and reset your password.`,
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to send password reset link: ' + err.message });

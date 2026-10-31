@@ -369,6 +369,7 @@ const mockStore: Record<string, any[]> = {
     { key: 'RESEND_FROM', value: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>', category: 'email', description: 'Verified default sender address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'EMAIL_WEBHOOK_URL', value: '', category: 'email', description: 'Custom webhook URL to receive outgoing email payloads', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_WEBHOOK_URL', value: '', category: 'email', description: 'Resend delivery webhook URL', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', value: 'true', category: 'email', description: 'Require email verification for new free trial registrations before access is activated', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'VAPID_PUBLIC_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Public Key for browser and PWA push notifications', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'VAPID_PRIVATE_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Private Key for server notification signing', is_secret: true, updated_at: new Date().toISOString() },
     { key: 'VAPID_SUBJECT', value: 'mailto:support@sarbaazsoft.com', category: 'notifications', description: 'Web Push contact subject URI or mailto link', is_secret: false, updated_at: new Date().toISOString() },
@@ -378,6 +379,7 @@ const mockStore: Record<string, any[]> = {
   platform_notifications: [],
   platform_notification_reads: [],
   pos_notification_dismissals: [],
+  email_verification_tokens: [],
 };
 
 let mockIdCounters: Record<string, number> = {
@@ -405,6 +407,7 @@ let mockIdCounters: Record<string, number> = {
   platform_notifications: 1,
   platform_notification_reads: 1,
   pos_notification_dismissals: 1,
+  email_verification_tokens: 1,
 };
 
 function nextMockId(table: string): number {
@@ -857,6 +860,56 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     }
     if (upper.startsWith('SELECT')) {
       return { rows: (mockStore.pos_notification_dismissals || []) as unknown as T[], rowCount: mockStore.pos_notification_dismissals?.length || 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  if (upper.includes('EMAIL_VERIFICATION_TOKENS')) {
+    if (!mockStore.email_verification_tokens) mockStore.email_verification_tokens = [];
+    if (upper.startsWith('INSERT INTO')) {
+      const tid = Number(params[0] || 1);
+      const uid = Number(params[1] || 0);
+      const token = String(params[2] || '');
+      const exp = params[3] ? new Date(params[3]).toISOString() : new Date(Date.now() + 86400000).toISOString();
+      const entry = {
+        id: nextMockId('email_verification_tokens'),
+        tenant_id: tid,
+        user_id: uid,
+        token,
+        expires_at: exp,
+        created_at: new Date().toISOString(),
+      };
+      mockStore.email_verification_tokens.push(entry);
+      return { rows: [entry as unknown as T], rowCount: 1 };
+    }
+    if (upper.startsWith('SELECT')) {
+      const tokenParam = String(params[0] || '').trim().toLowerCase();
+      const matches = mockStore.email_verification_tokens.filter(
+        (t) => String(t.token).trim().toLowerCase() === tokenParam
+      );
+      if (upper.includes('JOIN USERS')) {
+        const joined = matches.map((t) => {
+          const u = mockStore.users.find((user) => Number(user.id) === Number(t.user_id)) || {};
+          return {
+            ...t,
+            user_id: u.id,
+            tenant_id: u.tenant_id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone,
+            avatar_url: u.avatar_url,
+            role: u.role,
+            status: u.status,
+          };
+        });
+        return { rows: joined as unknown as T[], rowCount: joined.length };
+      }
+      return { rows: matches as unknown as T[], rowCount: matches.length };
+    }
+    if (upper.startsWith('DELETE FROM')) {
+      const uid = Number(params[0] || 0);
+      mockStore.email_verification_tokens = mockStore.email_verification_tokens.filter((t) => Number(t.user_id) !== uid);
+      return { rows: [], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
   }
