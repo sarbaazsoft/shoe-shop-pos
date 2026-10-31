@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, Phone, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield } from 'lucide-react';
+import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, Phone, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield, ExternalLink, Terminal, Copy } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
 
@@ -31,6 +31,16 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [createdResult, setCreatedResult] = useState<{
+    name: string;
+    email: string;
+    role: string;
+    password: string;
+    terminalUrl?: string;
+    previewUrl?: string | null;
+    emailDelivered?: boolean;
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -68,6 +78,45 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
     return true;
   };
 
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleResetAndClose = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'CASHIER',
+      status: 'APPROVED',
+      password: '',
+      confirmPassword: '',
+    });
+    setCurrentStep(1);
+    setCreatedResult(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    onClose();
+  };
+
+  const handleCreateAnother = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'CASHIER',
+      status: 'APPROVED',
+      password: '',
+      confirmPassword: '',
+    });
+    setCurrentStep(1);
+    setCreatedResult(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
+
   const handleFormSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!validateStep1()) {
@@ -93,11 +142,17 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
         status: formData.status,
       });
 
-      setSuccessMessage(res.message || 'Staff account created successfully!');
       onUserCreated();
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      setCreatedResult({
+        name: toTitleCaseTrimmed(formData.name),
+        email: toLowerTrimmed(formData.email),
+        role: formData.role,
+        password: formData.password,
+        terminalUrl: res.welcomeNotification?.terminalUrl,
+        previewUrl: res.welcomeNotification?.previewUrl,
+        emailDelivered: res.welcomeNotification?.delivered,
+      });
+      setSuccessMessage(res.message || 'Staff account created successfully! Welcome credentials dispatched.');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create staff account.');
     } finally {
@@ -130,17 +185,19 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-base text-slate-900 dark:text-white tracking-tight">
-                  Create Staff / Cashier Account
+                  {createdResult ? 'Staff Account Created & Authorized' : 'Create Staff / Cashier Account'}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-purple-200/80">
-                  Step {currentStep} of 2 • Provision Cashier or Administrator with direct authorization
+                  {createdResult
+                    ? 'Credentials provisioned • Welcome notification and POS Terminal shortcut dispatched'
+                    : `Step ${currentStep} of 2 • Provision Cashier or Administrator with direct authorization`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleResetAndClose}
                 className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-purple-300 dark:hover:text-white rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -149,7 +206,8 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
           </div>
 
           {/* 2-Step Stepper Navigation */}
-          <div className="grid grid-cols-2 gap-2">
+          {!createdResult && (
+            <div className="grid grid-cols-2 gap-2">
             {/* Step 1 Tab */}
             <button
               type="button"
@@ -206,6 +264,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
               </div>
             </button>
           </div>
+          )}
         </div>
 
         {/* WIZARD FORM CONTENT */}
@@ -234,8 +293,128 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
             </div>
           )}
 
-          {/* STEP 1: STAFF PROFILE & SYSTEM ROLE */}
-          {currentStep === 1 && (
+          {/* SUCCESS VIEW WHEN ACCOUNT CREATED & NOTIFICATION DISPATCHED */}
+          {createdResult ? (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-4 sm:p-5 text-emerald-900 dark:text-emerald-200 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-emerald-950 dark:text-emerald-100">
+                      Staff Account Created &amp; Welcome Dispatched
+                    </h4>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                      Welcome notification containing credentials and POS Terminal shortcut has been issued for <strong>{createdResult.name}</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Credentials Summary Box */}
+              <div className="bg-white dark:bg-[#131B2E] p-5 rounded-2xl border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-3">
+                <h5 className="font-bold text-gray-800 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-slate-800">
+                  <KeyRound className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Authorized Credentials</span>
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Staff Name &amp; Role</span>
+                    <span className="font-bold text-slate-800 dark:text-white text-sm">{createdResult.name}</span>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      {createdResult.role === 'ADMIN' ? 'Store Administrator' : 'Cashier & POS Operator'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Login Email</span>
+                      <span className="font-bold text-slate-800 dark:text-white font-mono text-xs">{createdResult.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(createdResult.email, 'email')}
+                      className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                      title="Copy Email"
+                    >
+                      {copiedField === 'email' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <div className="sm:col-span-2 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Initial Password</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-sm tracking-wider">{createdResult.password}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(createdResult.password, 'password')}
+                      className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                      title="Copy Password"
+                    >
+                      {copiedField === 'password' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* POS Terminal & F9 Shortcut Card */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-4 sm:p-5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <Terminal className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-slate-900 dark:text-white text-xs">
+                        POS Terminal Ready
+                      </h5>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        Global Shortcut: Press <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold text-slate-900 dark:text-white text-[11px] shadow-2xs">F9</kbd> anytime to launch the POS counter
+                      </p>
+                    </div>
+                  </div>
+                  {createdResult.terminalUrl && (
+                    <a
+                      href={createdResult.terminalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition"
+                    >
+                      <span>Launch POS (F9)</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Email Delivery & Test Preview URL */}
+              {createdResult.previewUrl && (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Welcome Email Dispatched</span>
+                    </span>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      View the rendered welcome email delivered to test inbox.
+                    </p>
+                  </div>
+                  <a
+                    href={createdResult.previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition shrink-0"
+                  >
+                    <span>View Email</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* STEP 1: STAFF PROFILE & SYSTEM ROLE */}
+              {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
               {/* Card 1: Basic Information */}
               <div className="bg-white dark:bg-gradient-to-b dark:from-[#131B2E]/90 dark:to-[#0A0E1A]/80 p-5 rounded-2xl border border-gray-200 dark:border-[#1A263D] shadow-xs space-y-4">
@@ -603,66 +782,90 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
               </div>
             </div>
           )}
+          </>
+          )}
 
           {/* FOOTER NAVIGATION & ACTION BUTTONS ALIGNED WITH PRODUCT FORM MODAL */}
           <div className="pt-4 -mx-6 -mb-6 p-6 bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900/90 dark:via-indigo-950/85 dark:to-slate-900 border-t border-gray-200 dark:border-purple-800/80 flex items-center justify-between">
-            <div>
-              {currentStep > 1 ? (
+            {createdResult ? (
+              <>
                 <button
                   type="button"
-                  onClick={() => {
-                    setErrorMessage(null);
-                    setCurrentStep(1);
-                  }}
-                  className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs font-bold"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onClose}
+                  onClick={handleCreateAnother}
                   className="btn-secondary px-4 py-2.5 text-xs font-semibold cursor-pointer"
                 >
-                  Cancel
+                  Create Another Staff Account
                 </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {currentStep === 1 ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (validateStep1()) setCurrentStep(2);
-                  }}
-                  className="btn-primary px-5 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-bold"
+                  onClick={handleResetAndClose}
+                  className="btn-primary px-6 py-2.5 text-xs font-bold cursor-pointer shadow-md flex items-center gap-1.5"
                 >
-                  <span>Next: Security &amp; Credentials</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Done / Close</span>
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleFormSubmit}
-                  disabled={isSubmitting}
-                  className="btn-primary px-6 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-md font-bold disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Creating Staff Account...</span>
-                    </>
+              </>
+            ) : (
+              <>
+                <div>
+                  {currentStep > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMessage(null);
+                        setCurrentStep(1);
+                      }}
+                      className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs font-bold"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back</span>
+                    </button>
                   ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Confirm &amp; Create Account</span>
-                    </>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="btn-secondary px-4 py-2.5 text-xs font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
                   )}
-                </button>
-              )}
-            </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {currentStep === 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (validateStep1()) setCurrentStep(2);
+                      }}
+                      className="btn-primary px-5 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-sm font-bold"
+                    >
+                      <span>Next: Security &amp; Credentials</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleFormSubmit}
+                      disabled={isSubmitting}
+                      className="btn-primary px-6 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-md font-bold disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Creating Staff Account...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Confirm &amp; Create Account</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </form>
       </motion.div>

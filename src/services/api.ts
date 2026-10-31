@@ -1116,7 +1116,18 @@ export const api = {
     update: (data: any) => apiFetch('/settings', { method: 'PUT', body: data }),
     changeSetting: (data: any) => apiFetch('/settings/changeSetting', { method: 'PUT', body: data }),
     getUsers: () => apiFetch('/settings/users'),
-    createUser: (data: any) => apiFetch('/settings/users', { method: 'POST', body: data }),
+    createUser: (data: any) =>
+      apiFetch<{
+        message: string;
+        user: any;
+        welcomeNotification?: {
+          delivered: boolean;
+          previewUrl?: string | null;
+          provider?: string | null;
+          terminalUrl?: string;
+          notificationId?: number;
+        };
+      }>('/settings/users', { method: 'POST', body: data }),
     updateUserStatus: (id: number, status: string) =>
       apiFetch(`/settings/users/${id}/status`, { method: 'PATCH', body: { status } }),
     updateUserRole: (id: number, role: string) =>

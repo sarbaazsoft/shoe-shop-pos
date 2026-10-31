@@ -1,7 +1,7 @@
 import { pgClient } from '../../db/index.ts';
 import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
-import { sendWelcomeEmail } from '../mailer.ts';
+import { sendWelcomeEmail, sendStaffWelcomeEmail } from '../mailer.ts';
 
 export interface SendWelcomeMsgResult {
   success: boolean;
@@ -122,5 +122,133 @@ export async function sendWelcomeMsg(
     ownerName,
     emailDelivered,
     emailPreviewUrl,
+  };
+}
+
+export interface SendStaffWelcomeParams {
+  tenantId: number;
+  staffName: string;
+  email: string;
+  password: string;
+  role: 'ADMIN' | 'CASHIER' | string;
+  storeName?: string;
+  origin?: string;
+}
+
+export interface SendStaffWelcomeResult {
+  success: boolean;
+  notificationId?: number;
+  emailDelivered: boolean;
+  emailPreviewUrl?: string | null;
+  provider?: string;
+  terminalUrl: string;
+  loginUrl: string;
+  error?: string;
+}
+
+/**
+ * Sends a personalized welcome email and creates an in-app platform notification
+ * for newly created staff/cashier accounts containing credentials and direct POS Terminal link (F9).
+ */
+export async function sendStaffWelcomeNotification(
+  params: SendStaffWelcomeParams
+): Promise<SendStaffWelcomeResult> {
+  const cleanTenantId = Number(params.tenantId) || 1;
+  const staffRole = String(params.role || 'CASHIER').toUpperCase();
+  const roleDisplay = staffRole === 'ADMIN' ? 'Administrator' : 'Cashier';
+
+  // 1. Fetch store name if not provided
+  let storeName = params.storeName;
+  if (!storeName) {
+    try {
+      const res = await pgClient.query<{ name: string }>(
+        'SELECT name FROM tenants WHERE id = $1 LIMIT 1',
+        [cleanTenantId]
+      );
+      storeName = res.rows[0]?.name || 'Shoe Store';
+    } catch {
+      storeName = 'Shoe Store';
+    }
+  }
+
+  // 2. Prepare terminal and login URLs
+  const baseUrl = (params.origin || '').replace(/\/+$/, '');
+  const terminalPath = `/pos?tenantId=${cleanTenantId}`;
+  const loginPath = `/?tenantId=${cleanTenantId}&mode=login`;
+  const terminalUrl = baseUrl ? `${baseUrl}${terminalPath}` : terminalPath;
+  const loginUrl = baseUrl ? `${baseUrl}${loginPath}` : loginPath;
+
+  const notifTitle = `Welcome to ${storeName}, ${params.staffName}!`;
+  const notifMessage = `Your ${roleDisplay} account has been activated. Press F9 anytime to launch the POS Terminal counter and begin ringing up footwear sales.`;
+
+  // 3. Ensure platform notifications table and record in-app notification
+  let notificationId: number | undefined;
+  try {
+    await ensurePlatformNotificationsSchema();
+    const notifRes = await pgClient.query<{ id: number; created_at: string }>(
+      `INSERT INTO platform_notifications (
+         tenant_id, target_role, title, message, type, action_url, action_label, created_at
+       ) VALUES ($1, $2, $3, $4, 'SUCCESS', $5, 'Launch POS Terminal (F9)', NOW())
+       RETURNING id, created_at`,
+      [
+        cleanTenantId,
+        staffRole === 'ADMIN' ? 'ADMIN' : 'CASHIER',
+        notifTitle,
+        notifMessage,
+        terminalPath,
+      ]
+    );
+    notificationId = notifRes.rows[0]?.id;
+
+    // 4. Dispatch real-time SSE & Web Push announcement
+    await notifyPlatformAnnouncement({
+      id: notificationId,
+      tenantId: cleanTenantId,
+      targetRole: staffRole === 'ADMIN' ? 'ADMIN' : 'CASHIER',
+      title: notifTitle,
+      message: notifMessage,
+      type: 'SUCCESS',
+      actionUrl: terminalPath,
+      actionLabel: 'Launch POS Terminal (F9)',
+      timestamp: notifRes.rows[0]?.created_at,
+    }).catch((err) => console.warn('Could not dispatch staff welcome push/SSE announcement:', err));
+  } catch (dbErr) {
+    console.warn('Could not persist staff platform notification:', dbErr);
+  }
+
+  // 5. Send personalized welcome email with credentials & terminal link
+  let emailDelivered = false;
+  let emailPreviewUrl: string | null = null;
+  let provider: string | undefined;
+
+  const targetEmail = (params.email || '').trim().toLowerCase();
+  if (targetEmail && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(targetEmail)) {
+    try {
+      const mailRes = await sendStaffWelcomeEmail({
+        to: targetEmail,
+        staffName: params.staffName,
+        role: staffRole,
+        storeName,
+        loginEmail: targetEmail,
+        initialPassword: params.password,
+        loginUrl,
+        terminalUrl,
+      });
+      emailDelivered = mailRes.delivered;
+      emailPreviewUrl = mailRes.previewUrl || null;
+      provider = mailRes.provider;
+    } catch (mailErr: any) {
+      console.warn('Staff welcome email error:', mailErr?.message || mailErr);
+    }
+  }
+
+  return {
+    success: true,
+    notificationId,
+    emailDelivered,
+    emailPreviewUrl,
+    provider,
+    terminalUrl,
+    loginUrl,
   };
 }

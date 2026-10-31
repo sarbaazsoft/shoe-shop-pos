@@ -9,6 +9,7 @@ import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAllAppSettings, updateAppSettings, APP_SETTINGS_DEFAULTS } from '../services/appSettingsService.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
+import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -929,9 +930,36 @@ router.post('/users', requireAuth, requireAdmin, async (req: AuthenticatedReques
       [tenantId, name.trim(), cleanEmail, cleanPhone, passwordHash, password, assignedRole, initialStatus]
     );
 
+    const createdUser = result.rows[0];
+
+    // Trigger personalized welcome email & platform notification with secure credentials and POS terminal link (F9)
+    let welcomeNotification: any = null;
+    try {
+      const origin = req.body?.origin || (req.get('origin') || `${req.protocol}://${req.get('host')}`);
+      welcomeNotification = await sendStaffWelcomeNotification({
+        tenantId,
+        staffName: name.trim(),
+        email: cleanEmail,
+        password,
+        role: assignedRole,
+        origin,
+      });
+    } catch (notifErr: any) {
+      console.warn('Could not dispatch staff welcome notification/email:', notifErr?.message || notifErr);
+    }
+
     res.status(201).json({
-      message: `${assignedRole === 'ADMIN' ? 'Administrator' : 'Cashier'} account created successfully.`,
-      user: result.rows[0],
+      message: `${assignedRole === 'ADMIN' ? 'Administrator' : 'Cashier'} account created successfully. Welcome credentials & POS Terminal link dispatched.`,
+      user: createdUser,
+      welcomeNotification: welcomeNotification
+        ? {
+            delivered: Boolean(welcomeNotification.emailDelivered),
+            previewUrl: welcomeNotification.emailPreviewUrl || null,
+            provider: welcomeNotification.provider || null,
+            terminalUrl: welcomeNotification.terminalUrl,
+            notificationId: welcomeNotification.notificationId,
+          }
+        : undefined,
     });
   } catch (err: any) {
     console.error('Create user error:', err);

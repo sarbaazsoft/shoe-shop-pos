@@ -651,6 +651,20 @@ export default function App() {
     window.history.replaceState({}, '', appPathForTab(valid));
   };
 
+  // Global F9 keyboard shortcut: Instantly launch POS Terminal from anywhere in the store app
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F9') {
+        e.preventDefault();
+        if (currentUser && saasMode === 'TENANT_ACTIVE') {
+          handleTabChange('pos');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentUser, saasMode]);
+
   useEffect(() => {
     const role = (currentUser?.role || '').toLowerCase();
     const isCashier = role === 'cashier';
