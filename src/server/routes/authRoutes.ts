@@ -737,13 +737,29 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
       `📧 [Password Reset Email] To: ${user.email} | Provider: ${mailResult.provider} | Delivered: ${mailResult.delivered} | Link: ${resetLink}`
     );
 
+    if (mailResult.delivered) {
+      return res.json({
+        success: true,
+        emailSent: true,
+        emailProvider: mailResult.provider,
+        email: user.email,
+        expiresAt: expiresAt.toISOString(),
+        message: `Password reset token and link have been sent by email to ${user.email}.`,
+      });
+    }
+
+    // Delivery failed (e.g. Resend unverified domain, invalid key, or network issue)
+    console.warn(`[Password Reset Delivery Issue] Email to ${user.email} could not be delivered: ${mailResult.error || 'Unknown error'}`);
     return res.json({
       success: true,
-      emailSent: mailResult.delivered,
+      emailSent: false,
       emailProvider: mailResult.provider,
       email: user.email,
+      resetToken,
+      resetLink,
       expiresAt: expiresAt.toISOString(),
-      message: `Password reset token and link have been sent by email to ${user.email}.`,
+      warning: mailResult.error || 'Email could not be delivered to inbox.',
+      message: `Password reset link created. Note: Email delivery returned: "${mailResult.error || 'delivery failed'}". You can use the verification token directly below to reset your password.`,
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to send password reset link: ' + err.message });

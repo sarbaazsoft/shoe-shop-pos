@@ -834,67 +834,58 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
 
   const featureItems = [
     {
-      title: 'POS & Sales Operations',
-      desc: 'Fast billing, offline support, barcode scanning, returns and exchanges.',
+      title: 'POS & Exchanges',
+      desc: 'High-speed barcode checkout, one-click shoe size swaps with automated price-difference calculation, and instant exchange receipts.',
       icon: ShoppingCart,
-      iconBg: 'bg-[#EBF3FF]',
-      iconColor: 'text-violet-300',
+      category: 'Counter',
     },
     {
-      title: 'Inventory Management',
-      desc: 'Set prices, check stock levels and record changes to your products.',
-      icon: Package,
-      iconBg: 'bg-[#E6F8EF]',
-      iconColor: 'text-[#10B981]',
-    },
-    {
-      title: 'Purchases & Suppliers',
-      desc: 'Supplier khata, purchase orders and supplier returns.',
-      icon: Truck,
-      iconBg: 'bg-[#FFEBEB]',
-      iconColor: 'text-[#EF4444]',
-    },
-    {
-      title: 'Hardware & Printing',
-      desc: 'Thermal receipts, barcode labels and direct hardware control.',
+      title: 'Box Label Printing',
+      desc: 'Generate and print shoe box labels, shelf price tags, and Code-128 / EAN-13 barcodes directly to TSPL and ESC/POS thermal printers.',
       icon: Printer,
-      iconBg: 'bg-[#F3E8FF]',
-      iconColor: 'text-[#8B5CF6]',
+      category: 'Barcodes',
     },
     {
-      title: 'Customers & Returns',
-      desc: 'Customer profiles, sales returns and POS exchanges.',
+      title: 'Shoe Inventory',
+      desc: 'Track pairs by Brand, Article Code, Footwear Category (Men, Women, Boys, Girls, Kids), and full or half-carton master packs.',
+      icon: Package,
+      category: 'Sizes & Packs',
+    },
+    {
+      title: 'Offline Checkout',
+      desc: 'Ring up sales, scan shoes, and print customer receipts even when the internet drops. IndexedDB auto-syncs when reconnected.',
+      icon: Zap,
+      category: 'Zero Downtime',
+    },
+    {
+      title: 'Retail & Wholesale',
+      desc: 'Seamlessly toggle between counter retail billing and wholesale carton distribution with minimum quantity and half-carton policies.',
+      icon: Tag,
+      category: 'Dual Mode',
+    },
+    {
+      title: 'Khata Ledgers',
+      desc: 'Complete double-entry khata: customer credit limits, store balance statements, supplier purchase orders, and return credits.',
       icon: Users,
-      iconBg: 'bg-[#E6F8EF]',
-      iconColor: 'text-[#10B981]',
+      category: 'Accounting',
     },
     {
-      title: 'Sales & Stock Reports',
-      desc: 'Sales, profit, inventory valuation and low-stock alerts.',
+      title: 'Financial Reports',
+      desc: 'Instant Profit & Loss statements, gross margin analysis, best-selling footwear articles, stock valuation, and PDF export.',
       icon: BarChart3,
-      iconBg: 'bg-[#FFF4E5]',
-      iconColor: 'text-[#F59E0B]',
+      category: 'Analytics',
     },
     {
-      title: 'Security & User Management',
-      desc: 'Role-based access, secure accounts and automated backups.',
-      icon: ShieldCheck,
-      iconBg: 'bg-[#EBF3FF]',
-      iconColor: 'text-violet-300',
-    },
-    {
-      title: 'Store Settings & Branding',
-      desc: 'Set up your shop, customize receipts and manage your team.',
-      icon: Settings,
-      iconBg: 'bg-[#F1F5F9]',
-      iconColor: 'text-[#475569]',
-    },
-    {
-      title: 'AI Store Assistant',
-      desc: 'Get help with store operations and POS questions, plus AI suggestions when adding products.',
+      title: 'Sammi AI Assistant',
+      desc: 'Powered by Gemini for automated shoe title and description drafting, sales trend summaries, and instant operational answers.',
       icon: Sparkles,
-      iconBg: 'bg-[#F3E8FF]',
-      iconColor: 'text-[#8B5CF6]',
+      category: 'AI Powered',
+    },
+    {
+      title: 'Multi-Store & Apps',
+      desc: 'Manage multiple shoe store branches under one account, install as desktop (.exe) or Android (.apk), with secure staff roles.',
+      icon: LayoutDashboard,
+      category: 'Cloud & PWA',
     },
   ];
 
@@ -915,11 +906,14 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   };
 
   const planFeatures = [
-    'Full access to all features',
+    'POS & size exchange',
+    'Shoe box label printing',
+    'Offline sales auto-sync',
+    'Carton & size inventory',
+    'Customer & supplier khata',
+    'Sammi AI store assistant',
+    'Desktop & Android apps',
     'Multi-role staff access',
-    'Built-in AI assistant',
-    'Free updates & support',
-    'Secure data backup',
   ];
 
   const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 dark:from-purple-600 dark:to-indigo-600 dark:hover:from-purple-500 dark:hover:to-indigo-500 text-white font-bold border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]';
@@ -975,15 +969,14 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700">
                 <Zap className="w-3.5 h-3.5 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" />
-                The Complete POS Solution for Shoe Stores
+                Footwear Retail &amp; Wholesale Point of Sale
               </div>
               <h1 className="mt-5 text-[40px] sm:text-5xl lg:text-[54px] font-extrabold tracking-tight leading-[1.05] text-white lt:text-slate-900">
-                Grow your shoe<br />
-                business <span className="text-[#8B7CFF] lt:text-[#5B4BFF]">smarter</span> &amp;<br />
-                <span className="bg-gradient-to-r from-[#8B7CFF] lt:from-[#5B4BFF] to-[#B9A9FF] lt:to-[#8B7CFF] bg-clip-text text-transparent">faster</span>
+                The modern POS built for <br />
+                <span className="text-[#8B7CFF] lt:text-[#5B4BFF]">shoe stores</span> &amp; footwear brands
               </h1>
               <p className="mt-6 max-w-md text-[15px] leading-relaxed text-slate-200 lt:text-slate-700">
-                SarbaazSoft POS gives you everything you need to manage sales, track inventory, and grow your footwear business — all in one powerful, easy-to-use platform.
+                Side-box label printing, 1-click shoe size exchanges, offline-ready checkouts, and complete customer &amp; supplier khata — tailored specifically for footwear merchants.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <button type="button" onClick={() => openGetStartedWithPlan('TRIAL')} className={`${primaryBtn} px-7 py-3.5 text-sm`}>
@@ -995,9 +988,9 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               </div>
               <ul className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-5">
                 {[
-                  { icon: Sparkles, title: 'Easy Setup', desc: 'Get started in minutes' },
-                  { icon: ShieldCheck, title: 'Secure & Reliable', desc: 'Your data is safe' },
-                  { icon: Headphones, title: '24/7 Support', desc: "We're always here" },
+                  { icon: Printer, title: 'Shoe Box Labels', desc: 'TSPL & ESC/POS direct output' },
+                  { icon: ShoppingCart, title: 'Instant Exchanges', desc: 'Size swaps with delta billing' },
+                  { icon: ShieldCheck, title: 'Offline-Ready', desc: 'Sell without internet drops' },
                 ].map(({ icon: Icon, title, desc }) => (
                   <li key={title} className="flex items-start gap-2.5">
                     <Icon className="w-5 h-5 mt-0.5 shrink-0 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" />
@@ -1021,13 +1014,13 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-5">
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700">
-              <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Features
+              <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Tailored Footwear Features
             </div>
             <h2 className="mt-5 text-3xl sm:text-4xl font-extrabold tracking-tight leading-[1.15] text-white lt:text-slate-900">
-              Everything you need to run your shoe store
+              Engineered specifically for the footwear industry
             </h2>
             <p className="mt-4 max-w-md text-base leading-relaxed text-slate-300 lt:text-slate-600">
-              From sales to inventory, suppliers to reports — SarbaazSoft POS helps you manage your complete retail business in one powerful platform.
+              Generic retail POS software ignores the reality of shoe shops: shoe box stickers, size assortments, carton pack ratios, and frequent exchanges. SarbaazSoft POS is purpose-built for shoe retailers and wholesalers.
             </p>
 
             {/* keep-dark:start */}
@@ -1036,54 +1029,54 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               <div className="text-center">
                 <div className="flex h-28 flex-col justify-between rounded-xl border border-indigo-400/25 bg-gradient-to-b from-[#12154A]/70 to-[#0A0C2E]/80 p-2 text-left">
                   <div className="flex items-center justify-between rounded bg-indigo-500/15 px-1.5 py-0.5 text-[7px] font-bold text-white">
-                    <span>SarbaazSoft</span><span className="text-violet-300">KPIs</span>
+                    <span>Footwear KPIs</span><span className="text-violet-300">Live</span>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     <div className="rounded border border-indigo-400/20 bg-[#080A2A] p-1">
                       <div className="text-[6px] text-slate-400">Today&apos;s sales</div>
-                      <div className="text-[8px] font-extrabold text-white">Rs. 48,750</div>
-                      <div className="text-[6px] font-bold text-emerald-400">+12%</div>
+                      <div className="text-[8px] font-extrabold text-white">Rs. 68,450</div>
+                      <div className="text-[6px] font-bold text-emerald-400">+14%</div>
                     </div>
                     <div className="rounded border border-indigo-400/20 bg-[#080A2A] p-1">
-                      <div className="text-[6px] text-slate-400">Orders</div>
-                      <div className="text-[8px] font-extrabold text-white">36</div>
-                      <div className="text-[6px] font-bold text-emerald-400">+8%</div>
+                      <div className="text-[6px] text-slate-400">Pairs Sold</div>
+                      <div className="text-[8px] font-extrabold text-white">48 pairs</div>
+                      <div className="text-[6px] font-bold text-emerald-400">+10%</div>
                     </div>
                   </div>
                   <div className="flex h-7 items-end gap-1 px-1">
                     {['h-2 bg-violet-300/70', 'h-3 bg-violet-300', 'h-4 bg-violet-400', 'h-5 bg-[#8B7CFF]', 'h-6 bg-[#7C6CFF]', 'h-7 bg-[#6D5CFF]'].map((c) => <span key={c} className={`flex-1 rounded-t ${c}`} />)}
                   </div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">Executive dashboard</div>
+                <div className="mt-2 text-xs font-semibold text-white">Footwear KPIs</div>
               </div>
 
               {/* POS counter */}
               <div className="text-center">
                 <div className="flex h-28 flex-col justify-between rounded-xl border border-indigo-400/25 bg-gradient-to-b from-[#12154A]/70 to-[#0A0C2E]/80 p-2 text-left">
                   <div className="flex items-center justify-between rounded bg-indigo-500/15 px-1.5 py-0.5 text-[7px] font-bold text-white">
-                    <span>POS terminal</span><span className="text-emerald-400">F9</span>
+                    <span>Size Exchange</span><span className="text-emerald-400">F9</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <div key={n} className="flex h-6 items-center justify-center rounded border border-indigo-400/20 bg-[#080A2A] p-0.5"><SneakerGlyph /></div>
                     ))}
                   </div>
-                  <div className="rounded bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 py-0.5 text-center text-[7px] font-bold text-white shadow-xs">Checkout · Rs. 16,699</div>
+                  <div className="rounded bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 py-0.5 text-center text-[7px] font-bold text-white shadow-xs">Swap 42 ⇄ 43 · Done</div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">POS counter</div>
+                <div className="mt-2 text-xs font-semibold text-white">Counter Exchanges</div>
               </div>
 
               {/* Barcode labels */}
               <div className="text-center">
                 <div className="flex h-28 items-center justify-center rounded-xl border border-indigo-400/25 bg-gradient-to-b from-[#12154A]/70 to-[#0A0C2E]/80 p-2">
                   <div className="w-full rounded bg-slate-50 p-1.5 text-center">
-                    <div className="text-[7px] font-extrabold text-slate-900">Shoe store</div>
-                    <div className="text-[8px] font-black text-slate-900">HS-1021</div>
+                    <div className="text-[7px] font-extrabold text-slate-900 tracking-wider">AIR-RUNNER · 42</div>
+                    <div className="text-[8px] font-black text-slate-900">AR-9021</div>
                     <div className="my-0.5 h-4 bg-[repeating-linear-gradient(90deg,#0f172a,#0f172a_1px,transparent_1px,transparent_3px)]" />
-                    <div className="font-mono text-[6px] text-slate-600">0108923000012</div>
+                    <div className="font-mono text-[6px] text-slate-700 font-bold">Rs. 6,500 · Code-128</div>
                   </div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">Barcode labels</div>
+                <div className="mt-2 text-xs font-semibold text-white">Side-Box Labels</div>
               </div>
             </div>
             {/* keep-dark:end */}
@@ -1101,9 +1094,12 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 lt:border-indigo-200 bg-indigo-500/15 lt:bg-indigo-100 text-violet-300 lt:text-[#5B4BFF]">
                     <Icon className="w-5 h-5" aria-hidden="true" />
                   </span>
-                  <span className="min-w-0">
-                    <h3 className="text-sm font-bold text-white lt:text-slate-900">{feat.title}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400 lt:text-slate-500">{feat.desc}</p>
+                  <span className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-white lt:text-slate-900">{feat.title}</h3>
+                      <span className="text-[10px] font-semibold text-violet-400 lt:text-indigo-600 shrink-0">{feat.category}</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-300 lt:text-slate-600">{feat.desc}</p>
                   </span>
                 </li>
               );

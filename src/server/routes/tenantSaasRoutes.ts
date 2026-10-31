@@ -7,6 +7,7 @@ import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type Authe
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
 import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getOnlineTenantCount, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
+import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
 const router = Router();
 
@@ -214,6 +215,7 @@ router.get('/saas/public-stats', async (_req: Request, res: Response) => {
     const stats = statsRes.rows[0];
     const superAdminEmail = superAdminRes.rows[0]?.email || '';
     const superAdminPhone = superAdminRes.rows[0]?.phone || '+92-321-2257340';
+    const resendFrom = getCachedAppSetting('RESEND_FROM') || 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>';
     return res.json({
       stores: Number(stats.store_count),
       products: Number(stats.product_count),
@@ -221,6 +223,8 @@ router.get('/saas/public-stats', async (_req: Request, res: Response) => {
       invoicesToday: Number(stats.invoices_today_count),
       superAdminEmail,
       superAdminPhone,
+      resendFrom,
+      supportEmail: superAdminEmail || 'sarbaazsoft@gmail.com',
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to load public statistics: ' + err.message });
@@ -229,7 +233,8 @@ router.get('/saas/public-stats', async (_req: Request, res: Response) => {
 
 /**
  * 2A2. PUBLIC PLATFORM OWNER INFO (`GET /api/saas/platform-owner`)
- * Dynamically retrieves the SuperAdmin email and name from `users` where role = 'SUPERADMIN'.
+ * Dynamically retrieves the SuperAdmin email and name from `users` where role = 'SUPERADMIN',
+ * enriched with system-wide app_settings.
  */
 router.get('/saas/platform-owner', async (_req: Request, res: Response) => {
   try {
@@ -238,10 +243,13 @@ router.get('/saas/platform-owner', async (_req: Request, res: Response) => {
       `SELECT name, email, phone FROM users WHERE UPPER(BTRIM(role::text)) = 'SUPERADMIN' AND active = true ORDER BY id ASC LIMIT 1`
     );
     const admin = superAdminRes.rows[0];
+    const resendFrom = getCachedAppSetting('RESEND_FROM') || 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>';
     return res.json({
       name: admin?.name || 'Platform SuperAdmin',
       email: admin?.email || '',
       phone: admin?.phone || '+92-321-2257340',
+      resendFrom,
+      supportEmail: admin?.email || 'sarbaazsoft@gmail.com',
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to retrieve platform owner details: ' + err.message });

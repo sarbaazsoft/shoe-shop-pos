@@ -1147,6 +1147,13 @@ export const api = {
       apiFetch('/settings/app', { method: 'PUT', body: { appSettings } }).catch(() =>
         apiFetch('/settings', { method: 'POST', body: { appSettings } })
       ),
+    testEmail: (recipientEmail?: string) =>
+      apiFetch<{
+        success: boolean;
+        delivered: boolean;
+        message: string;
+        details?: any;
+      }>('/settings/test-email', { method: 'POST', body: { recipientEmail } }),
     post: (data: any) => apiFetch('/settings', { method: 'POST', body: data }),
     getSubscription: () => apiFetch('/settings/subscription'),
     requestSubscriptionRenewal: (data: { plan: '6_MONTHS' | 'YEARLY' | string; notes?: string }) =>

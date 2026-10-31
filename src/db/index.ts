@@ -366,7 +366,7 @@ const mockStore: Record<string, any[]> = {
     { key: 'INVOICE_PREFIX', value: 'INV-', category: 'billing', description: 'Default prefix for customer sales receipts and invoices', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'PURCHASE_PREFIX', value: 'PUR-', category: 'billing', description: 'Default prefix for supplier purchase orders and stock receipts', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_API_KEY', value: '', category: 'email', description: 'Resend API Key for transactional emails', is_secret: true, updated_at: new Date().toISOString() },
-    { key: 'RESEND_FROM', value: 'SarbaazSoft Shoe POS <noreply@sarbaazsoft.com>', category: 'email', description: 'Verified default sender address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'RESEND_FROM', value: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>', category: 'email', description: 'Verified default sender address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'EMAIL_WEBHOOK_URL', value: '', category: 'email', description: 'Custom webhook URL to receive outgoing email payloads', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_WEBHOOK_URL', value: '', category: 'email', description: 'Resend delivery webhook URL', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'VAPID_PUBLIC_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Public Key for browser and PWA push notifications', is_secret: false, updated_at: new Date().toISOString() },

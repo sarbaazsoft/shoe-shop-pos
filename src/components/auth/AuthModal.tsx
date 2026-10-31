@@ -232,7 +232,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         tenantId: activeTenantId,
         origin: window.location.origin,
       });
-      setResetToken('');
+      if (res.resetToken) {
+        setResetToken(res.resetToken);
+      } else {
+        setResetToken('');
+      }
       setInfoMessage(
         res.message ||
           `Password reset token and link have been sent by email to ${trimmedEmail}. Please check your inbox and enter the verification token below.`

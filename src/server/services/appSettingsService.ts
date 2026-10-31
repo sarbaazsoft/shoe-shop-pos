@@ -37,7 +37,7 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
   },
   {
     key: 'RESEND_FROM',
-    defaultValue: 'SarbaazSoft Shoe POS <noreply@sarbaazsoft.com>',
+    defaultValue: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>',
     category: 'email',
     description: 'Default verified sender address for Resend emails',
     isSecret: false,
@@ -202,6 +202,10 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
   const cached = settingsCache.get(key);
   if (cached !== undefined && cached !== '') {
     return cached;
+  }
+  const envVal = process.env[key]?.trim();
+  if (envVal !== undefined && envVal !== '') {
+    return envVal;
   }
   const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
   if (key === 'RESEND_API_KEY') return '';

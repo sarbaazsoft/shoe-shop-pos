@@ -1,8 +1,8 @@
 // Centralized transactional email service powered exclusively by the Resend SDK
 import { Resend } from 'resend';
-import { getAllAppSettings } from '../services/appSettingsService.ts';
+import { getAllAppSettings, getCachedAppSetting } from '../services/appSettingsService.ts';
 
-export const DEFAULT_FROM_ADDRESS = 'SarbaazSoft Shoe POS <noreply@sarbaazsoft.com>';
+export const DEFAULT_FROM_ADDRESS = 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>';
 
 export function isValidResendApiKey(key?: string | null): boolean {
   const clean = (key || '').trim();
@@ -18,32 +18,80 @@ export function sanitizeError(err: unknown): string {
     .replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED_TOKEN]');
 }
 
+export interface ParsedSenderAddress {
+  displayName: string;
+  email: string;
+  isPublicWebmail: boolean;
+  cleanAddress: string;
+  resendFrom: string;
+  replyTo: string;
+}
+
+export function parseSenderAddress(rawCandidate?: string | null): ParsedSenderAddress {
+  const raw = (rawCandidate || '').trim();
+  let displayName = 'SarbaazSoft Shoe POS Security';
+  let email = '';
+
+  if (!raw) {
+    return {
+      displayName,
+      email: 'onboarding@resend.dev',
+      isPublicWebmail: false,
+      cleanAddress: DEFAULT_FROM_ADDRESS,
+      resendFrom: DEFAULT_FROM_ADDRESS,
+      replyTo: 'onboarding@resend.dev',
+    };
+  }
+
+  // Format: "Display Name <email@example.com>"
+  const match = raw.match(/^(.*?)\s*<([^\s<>]+@[^\s<>]+)>$/);
+  if (match) {
+    const extractedName = match[1].replace(/["']/g, '').trim();
+    if (extractedName) displayName = extractedName;
+    email = match[2].trim().toLowerCase();
+  } else if (raw.includes('@')) {
+    email = raw.replace(/["']/g, '').trim().toLowerCase();
+  } else {
+    displayName = raw;
+    email = 'onboarding@resend.dev';
+  }
+
+  // Check if email domain is a public webmail domain that Resend strictly blocks from being the SPF/envelope sender
+  const isPublicWebmail = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|msn|icloud|me|mac|aol|proton|protonmail|zoho|mail|yandex|gmx)\./i.test(email);
+
+  // If public webmail (e.g. sarbaazsoft@gmail.com), Resend API requires using onboarding@resend.dev as envelope
+  // while preserving user's email in Reply-To and personal display name.
+  const resendFrom = isPublicWebmail || !email || email === 'noreply@sarbaazsoft.com'
+    ? `${displayName} <onboarding@resend.dev>`
+    : `${displayName} <${email}>`;
+
+  const replyTo = email && email !== 'onboarding@resend.dev' ? email : 'sarbaazsoft@gmail.com';
+
+  return {
+    displayName,
+    email,
+    isPublicWebmail,
+    cleanAddress: displayName ? `${displayName} <${email}>` : email,
+    resendFrom,
+    replyTo,
+  };
+}
+
 export function resolveSenderAddress(
   customFrom?: string,
   settings?: Record<string, string>
 ): string {
-  const fromCandidate = (
+  // CRITICAL REQUIREMENT: Database root app_settings must strictly take precedence over .env
+  const candidate = (
     customFrom ||
-    process.env.RESEND_FROM ||
     settings?.RESEND_FROM ||
+    getCachedAppSetting('RESEND_FROM') ||
+    process.env.RESEND_FROM ||
     ''
   ).trim();
 
-  if (!fromCandidate) {
-    return DEFAULT_FROM_ADDRESS;
-  }
-
-  // Resend requires a verified domain or onboarding@resend.dev; free/public webmails cannot be sender
-  if (/@(gmail|yahoo|hotmail|outlook|ethereal)\./i.test(fromCandidate)) {
-    return DEFAULT_FROM_ADDRESS;
-  }
-
-  // If provided as plain email (e.g. noreply@sarbaazsoft.com), wrap with friendly brand title
-  if (!fromCandidate.includes('<') && fromCandidate.includes('@')) {
-    return `SarbaazSoft Shoe POS <${fromCandidate}>`;
-  }
-
-  return fromCandidate;
+  const parsed = parseSenderAddress(candidate);
+  return parsed.resendFrom;
 }
 
 export interface SendEmailOptions {
@@ -66,25 +114,71 @@ export interface SendEmailResult {
 
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
   const settings = (await getAllAppSettings().catch(() => ({ byKey: {} as Record<string, string> }))).byKey;
-  const apiKey = (process.env.RESEND_API_KEY || settings.RESEND_API_KEY || '').trim();
-  const fromAddress = resolveSenderAddress(opts.from, settings);
+  
+  // Database root app_settings strictly takes precedence over .env
+  const apiKey = (
+    settings.RESEND_API_KEY ||
+    getCachedAppSetting('RESEND_API_KEY') ||
+    process.env.RESEND_API_KEY ||
+    ''
+  ).trim();
+
+  const rawFromCandidate = (
+    opts.from ||
+    settings.RESEND_FROM ||
+    getCachedAppSetting('RESEND_FROM') ||
+    process.env.RESEND_FROM ||
+    ''
+  ).trim();
+
+  const parsedSender = parseSenderAddress(rawFromCandidate);
+  const fromAddress = parsedSender.resendFrom;
+  const replyToAddress = opts.replyTo || parsedSender.replyTo;
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
 
   // 1. Send via Resend SDK when API key is provided
   if (isValidResendApiKey(apiKey)) {
     try {
       const resend = new Resend(apiKey);
-      const { data, error } = await resend.emails.send({
+      const payload: any = {
         from: fromAddress,
         to: recipients,
         subject: opts.subject,
         html: opts.html,
         text: opts.text,
-        replyTo: opts.replyTo,
+        replyTo: replyToAddress,
         tags: opts.tags,
-      });
+      };
 
+      let { data, error } = await resend.emails.send(payload);
+
+      // Automatic fallback: If custom domain fails domain verification on Resend, retry once via onboarding@resend.dev
       if (error) {
+        const errorMsg = String(error.message || error || '');
+        const isDomainError = /domain.*not.*verified|domain_not_found|validation_error|cannot send from/i.test(errorMsg);
+
+        if (isDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
+          const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
+          console.warn(`[Resend Auto-Fallback] Custom domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
+
+          const retryPayload = {
+            ...payload,
+            from: fallbackFrom,
+            replyTo: replyToAddress,
+          };
+
+          const retryResult = await resend.emails.send(retryPayload);
+          if (!retryResult.error) {
+            console.log(`[Resend Email Sent via Fallback] ID: ${retryResult.data?.id} | To: ${recipients.join(', ')} | From: ${fallbackFrom}`);
+            return {
+              delivered: true,
+              provider: 'resend',
+              messageId: retryResult.data?.id,
+            };
+          }
+          error = retryResult.error;
+        }
+
         const sanitized = sanitizeError(error.message || error);
         console.error(`[Resend API Error] Failed to send email to ${recipients.join(', ')}: ${sanitized}`);
         return {
@@ -113,9 +207,9 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
 
   // 2. Optional secondary webhook dispatcher if configured
   const webhookUrl = (
-    process.env.EMAIL_WEBHOOK_URL ||
     settings.EMAIL_WEBHOOK_URL ||
     settings.RESEND_WEBHOOK_URL ||
+    process.env.EMAIL_WEBHOOK_URL ||
     ''
   ).trim();
 
@@ -130,6 +224,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           subject: opts.subject,
           html: opts.html,
           text: opts.text,
+          replyTo: replyToAddress,
         }),
       });
 
@@ -139,13 +234,15 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           provider: 'webhook',
         };
       }
-    } catch (hookErr: any) {
-      console.warn('[Email Webhook Warning] Delivery failed:', sanitizeError(hookErr));
+    } catch (whErr) {
+      console.warn('Webhook email dispatch notice:', whErr);
     }
   }
 
-  const unconfiguredMsg = 'Email delivery unavailable: RESEND_API_KEY is not configured or is invalid.';
-  console.warn(`[Resend] ${unconfiguredMsg}`);
+  const unconfiguredMsg = !apiKey
+    ? 'Email delivery unavailable: RESEND_API_KEY is not configured in app_settings.'
+    : 'Email delivery unavailable: RESEND_API_KEY format is invalid (must start with re_ and be >= 20 characters).';
+
   return {
     delivered: false,
     provider: 'resend',
@@ -476,4 +573,74 @@ export async function sendStaffWelcomeEmail(
     text,
     tags: [{ name: 'category', value: 'staff_invitation' }],
   });
+}
+
+// ---------------------------------------------------------------------------
+// 4. Test Email Configuration Utility
+// ---------------------------------------------------------------------------
+
+export interface TestEmailDiagnostics {
+  success: boolean;
+  delivered: boolean;
+  provider: 'resend' | 'webhook';
+  messageId?: string;
+  from: string;
+  to: string;
+  error?: string;
+  info?: string;
+}
+
+export async function testResendConfiguration(testRecipient?: string): Promise<TestEmailDiagnostics> {
+  const settings = (await getAllAppSettings().catch(() => ({ byKey: {} as Record<string, string> }))).byKey;
+  const rawFromCandidate = (
+    settings.RESEND_FROM ||
+    getCachedAppSetting('RESEND_FROM') ||
+    process.env.RESEND_FROM ||
+    ''
+  ).trim();
+
+  const parsedSender = parseSenderAddress(rawFromCandidate);
+  const targetRecipient = (testRecipient || parsedSender.email || 'sarbaazsoft@gmail.com').trim().toLowerCase();
+
+  const timestamp = new Date().toLocaleString();
+  const subject = `Test Delivery — SarbaazSoft Shoe POS (${timestamp})`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><title>Resend Test Email</title></head>
+<body style="font-family:sans-serif;background-color:#0f172a;color:#f8fafc;padding:32px 16px;">
+  <div style="max-width:520px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;">
+    <h2 style="color:#38bdf8;margin-top:0;">SarbaazSoft Shoe POS Resend Test</h2>
+    <p>This is a live test email confirming that your Resend transactional email integration is operational.</p>
+    <div style="background:#0f172a;padding:12px;border-radius:8px;font-family:monospace;font-size:13px;line-height:1.6;margin:16px 0;">
+      <div><strong>Sender (From):</strong> ${parsedSender.resendFrom}</div>
+      <div><strong>Recipient (To):</strong> ${targetRecipient}</div>
+      <div><strong>Reply-To:</strong> ${parsedSender.replyTo}</div>
+      <div><strong>Timestamp:</strong> ${timestamp}</div>
+    </div>
+    <p style="color:#94a3b8;font-size:12px;">If you received this message, password reset tokens and store onboarding notifications will deliver successfully.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const result = await sendEmail({
+    to: targetRecipient,
+    subject,
+    html,
+    text: `SarbaazSoft Shoe POS Resend Test Email\n\nSent to: ${targetRecipient}\nFrom: ${parsedSender.resendFrom}\nTimestamp: ${timestamp}`,
+  });
+
+  return {
+    success: result.delivered,
+    delivered: result.delivered,
+    provider: result.provider,
+    messageId: result.messageId,
+    from: parsedSender.resendFrom,
+    to: targetRecipient,
+    error: result.error,
+    info: result.delivered
+      ? `Email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
+      : `Email delivery failed: ${result.error}`,
+  };
 }

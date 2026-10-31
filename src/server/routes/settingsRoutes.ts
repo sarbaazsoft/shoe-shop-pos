@@ -10,6 +10,7 @@ import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAllAppSettings, updateAppSettings, APP_SETTINGS_DEFAULTS } from '../services/appSettingsService.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
+import { testResendConfiguration } from '../utils/email.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -474,6 +475,38 @@ router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requir
   } catch (err: any) {
     const status = err.statusCode || 500;
     return res.status(status).json({ error: 'Failed to update app settings: ' + err.message });
+  }
+});
+
+// POST /api/settings/test-email - Trigger live Resend test email to verify credentials and sender domain
+router.post('/test-email', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const requestedRecipient = req.body?.recipientEmail || req.body?.to || req.user?.email || 'sarbaazsoft@gmail.com';
+    const cleanRecipient = String(requestedRecipient).trim().toLowerCase();
+
+    const diagnostics = await testResendConfiguration(cleanRecipient);
+
+    if (diagnostics.delivered) {
+      return res.json({
+        success: true,
+        delivered: true,
+        message: diagnostics.info || `Test email sent successfully to ${cleanRecipient}.`,
+        details: diagnostics,
+      });
+    }
+
+    return res.status(200).json({
+      success: false,
+      delivered: false,
+      message: diagnostics.info || `Test email could not be delivered: ${diagnostics.error}`,
+      details: diagnostics,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      delivered: false,
+      error: 'Test email failed: ' + err.message,
+    });
   }
 });
 
