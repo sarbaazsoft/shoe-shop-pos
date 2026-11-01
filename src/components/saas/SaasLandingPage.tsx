@@ -318,24 +318,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const statsSectionRef = useRef<HTMLElement>(null);
   const storesSwiperRef = useRef<HTMLDivElement>(null);
   const swiperInstanceRef = useRef<any>(null);
-  const { setThemeMode } = useTheme();
-  const [landingTheme, setLandingTheme] = useState<'dark' | 'light'>(() => {
-    try {
-      return localStorage.getItem('pos_landing_theme') === 'light' ? 'light' : 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
-  const toggleLandingTheme = () => {
-    const next = landingTheme === 'dark' ? 'light' : 'dark';
-    try {
-      localStorage.setItem('pos_landing_theme', next);
-    } catch {}
-    setLandingTheme(next);
-    try {
-      setThemeMode(next);
-    } catch {}
-  };
+  const { theme, themeMode, setThemeMode, toggleTheme } = useTheme();
+  // landingTheme dynamically reflects the resolved theme ('dark' | 'light'), seamlessly supporting System preference
+  const landingTheme: 'dark' | 'light' = theme;
+  const toggleLandingTheme = toggleTheme;
 
   useEffect(() => {
     let isMounted = true;

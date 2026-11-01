@@ -249,15 +249,34 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
         throw new Error(res?.message || 'Failed to complete registration.');
       }
 
-      // Automatically log the newly registered store owner in
+      const createdTenantId = Number(res.tenantId || res.user?.tenantId || 0);
+
+      // LAYER 2: If email verification is required, STOP immediate auto-login and redirect to /verify-email notice view
+      if (res.requiresVerification || !res.token) {
+        onClose();
+        const verifyUrl = `/verify-email?email=${encodeURIComponent(cleanEmail)}&tenantId=${createdTenantId}`;
+        window.history.pushState({}, '', verifyUrl);
+        window.dispatchEvent(new CustomEvent('auth:require-email-verification', {
+          detail: {
+            email: cleanEmail,
+            tenantId: createdTenantId,
+            storeName: res.storeName,
+            verificationToken: res.verificationToken,
+            verificationLink: res.verificationLink,
+            message: res.message,
+          },
+        }));
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        return;
+      }
+
+      // Automatically log the newly registered store owner in ONLY when verification toggle is OFF
       if (res.token && res.user) {
         setAuthSession(res.token, {
           ...res.user,
           onboardingCompleted: false,
         });
       }
-
-      const createdTenantId = Number(res.tenantId || res.user?.tenantId || 0);
 
       // Hand off to parent component router
       if (onStoreCreated) {

@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, ensureEmailVerificationSchema, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
+import { sendTrialActivationEmail } from '../utils/email.ts';
 import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getOnlineTenantCount, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
@@ -328,7 +330,7 @@ export async function recordTrialActivation(data: {
   trialDurationDays?: number;
   trialStartDate?: string | Date;
   trialEndDate?: string | Date;
-  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
+  status?: 'ACTIVE' | 'EXPIRED' | 'CONVERTED' | 'PENDING';
   ipAddress?: string;
   userAgent?: string;
   details?: Record<string, any>;
@@ -515,13 +517,33 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
     }
 
     const duplicateOwnerEmail = await pgClient.query(
-      'SELECT id, tenant_id, name, quick_password FROM users WHERE LOWER(BTRIM(email)) = LOWER(BTRIM($1)) LIMIT 1',
+      'SELECT id, tenant_id, name, quick_password, status FROM users WHERE LOWER(BTRIM(email)) = LOWER(BTRIM($1)) LIMIT 1',
       [cleanOwnerEmail]
     );
     if (duplicateOwnerEmail.rows.length > 0) {
       const existingUser = duplicateOwnerEmail.rows[0];
+
+      // Check SuperAdmin toggle setting for email verification requirement
+      const requireEmailVerificationSetting =
+        getCachedAppSetting('REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', 'true');
+      const requireEmailConfirmationSetting =
+        getCachedAppSetting('REQUIRE_EMAIL_CONFIRMATION', 'false');
+      const isEmailVerificationRequired =
+        requireEmailVerificationSetting === 'true' || requireEmailConfirmationSetting === 'true';
+
+      if (isEmailVerificationRequired && existingUser.status === 'PENDING') {
+        return res.status(409).json({
+          code: 'EMAIL_VERIFICATION_PENDING',
+          requiresVerification: true,
+          email: cleanOwnerEmail,
+          tenantId: existingUser.tenant_id,
+          redirectUrl: `/verify-email?email=${encodeURIComponent(cleanOwnerEmail)}&tenantId=${existingUser.tenant_id}`,
+          error: 'An account with this email was recently created and is pending email verification. Please check your inbox or click Resend Verification.',
+        });
+      }
+
       // Resilience for network/power drop: If this trial store was already created in the last 15 minutes,
-      // recover the provisioned store and credentials gracefully rather than failing with duplicate error!
+      // and verified or verification not required, recover the provisioned store and credentials
       const recentTrial = await pgClient
         .query(
           "SELECT * FROM trial_activations WHERE LOWER(BTRIM(email)) = LOWER(BTRIM($1)) AND activated_at >= NOW() - INTERVAL '15 minutes' ORDER BY id DESC LIMIT 1",
@@ -529,7 +551,7 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
         )
         .catch(() => ({ rows: [] }));
 
-      if (recentTrial.rows.length > 0 && existingUser.tenant_id) {
+      if (recentTrial.rows.length > 0 && existingUser.tenant_id && (!isEmailVerificationRequired || existingUser.status === 'APPROVED')) {
         const tr = recentTrial.rows[0];
         const tenantRes = await pgClient
           .query('SELECT name, subscription_end_date FROM tenants WHERE id = $1', [existingUser.tenant_id])
@@ -635,6 +657,15 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
       }
     }
 
+    // Check SuperAdmin toggle setting for email verification requirement
+    const requireEmailVerificationSetting =
+      getCachedAppSetting('REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', 'true');
+    const requireEmailConfirmationSetting =
+      getCachedAppSetting('REQUIRE_EMAIL_CONFIRMATION', 'false');
+    const isEmailVerificationRequired =
+      requireEmailVerificationSetting === 'true' || requireEmailConfirmationSetting === 'true';
+    const ownerInitialStatus: 'PENDING' | 'APPROVED' = isEmailVerificationRequired ? 'PENDING' : 'APPROVED';
+
     // Automatically provision new store on 30-Day Free Tier Trial (bypassing old store-request form logic)
     const ownerInitialPassword =
       (password && String(password).trim()) ||
@@ -672,6 +703,7 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
         cashierEmail: cleanCashierEmail,
         cashierPassword: cleanCashierPassword,
         cashierPhone: cleanCashierPhone,
+        ownerStatus: ownerInitialStatus,
       });
       await pgClient.query('COMMIT');
     } catch (provErr: any) {
@@ -709,11 +741,12 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
       trialDurationDays: 30,
       trialStartDate: provisioned.subscriptionStartDate,
       trialEndDate: provisioned.subscriptionEndDate,
-      status: 'ACTIVE',
+      status: isEmailVerificationRequired ? 'PENDING' : 'ACTIVE',
       ipAddress: String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || ''),
       userAgent: String(req.headers['user-agent'] || ''),
       details: {
-        autoActivated: true,
+        autoActivated: !isEmailVerificationRequired,
+        requiresVerification: isEmailVerificationRequired,
         initialPassword,
         ownerName: cleanOwnerName,
         address: cleanAddress,
@@ -736,6 +769,89 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
 
     const calculatedDaysLeft = calculateDaysLeft(provisioned.subscriptionEndDate, currentTimestamp, 'free_tier');
 
+    // LAYER 2 & 4: If SuperAdmin has "Require Email Confirmation" turned ON,
+    // STOP executing immediate auto-login, generate verification token, trigger activation email,
+    // and redirect user to /verify-email notice view.
+    if (isEmailVerificationRequired) {
+      await ensureEmailVerificationSchema();
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await pgClient.query(
+        'DELETE FROM email_verification_tokens WHERE user_id = $1',
+        [provisioned.adminUserId]
+      ).catch(() => {});
+
+      await pgClient.query(
+        'INSERT INTO email_verification_tokens (tenant_id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)',
+        [provisionedTenantId, provisioned.adminUserId, verificationToken, verificationExpiresAt]
+      ).catch(() => {});
+
+      const requestOrigin =
+        (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+        (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+        `${req.protocol}://${req.get('host')}`;
+
+      const activationLink = `${requestOrigin.replace(/\/+$/, '')}/verify-email?token=${verificationToken}&email=${encodeURIComponent(cleanOwnerEmail)}&tenantId=${provisionedTenantId}`;
+
+      // Dispatch activation email event via centralized email service
+      const mailResult = await sendTrialActivationEmail({
+        to: cleanOwnerEmail,
+        userName: cleanOwnerName,
+        storeName: cleanStoreName,
+        activationToken: verificationToken,
+        activationLink,
+        expiresAt: verificationExpiresAt,
+      }).catch((err) => ({
+        delivered: false,
+        provider: 'resend' as const,
+        sandbox: true,
+        sandboxRecipient: undefined as string | undefined,
+        error: err?.message || String(err),
+      }));
+
+      // No token is issued! Immediate auto-login is strictly blocked until email is confirmed.
+      return res.status(201).json({
+        success: true,
+        trialActivated: true,
+        requiresVerification: true,
+        verified: false,
+        active: false,
+        emailSent: mailResult.delivered,
+        sandbox: Boolean(mailResult.sandbox),
+        token: null,
+        user: null,
+        tenantId: provisioned.tenantId,
+        storeName: cleanStoreName,
+        ownerName: cleanOwnerName,
+        ownerEmail: cleanOwnerEmail,
+        cashierName: provisioned?.cashierName || (willCreateCashier ? cleanCashierName : null),
+        cashierEmail: provisioned?.cashierEmail || null,
+        address: cleanAddress,
+        currency: cleanCurrency,
+        currencySymbol: cleanCurrencySymbol,
+        invoiceFooter: cleanInvoiceFooter,
+        loginUrl: `/?tenantId=${provisionedTenantId}`,
+        redirectUrl: `/verify-email?email=${encodeURIComponent(cleanOwnerEmail)}&tenantId=${provisionedTenantId}`,
+        verificationToken: (mailResult.delivered && !mailResult.sandbox) ? undefined : verificationToken,
+        verificationLink: (mailResult.delivered && !mailResult.sandbox) ? undefined : activationLink,
+        subscriptionType: 'free_tier',
+        subscriptionPlan: 'free_tier',
+        subscriptionStartDate: provisioned.subscriptionStartDate,
+        subscriptionEndDate: provisioned.subscriptionEndDate,
+        daysLeft: calculatedDaysLeft,
+        trialDays: 30,
+        superAdminEmail,
+        superAdminPhone,
+        message: mailResult.sandbox
+          ? `Free trial registered successfully! (Resend Sandbox: activation message routed to ${mailResult.sandboxRecipient || 'developer email'}). Please verify your email to access your dashboard.`
+          : (mailResult.delivered
+              ? `Free trial registered successfully! A confirmation email has been sent to ${cleanOwnerEmail}. Please check your inbox and verify your email to access your dashboard.`
+              : `Free trial registered successfully! Email confirmation is required. Please check your inbox or use the verification link to activate your account.`),
+      });
+    }
+
+    // When Require Email Confirmation is OFF: immediate auto-login session is granted
     const userToken = generateToken({
       id: provisioned.adminUserId,
       tenantId: provisionedTenantId,
@@ -760,6 +876,9 @@ const handleRegisterStoreRequest = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       trialActivated: true,
+      requiresVerification: false,
+      verified: true,
+      active: true,
       token: userToken,
       user: authUser,
       tenantId: provisioned.tenantId,
@@ -1709,6 +1828,7 @@ async function provisionNewTenantStore(params: {
   cashierPassword?: string;
   cashierPhone?: string;
   onboardingCompleted?: boolean;
+  ownerStatus?: 'PENDING' | 'APPROVED';
 }) {
   const normalizedOwnerEmail = params.ownerEmail.trim().toLowerCase();
   const onboardingCompleted = params.onboardingCompleted ?? false;
@@ -1867,6 +1987,7 @@ async function provisionNewTenantStore(params: {
     cashierEmail: params.cashierEmail?.trim(),
     cashierPassword: params.cashierPassword?.trim(),
     cashierPhone: params.cashierPhone?.trim(),
+    ownerStatus: params.ownerStatus,
   });
 
   return {

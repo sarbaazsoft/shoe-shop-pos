@@ -290,8 +290,13 @@ async function handleStoreOrPlatformLogin(req: Request, res: Response) {
 
     if (user.status === 'PENDING') {
       return res.status(423).json({
-        error: 'Your account is currently PENDING approval by the Shop Owner/Admin.',
+        error: 'Your email address is unverified. Please check your inbox and confirm your email to log in.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
         status: 'PENDING',
+        requiresVerification: true,
+        email: user.email,
+        tenantId: user.tenant_id,
+        redirectUrl: `/verify-email?email=${encodeURIComponent(user.email)}&tenantId=${user.tenant_id}`,
       });
     }
 
@@ -547,10 +552,12 @@ const handleStoreRegister = async (req: Request, res: Response) => {
     }).catch((err) => ({
       delivered: false,
       provider: 'resend' as const,
+      sandbox: true,
+      sandboxRecipient: undefined as string | undefined,
       error: err?.message || String(err),
     }));
 
-    if (mailResult.delivered) {
+    if (mailResult.delivered && !mailResult.sandbox) {
       return res.status(201).json({
         success: true,
         verified: false,
@@ -563,20 +570,24 @@ const handleStoreRegister = async (req: Request, res: Response) => {
       });
     }
 
-    // Smart Fallback when email fails or is unconfigured:
-    console.warn(`[Trial Activation Email Issue] Email to ${cleanEmail} could not be delivered: ${mailResult.error || 'Unknown error'}`);
-    console.info(`🔑 [SuperAdmin Diagnostic Log] Instant Free Trial Verification Token for ${cleanEmail}: ${verificationToken} | Link: ${activationLink}`);
+    // Smart Fallback when email is handled in sandbox or encounters mail provider limits:
+    console.info(`🔑 [SuperAdmin Diagnostic Log] Free Trial Verification Token for ${cleanEmail}: ${verificationToken} | Link: ${activationLink}`);
 
     return res.status(201).json({
       success: true,
       verified: false,
       active: false,
       requiresVerification: true,
-      emailSent: false,
+      emailSent: mailResult.delivered,
+      sandbox: Boolean(mailResult.sandbox),
       verificationToken,
       verificationLink: activationLink,
-      warning: mailResult.error || 'Email could not be delivered to inbox.',
-      message: `Registration submitted. Note: Email service returned: "${mailResult.error || 'unconfigured'}". You can use the instant verification token or link below to activate your account.`,
+      warning: mailResult.sandbox ? `Resend Sandbox: Forwarded to ${mailResult.sandboxRecipient || 'developer email'}` : (mailResult.error || undefined),
+      message: mailResult.sandbox
+        ? `Registration submitted! (Resend Sandbox: activation message routed to ${mailResult.sandboxRecipient || 'developer email'}). Use the token or link below to complete verification.`
+        : (mailResult.delivered
+            ? `Registration submitted! An activation email has been sent to ${cleanEmail}.`
+            : `Registration submitted. Note: Email service returned: "${mailResult.error || 'unconfigured'}". You can use the instant verification token or link below to activate your account.`),
       user: createdUser,
       tenantId: createdUser.tenant_id,
     });
@@ -651,6 +662,89 @@ router.all('/verify-email', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Email verification failed: ' + err.message });
+  }
+});
+
+// POST & GET /api/auth/resend-verification - Resends activation email for pending user
+router.all('/resend-verification', async (req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    await ensureEmailVerificationSchema();
+    const rawEmail = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+    if (!rawEmail) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    const userRes = await pgClient.query(
+      `SELECT u.id, u.tenant_id, u.name, u.email, u.status, t.name as store_name
+       FROM users u
+       LEFT JOIN tenants t ON t.id = u.tenant_id
+       WHERE LOWER(BTRIM(u.email)) = LOWER(BTRIM($1))
+       ORDER BY u.id DESC
+       LIMIT 1`,
+      [rawEmail]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with this email address.' });
+    }
+
+    const user = userRes.rows[0];
+    if (user.status === 'APPROVED') {
+      return res.status(400).json({
+        error: 'This account has already been verified. Please log in directly.',
+        alreadyVerified: true,
+      });
+    }
+
+    // Invalidate existing tokens
+    await pgClient.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]).catch(() => {});
+
+    // Generate fresh verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pgClient.query(
+      'INSERT INTO email_verification_tokens (tenant_id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)',
+      [user.tenant_id || 1, user.id, verificationToken, expiresAt]
+    );
+
+    const requestOrigin =
+      (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+      (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+      `${req.protocol}://${req.get('host')}`;
+
+    const activationLink = `${requestOrigin.replace(/\/+$/, '')}/verify-email?token=${verificationToken}&email=${encodeURIComponent(rawEmail)}&tenantId=${user.tenant_id || 1}`;
+
+    const mailResult = await sendTrialActivationEmail({
+      to: rawEmail,
+      userName: user.name || 'Store Owner',
+      storeName: user.store_name || 'SarbaazSoft Shoe POS',
+      activationToken: verificationToken,
+      activationLink,
+      expiresAt,
+    }).catch((err) => ({
+      delivered: false,
+      provider: 'resend' as const,
+      sandbox: true,
+      sandboxRecipient: undefined as string | undefined,
+      error: err?.message || String(err),
+    }));
+
+    return res.json({
+      success: true,
+      emailSent: mailResult.delivered,
+      sandbox: Boolean(mailResult.sandbox),
+      verificationToken: (!mailResult.delivered || mailResult.sandbox) ? verificationToken : undefined,
+      verificationLink: (!mailResult.delivered || mailResult.sandbox) ? activationLink : undefined,
+      message: mailResult.sandbox
+        ? `Resend Sandbox Mode: A verification email was forwarded to ${mailResult.sandboxRecipient || 'developer email'}. You can also use the token below to activate.`
+        : (mailResult.delivered
+            ? `A new verification email has been sent to ${rawEmail}. Please check your inbox.`
+            : `Verification token generated. Please use the verification link to activate your account.`),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to resend verification email: ' + err.message });
   }
 });
 
@@ -914,7 +1008,7 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
       `📧 [Password Reset Email] To: ${user.email} | Provider: ${mailResult.provider} | Delivered: ${mailResult.delivered} | Link: ${resetLink}`
     );
 
-    if (mailResult.delivered) {
+    if (mailResult.delivered && !mailResult.sandbox) {
       return res.json({
         success: true,
         emailSent: true,
@@ -922,6 +1016,20 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
         email: user.email,
         expiresAt: expiresAt.toISOString(),
         message: `Password reset token and link have been sent by email to ${user.email}.`,
+      });
+    }
+
+    if (mailResult.sandbox) {
+      return res.json({
+        success: true,
+        emailSent: true,
+        sandbox: true,
+        resetToken,
+        resetLink,
+        emailProvider: mailResult.provider,
+        email: user.email,
+        expiresAt: expiresAt.toISOString(),
+        message: `Password reset link dispatched via Resend Sandbox (forwarded to ${mailResult.sandboxRecipient || 'developer email'}). Token: ${resetToken}`,
       });
     }
 

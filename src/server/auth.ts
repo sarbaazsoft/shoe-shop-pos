@@ -206,7 +206,13 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 
     const row = userRes.rows[0];
     if (row.status !== 'APPROVED') {
-      return res.status(423).json({ error: 'Your account is pending Admin approval.' });
+      return res.status(423).json({
+        error: 'Your account is pending email confirmation. Please check your inbox and verify your email before accessing the dashboard.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        requiresVerification: true,
+        email: row.email,
+        tenantId: row.tenant_id,
+      });
     }
 
     // Strict tenantId resolution from verified user row, active store resolution, and decrypted JWT
@@ -380,4 +386,36 @@ export function requireSuperAdmin(req: AuthenticatedRequest, res: Response, next
 }
 
 export const requirePlatformOwner = requireSuperAdmin;
+
+/**
+ * Route Middleware Safeguard:
+ * Explicitly protects trial/dashboard route groups and sensitive store operations.
+ * Ensures unverified users are blocked with 423/403 if they attempt to navigate to protected routes directly.
+ */
+export function requireVerifiedUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: 'Authentication required. Please sign in.',
+      code: 'AUTH_REQUIRED',
+    });
+  }
+
+  // SuperAdmin bypasses email verification
+  if (req.user.role === 'SUPERADMIN') {
+    return next();
+  }
+
+  if (req.user.status !== 'APPROVED') {
+    return res.status(423).json({
+      error: 'Email verification required. Please verify your email before accessing the store dashboard.',
+      code: 'EMAIL_VERIFICATION_REQUIRED',
+      requiresVerification: true,
+      email: req.user.email,
+      tenantId: req.user.tenantId,
+      redirectUrl: `/verify-email?email=${encodeURIComponent(req.user.email)}&tenantId=${req.user.tenantId}`,
+    });
+  }
+
+  next();
+}
 

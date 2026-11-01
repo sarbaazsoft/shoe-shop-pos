@@ -419,6 +419,10 @@ export const api = {
       superAdminPhone?: string;
       token?: string;
       user?: any;
+      requiresVerification?: boolean;
+      verificationToken?: string;
+      verificationLink?: string;
+      redirectUrl?: string;
       onboardingCompleted?: boolean;
       message: string;
     }>('/saas/store-requests', { method: 'POST', body: data }),
@@ -728,6 +732,26 @@ export const api = {
     approveUser: (id: number, status: 'APPROVED' | 'PENDING') =>
       apiFetch(`/auth/users/${id}/status`, { method: 'PATCH', body: { status } }),
     deleteUser: (id: number) => apiFetch(`/auth/users/${id}`, { method: 'DELETE' }),
+    verifyEmail: (token: string) =>
+      apiFetch<{
+        success: boolean;
+        verified: boolean;
+        active: boolean;
+        token?: string;
+        user?: any;
+        message: string;
+      }>(`/auth/verify-email?token=${encodeURIComponent(token)}`),
+    resendVerification: (email: string, tenantId?: number) =>
+      apiFetch<{
+        success: boolean;
+        emailSent: boolean;
+        message: string;
+        verificationToken?: string;
+        verificationLink?: string;
+      }>('/auth/resend-verification', {
+        method: 'POST',
+        body: { email, tenantId },
+      }),
     listApiTokens: () => apiFetch('/auth/api-tokens'),
     createApiToken: (name: string) => apiFetch('/auth/api-tokens', { method: 'POST', body: { name } }),
     deleteApiToken: (id: number) => apiFetch(`/auth/api-tokens/${id}`, { method: 'DELETE' }),

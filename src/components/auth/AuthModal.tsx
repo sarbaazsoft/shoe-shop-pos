@@ -448,9 +448,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Alerts */}
               {errorMessage && (
-                <div role="alert" className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed font-medium">{errorMessage}</span>
+                <div role="alert" className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex flex-col gap-2">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed font-medium">{errorMessage}</span>
+                  </div>
+                  {(errorMessage.toLowerCase().includes('verification') || errorMessage.toLowerCase().includes('activate your store')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent('auth:require-email-verification', {
+                            detail: {
+                              email: getLoginEmail(),
+                              tenantId: activeTenantId,
+                              storeName: effectiveStoreName,
+                            },
+                          })
+                        );
+                      }}
+                      className="mt-1 self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer"
+                    >
+                      Verify Email &amp; Activate Account &rarr;
+                    </button>
+                  )}
                 </div>
               )}
 

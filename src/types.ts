@@ -45,7 +45,7 @@ export interface TrialActivation {
   trialStartDate: string;
   trialEndDate: string;
   daysRemaining?: number;
-  status: 'ACTIVE' | 'EXPIRED' | 'CONVERTED';
+  status: 'ACTIVE' | 'EXPIRED' | 'CONVERTED' | 'PENDING';
   ipAddress?: string;
   userAgent?: string;
   activatedAt: string;

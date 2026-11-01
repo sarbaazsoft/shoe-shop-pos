@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, X, Sun, Moon } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { ThemeDropdown } from './ThemeDropdown.tsx';
 
 export interface NavItem {
   key: string;
@@ -116,20 +117,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* RIGHT ACTIONS:
-            - Mobile: Light/Dark mode toggle placed on the right
-            - Desktop: Light/Dark mode toggle + Login button + Free Trial button
+            - 3-Way Theme Preference Dropdown (Light, Dark, System) matching Store & Public Headers
+            - Desktop: Login button + Free Trial button
         */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 justify-end w-9 md:w-auto">
-          {/* Light / Dark Mode Toggle Button (Mobile right, Desktop right) */}
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            aria-label={landingTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={landingTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-400/40 lt:border-indigo-200 text-violet-200 lt:text-indigo-700 hover:bg-indigo-500/10 lt:hover:bg-indigo-50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
-          >
-            {landingTheme === 'dark' ? <Sun className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
-          </button>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 justify-end">
+          {/* 3-Way Theme Dropdown (Light, Dark, System) */}
+          <ThemeDropdown
+            id="landing-navbar-theme-dropdown"
+            dropdownAlign="right"
+            showLabel={true}
+          />
 
           {/* Desktop Login Button */}
           <button
@@ -178,8 +175,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             ))}
 
+            {/* Theme Preference in Mobile Drawer */}
+            <div className="pt-3 pb-1 border-t border-white/10 lt:border-slate-200 flex items-center justify-between px-1">
+              <span className="text-xs font-semibold text-slate-300 lt:text-slate-700">Theme Preference</span>
+              <ThemeDropdown
+                id="landing-drawer-theme-dropdown"
+                dropdownAlign="right"
+                showLabel={true}
+              />
+            </div>
+
             {/* Action Buttons in Mobile Drawer */}
-            <div className="pt-3 mt-2 border-t border-white/10 lt:border-slate-200 flex flex-col gap-2.5">
+            <div className="pt-2 flex flex-col gap-2.5">
               <button
                 type="button"
                 onClick={handleFreeTrialClick}

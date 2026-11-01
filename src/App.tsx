@@ -25,6 +25,7 @@ import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel
 import { TenantOnboardingWizard } from './components/saas/TenantOnboardingWizard.tsx';
 import { InstallationWizard } from './components/saas/InstallationWizard.tsx';
 import { NotificationsView } from './components/notifications/NotificationsView.tsx';
+import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
 import type { ActiveExchange, TenantInfo } from './types.ts';
 
@@ -36,7 +37,8 @@ type SaasRouteMode =
   | 'TENANT_SUSPENDED'
   | 'TENANT_EXPIRED'
   | 'TENANT_NOT_FOUND'
-  | 'TENANT_ONBOARDING';
+  | 'TENANT_ONBOARDING'
+  | 'VERIFY_EMAIL';
 
 const APP_TAB_ROUTES = new Set([
   'dashboard', 'pos', 'inventory', 'ledger', 'purchases', 'suppliers',
@@ -105,6 +107,9 @@ function detectInitialRouteFromLocation(): {
   }
   if (pathname === '/onboarding' || pathname.startsWith('/onboarding') || searchParams.get('mode') === 'onboarding') {
     return { mode: 'TENANT_ONBOARDING', tenantIdParam, isAuthRoute };
+  }
+  if (pathname === '/verify-email' || pathname.startsWith('/verify-email') || searchParams.get('mode') === 'verify-email') {
+    return { mode: 'VERIFY_EMAIL', tenantIdParam, isAuthRoute };
   }
 
   let pathTab = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -650,6 +655,23 @@ export default function App() {
     return () => window.removeEventListener('pos:subscription-expired', handleSubExpired);
   }, [saasMode, activeTenant?.id, refreshTenantDirectory]);
 
+  // Listen for registration or sign-in requiring email verification
+  useEffect(() => {
+    const handleRequireVerification = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail;
+      setSaasMode('VERIFY_EMAIL');
+      setGlobalLoginOpen(false);
+      const queryParams = new URLSearchParams();
+      if (detail?.email) queryParams.set('email', detail.email);
+      if (detail?.tenantId) queryParams.set('tenantId', String(detail.tenantId));
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      window.history.pushState({}, '', `/verify-email${queryString}`);
+    };
+    window.addEventListener('auth:require-email-verification', handleRequireVerification);
+    return () => window.removeEventListener('auth:require-email-verification', handleRequireVerification);
+  }, []);
+
   // Navigate between the shared portal and tenant paths.
   const handleNavigateDomain = async (target: {
     mode: 'LANDING' | 'SUPERADMIN' | 'TENANT' | 'NOT_FOUND' | 'ONBOARDING';
@@ -1186,6 +1208,27 @@ export default function App() {
             onStoreCreated={handleStoreCreated}
           />
         </>
+      )}
+
+      {/* EMAIL VERIFICATION REQUIRED NOTICE VIEW */}
+      {saasMode === 'VERIFY_EMAIL' && (
+        <VerifyEmailNoticeView
+          storeName={effectiveStoreName || 'SarbaazSoft Shoe POS'}
+          onNavigateLogin={(verifiedEmail) => {
+            setSaasMode('LANDING');
+            setGlobalLoginOpen(true);
+            if (verifiedEmail) {
+              window.history.pushState({}, '', `/?mode=login&email=${encodeURIComponent(verifiedEmail)}`);
+            } else {
+              window.history.pushState({}, '', '/?mode=login');
+            }
+          }}
+          onNavigateHome={() => {
+            setSaasMode('LANDING');
+            setGlobalLoginOpen(false);
+            window.history.pushState({}, '', '/');
+          }}
+        />
       )}
 
       {/* 2. SUPERADMIN CONTROL PANEL (`/admin`) */}

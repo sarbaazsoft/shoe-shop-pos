@@ -884,6 +884,29 @@ export async function clearSubscriptionAlertsOnRenewal(tenantId: number): Promis
   }
 }
 
+let emailVerificationSchemaVerified = false;
+export async function ensureEmailVerificationSchema(): Promise<void> {
+  if (emailVerificationSchemaVerified) return;
+  try {
+    await pgClient.waitReady;
+    await pgClient.exec(`
+      CREATE TABLE IF NOT EXISTS public.email_verification_tokens (
+        id SERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL DEFAULT 1,
+        user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS email_verification_tokens_token_idx ON public.email_verification_tokens(token);
+      CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON public.email_verification_tokens(user_id);
+    `);
+    emailVerificationSchemaVerified = true;
+  } catch (err) {
+    console.warn('Could not ensure email_verification_tokens table:', err);
+  }
+}
+
 /** Migrates legacy Khata history and ensures the unified customer ledger exists. */
 export function ensureCustomerLedgerSchema(): Promise<void> {
   if (!customerLedgerSchemaPromise) {
@@ -1436,12 +1459,14 @@ export async function ensureTenantStoreUsers(params: {
   cashierEmail?: string;
   cashierPhone?: string;
   cashierPassword?: string;
+  ownerStatus?: 'PENDING' | 'APPROVED';
 }): Promise<{
   owner: StoreQuickCredential;
   cashier: StoreQuickCredential | null;
 }> {
   const tenantId = Number(params.tenantId) || 1;
   const storeLabel = (params.storeName || 'Store').trim();
+  const ownerStatus = params.ownerStatus || 'APPROVED';
 
   // Determine canonical store-specific emails & default passwords
   const defaultOwnerEmail = (params.ownerEmail || `admin+${tenantId}@store.com`).trim().toLowerCase();
@@ -1470,6 +1495,7 @@ export async function ensureTenantStoreUsers(params: {
   if (adminRes.rows.length > 0) {
     const row = adminRes.rows[0];
     let verifiedPass = '';
+    const targetStatus = row.status === 'PENDING' && ownerStatus === 'PENDING' ? 'PENDING' : 'APPROVED';
     if (row.quick_password && (await bcrypt.compare(row.quick_password, row.password_hash))) {
       verifiedPass = row.quick_password;
     } else {
@@ -1486,13 +1512,13 @@ export async function ensureTenantStoreUsers(params: {
         verifiedPass = defaultOwnerPassword;
         const freshHash = await bcrypt.hash(verifiedPass, 10);
         await pgClient.query(
-          `UPDATE users SET password_hash = $1, quick_password = $2, status = 'APPROVED', active = true WHERE id = $3`,
-          [freshHash, verifiedPass, row.id]
+          `UPDATE users SET password_hash = $1, quick_password = $2, status = $3, active = true WHERE id = $4`,
+          [freshHash, verifiedPass, targetStatus, row.id]
         );
       } else {
         await pgClient.query(
-          `UPDATE users SET quick_password = $1, status = 'APPROVED', active = true WHERE id = $2`,
-          [verifiedPass, row.id]
+          `UPDATE users SET quick_password = $1, status = $2, active = true WHERE id = $3`,
+          [verifiedPass, targetStatus, row.id]
         );
       }
     }
@@ -1523,9 +1549,9 @@ export async function ensureTenantStoreUsers(params: {
     const ownerHash = await bcrypt.hash(defaultOwnerPassword, 10);
     const createdOwner = await pgClient.query<{ id: number; name: string; email: string }>(
       `INSERT INTO users (tenant_id, name, email, phone, password_hash, quick_password, role, status, active)
-       VALUES ($1, $2, $3, $4, $5, $6, 'ADMIN', 'APPROVED', true)
+       VALUES ($1, $2, $3, $4, $5, $6, 'ADMIN', $7, true)
        RETURNING id, name, email`,
-      [tenantId, defaultOwnerName, candidateOwnerEmail, (params.ownerPhone || '').trim(), ownerHash, defaultOwnerPassword]
+      [tenantId, defaultOwnerName, candidateOwnerEmail, (params.ownerPhone || '').trim(), ownerHash, defaultOwnerPassword, ownerStatus]
     );
     ownerCred = {
       id: createdOwner.rows[0].id,
