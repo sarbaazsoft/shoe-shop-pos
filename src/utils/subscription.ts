@@ -214,7 +214,12 @@ export function getSubscriptionShortLabel(
   }
 }
 
-export type RenewalTemplateType = 'UPGRADE' | 'RENEWAL' | 'REACTIVATION';
+export type RenewalTemplateType =
+  | 'UPGRADE'
+  | 'UPGRADE_FROM_6_MONTHS'
+  | 'RENEWAL'
+  | 'EXTENSION'
+  | 'REACTIVATION';
 
 export interface RenewalTemplateChip {
   type: RenewalTemplateType;
@@ -228,37 +233,119 @@ export const RENEWAL_TEMPLATE_CHIPS: RenewalTemplateChip[] = [
 ];
 
 /**
- * Returns the exact dynamic payment message template based on template type and plan selection.
+ * Returns dynamically tailored chips based on store's current subscription plan and status.
+ * Eliminates redundant upgrade chips for plans the store already holds.
+ */
+export function getAvailableTemplateChips(
+  currentPlan?: string | null,
+  status?: string | null,
+  selectedPlan: '6_MONTHS' | 'YEARLY' = 'YEARLY'
+): RenewalTemplateChip[] {
+  const cleanStatus = String(status || '').toUpperCase();
+  const isExpired = cleanStatus === 'EXPIRED';
+  const normCurrent = normalizeSubscriptionPlan(currentPlan);
+
+  if (isExpired) {
+    return [
+      { type: 'REACTIVATION', label: 'Urgent Reactivation' },
+      { type: 'RENEWAL', label: 'Standard Renewal' },
+    ];
+  }
+
+  if (normCurrent === 'YEARLY') {
+    // Already active on 1-Year: user is on highest tier, show renewal / extension only
+    return [
+      { type: 'RENEWAL', label: 'Standard Renewal' },
+      { type: 'EXTENSION', label: 'Extend +1 Year' },
+    ];
+  }
+
+  if (normCurrent === '6_MONTHS') {
+    // Already active on 6-Months: can renew 6-month or upgrade to 1-year
+    if (selectedPlan === 'YEARLY') {
+      return [
+        { type: 'UPGRADE_FROM_6_MONTHS', label: 'Upgrade to 1-Year' },
+        { type: 'RENEWAL', label: 'Renew 6-Month Plan' },
+      ];
+    }
+    return [
+      { type: 'RENEWAL', label: 'Renew 6-Month Plan' },
+      { type: 'UPGRADE_FROM_6_MONTHS', label: 'Upgrade to 1-Year' },
+    ];
+  }
+
+  // Free Tier / Trial evaluation
+  return [
+    { type: 'UPGRADE', label: 'Upgrading Free Tier' },
+    { type: 'RENEWAL', label: 'Standard Renewal' },
+  ];
+}
+
+/**
+ * Returns the exact dynamic payment message template based on template type, plan selection, and current plan.
  */
 export function getRenewalMessageTemplate(
   type: RenewalTemplateType,
-  selectedPlan: '6_MONTHS' | 'YEARLY' = 'YEARLY'
+  selectedPlan: '6_MONTHS' | 'YEARLY' = 'YEARLY',
+  currentPlan?: string | null
 ): string {
   const planTerm = selectedPlan === '6_MONTHS' ? '6 Months' : '1 Year';
+  const normCurrent = normalizeSubscriptionPlan(currentPlan);
+
   switch (type) {
     case 'UPGRADE':
+      // If store is already paid, adjust appropriately
+      if (normCurrent === '6_MONTHS' && selectedPlan === 'YEARLY') {
+        return `Hi Admin, currently on 6-Month Plan and upgrading to 1 Year Premium Plan for my store. Payment Ref ID: [Insert Ref ID]`;
+      }
+      if (normCurrent === 'YEARLY') {
+        return `Hi Admin, renewing store's 1 Year subscription. Payment Ref ID: [Insert Ref ID]`;
+      }
       return `Hi Admin, completed Free Tier evaluation and upgrading to ${planTerm} Premium Plan for my store. Payment Ref ID: [Insert Ref ID]`;
+
+    case 'UPGRADE_FROM_6_MONTHS':
+      return `Hi Admin, currently on 6-Month Plan and upgrading to 1 Year Premium Plan for my store. Payment Ref ID: [Insert Ref ID]`;
+
+    case 'EXTENSION':
+      return `Hi Admin, extending active 1-Year Premium License (+12 Months) for my store. Payment Ref ID: [Insert Ref ID]`;
+
     case 'RENEWAL':
       return `Hi Admin, renewing store's ${planTerm} subscription. Payment Ref ID: [Insert Ref ID]`;
+
     case 'REACTIVATION':
       return `Hi Admin, store subscription expired. Paid via online transfer (Ref ID: [Insert Ref ID]). Please reactivate POS access.`;
+
+    default:
+      return `Hi Admin, renewing store's ${planTerm} subscription. Payment Ref ID: [Insert Ref ID]`;
   }
 }
 
 /**
- * Automatically determines the default renewal template type based on store status and plan.
+ * Automatically determines the default renewal template type based on store status, current plan, and selected extension plan.
  */
 export function resolveDefaultRenewalTemplateType(
   status?: string | null,
-  currentPlan?: string | null
+  currentPlan?: string | null,
+  selectedPlan: '6_MONTHS' | 'YEARLY' = 'YEARLY'
 ): RenewalTemplateType {
   const cleanStatus = String(status || '').toUpperCase();
   if (cleanStatus === 'EXPIRED') {
     return 'REACTIVATION';
   }
-  if (isFreeTrial(currentPlan)) {
+  const norm = normalizeSubscriptionPlan(currentPlan);
+  if (norm === 'free_tier') {
     return 'UPGRADE';
+  }
+  if (norm === '6_MONTHS') {
+    if (selectedPlan === 'YEARLY') {
+      return 'UPGRADE_FROM_6_MONTHS';
+    }
+    return 'RENEWAL';
+  }
+  if (norm === 'YEARLY') {
+    return 'RENEWAL';
   }
   return 'RENEWAL';
 }
+
 
