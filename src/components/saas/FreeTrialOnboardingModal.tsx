@@ -18,7 +18,7 @@ import {
   Check,
 } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
-import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
 
 interface FreeTrialOnboardingModalProps {
@@ -165,12 +165,12 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   // Validation calculations
   const cleanName = name.trim();
   const cleanEmail = toLowerTrimmed(email);
-  const cleanPhone = phone.trim();
+  const cleanPhone = cleanPhoneNumber(phone);
   const phoneDigits = cleanPhone.replace(/\D/g, '');
 
   const isNameValid = cleanName.length >= 2 && /[a-zA-Z\u0600-\u06FF]/.test(cleanName);
   const isEmailFormatValid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail);
-  const isPhoneValid = phoneDigits.length >= 7 && phoneDigits.length <= 15;
+  const isPhoneValid = isValidPhoneNumber(cleanPhone, 10, 15);
   const isPasswordValid = password.length >= 6;
   const isConfirmPasswordValid = confirmPassword.length >= 6 && confirmPassword === password;
 
@@ -199,8 +199,9 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
       return;
     }
 
-    if (!cleanPhone || !isPhoneValid) {
-      setErrorMessage('Please enter a valid Phone / WhatsApp number (7 to 15 digits).');
+    const phoneError = getPhoneValidationError(cleanPhone, { label: 'Phone / WhatsApp number', minDigits: 10, maxDigits: 15 });
+    if (phoneError) {
+      setErrorMessage(phoneError);
       return;
     }
 
@@ -632,7 +633,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                         if (errorMessage) setErrorMessage(null);
                       }}
                       onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-                      placeholder="e.g. +92-300-1234567"
+                      placeholder="e.g. 0321-1234567 or +92-300-1234567"
                       disabled={isLoading}
                       className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
                         isDark
@@ -665,9 +666,11 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       <span>
-                        {phoneDigits.length < 7
-                          ? `Please enter at least 7 digits (e.g. +92-300-1234567). Current: ${phoneDigits.length} digits.`
-                          : 'Phone number cannot exceed 15 digits.'}
+                        {phoneDigits.length < 10
+                          ? `Please enter at least 10 digits (e.g. 0321-1234567 or +92-300-1234567). Current: ${phoneDigits.length} digits.`
+                          : phoneDigits.length > 15
+                          ? 'Phone number cannot exceed 15 digits.'
+                          : 'Invalid format: remove leading 0 immediately after the hyphen.'}
                       </span>
                     </div>
                   )}

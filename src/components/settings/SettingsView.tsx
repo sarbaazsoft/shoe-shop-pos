@@ -7,7 +7,7 @@ import { UserAvatar } from '../common/UserAvatar.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
@@ -875,8 +875,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!formData.company_name.trim()) {
       errors.company_name = 'Company name is required.';
     }
-    if (!formData.company_phone.trim()) {
-      errors.company_phone = 'Company phone is required.';
+    const phoneError = getPhoneValidationError(formData.company_phone, { label: 'Company phone' });
+    if (phoneError) {
+      errors.company_phone = phoneError;
     }
     if (formData.company_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.company_email.trim())) {
       errors.company_email = 'Please provide a valid email address (e.g., info@company.com).';
@@ -900,6 +901,7 @@ setFormErrors(errors);
       const sanitizedFormData: any = {
         ...formData,
         company_name: toTitleCaseTrimmed(formData.company_name),
+        company_phone: cleanPhoneNumber(formData.company_phone),
         company_address: toTitleCaseTrimmed(formData.company_address),
         company_email: toLowerTrimmed(formData.company_email),
         website: toLowerTrimmed(formData.website),
@@ -1603,16 +1605,18 @@ setFormErrors(errors);
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
-                    type="text"
+                    type="tel"
+                    autoComplete="tel"
                     value={formData.company_phone}
                     onChange={(e) => {
-                      setFormData({ ...formData, company_phone: e.target.value });
+                      const formatted = formatPhoneNumber(e.target.value, formData.company_phone);
+                      setFormData({ ...formData, company_phone: formatted });
                       if (formErrors.company_phone) {
                         setFormErrors({ ...formErrors, company_phone: '' });
                       }
                     }}
-                    placeholder="e.g., +92-321-2257340"
-                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
+                    placeholder="e.g. 0321-1234567 or +92-321-1234567"
+                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
                       formErrors.company_phone
                         ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10'
                         : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
