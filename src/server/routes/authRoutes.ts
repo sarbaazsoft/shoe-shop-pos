@@ -620,9 +620,11 @@ router.all('/verify-email', async (req: Request, res: Response) => {
 
     const tokenRes = await pgClient.query(
       `SELECT evt.id, evt.user_id, evt.tenant_id, evt.expires_at,
-              u.id as user_id, u.tenant_id, u.name, u.email, u.phone, u.avatar_url, u.role, u.status
+              u.id as user_id, u.tenant_id, u.name, u.email, u.phone, u.avatar_url, u.role, u.status,
+              t.name as store_name, t.onboarding_completed, t.subscription_status
        FROM email_verification_tokens evt
        JOIN users u ON u.id = evt.user_id
+       LEFT JOIN tenants t ON t.id = u.tenant_id
        WHERE LOWER(BTRIM(evt.token)) = LOWER(BTRIM($1))
        LIMIT 1`,
       [token]
@@ -639,18 +641,25 @@ router.all('/verify-email', async (req: Request, res: Response) => {
 
     await pgClient.query('UPDATE users SET status = $1, updated_at = NOW() WHERE id = $2', ['APPROVED', row.user_id]);
     await pgClient.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [row.user_id]).catch(() => {});
+    await pgClient.query(
+      "UPDATE trial_activations SET status = 'ACTIVE' WHERE user_id = $1 AND status = 'PENDING'",
+      [row.user_id]
+    ).catch(() => {});
 
-    const authUser: AuthUser = {
+    const authUser = {
       id: row.user_id,
       tenantId: row.tenant_id,
+      tenantName: row.store_name,
       name: row.name,
       email: row.email,
       phone: row.phone || '',
       avatarUrl: row.avatar_url || '',
       role: row.role,
       status: 'APPROVED',
+      onboardingCompleted: Boolean(row.onboarding_completed),
+      subscriptionStatus: row.subscription_status || 'ACTIVE',
     };
-    const sessionToken = generateToken(authUser);
+    const sessionToken = generateToken(authUser as any);
 
     return res.json({
       success: true,
@@ -658,7 +667,10 @@ router.all('/verify-email', async (req: Request, res: Response) => {
       active: true,
       token: sessionToken,
       user: authUser,
-      message: 'Email verified successfully! Your account is now active and logged in.',
+      tenantId: row.tenant_id,
+      storeName: row.store_name,
+      loginUrl: row.onboarding_completed ? `/?tenantId=${row.tenant_id}` : `/onboarding?tenantId=${row.tenant_id}`,
+      message: 'Email verified successfully! Your account is now active and ready for setup.',
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Email verification failed: ' + err.message });

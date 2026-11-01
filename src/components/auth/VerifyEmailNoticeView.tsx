@@ -8,7 +8,7 @@ interface VerifyEmailNoticeViewProps {
   initialToken?: string;
   initialTenantId?: number | null;
   storeName?: string;
-  onNavigateLogin?: (email?: string) => void;
+  onNavigateLogin?: (email?: string, sessionData?: any) => void;
   onNavigateHome?: () => void;
 }
 
@@ -55,7 +55,7 @@ export const VerifyEmailNoticeView: React.FC<VerifyEmailNoticeViewProps> = ({
 
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<{ message?: string; loginUrl?: string } | null>(null);
+  const [successData, setSuccessData] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isResending, setIsResending] = useState(false);
@@ -165,10 +165,12 @@ export const VerifyEmailNoticeView: React.FC<VerifyEmailNoticeViewProps> = ({
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                onClick={() => onNavigateLogin?.(email)}
+                onClick={() => onNavigateLogin?.(email, successData)}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white font-bold text-sm shadow-lg shadow-purple-600/30 hover:opacity-95 transition-all cursor-pointer"
               >
-                Sign In to Dashboard <ArrowRight className="w-4 h-4" />
+                {successData?.user?.onboardingCompleted === false
+                  ? 'Continue to Store Setup'
+                  : 'Sign In to Dashboard'} <ArrowRight className="w-4 h-4" />
               </button>
               {onNavigateHome && (
                 <button

@@ -238,6 +238,12 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
 
       // LAYER 2: If email verification is required, STOP immediate auto-login and redirect to /verify-email notice view
       if (res.requiresVerification || !res.token) {
+        try {
+          localStorage.setItem('pos_pending_verification_email', cleanEmail);
+          if (createdTenantId) {
+            localStorage.setItem('pos_pending_verification_tenant_id', String(createdTenantId));
+          }
+        } catch {}
         onClose();
         const verifyUrl = `/verify-email?email=${encodeURIComponent(cleanEmail)}&tenantId=${createdTenantId}`;
         window.history.pushState({}, '', verifyUrl);

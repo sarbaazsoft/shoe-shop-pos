@@ -16,6 +16,10 @@ export interface AuthUser {
   avatarUrl?: string;
   role: 'SUPERADMIN' | 'ADMIN' | 'CASHIER';
   status: 'PENDING' | 'APPROVED';
+  onboardingCompleted?: boolean;
+  tenantName?: string;
+  storeName?: string;
+  subscriptionStatus?: string;
 }
 
 export interface AuthenticatedRequest extends Request {

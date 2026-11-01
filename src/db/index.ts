@@ -868,16 +868,20 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       if (upper.includes('JOIN USERS')) {
         const joined = matches.map((t) => {
           const u = mockStore.users.find((user) => Number(user.id) === Number(t.user_id)) || {};
+          const tenant = mockStore.tenants.find((tn) => Number(tn.id) === Number(u.tenant_id || t.tenant_id)) || {};
           return {
             ...t,
             user_id: u.id,
-            tenant_id: u.tenant_id,
+            tenant_id: u.tenant_id || t.tenant_id,
             name: u.name,
             email: u.email,
             phone: u.phone,
             avatar_url: u.avatar_url,
             role: u.role,
             status: u.status,
+            store_name: tenant.name,
+            onboarding_completed: Boolean(tenant.onboarding_completed),
+            subscription_status: tenant.subscription_status || 'ACTIVE',
           };
         });
         return { rows: joined as unknown as T[], rowCount: joined.length };

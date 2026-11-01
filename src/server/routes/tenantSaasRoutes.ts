@@ -315,6 +315,10 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       });
     }
 
+    const requireEmailVerification =
+      getCachedAppSetting('REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', 'true') === 'true';
+    const ownerStatus = requireEmailVerification ? 'PENDING' : 'APPROVED';
+
     const trialDurationDays = 30;
     const startDate = new Date();
     const endDate = new Date(startDate.getTime() + trialDurationDays * 86400000);
@@ -334,8 +338,8 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       subscriptionType: 'free_tier',
       subscriptionStartDate: startDate.toISOString(),
       subscriptionEndDate: endDate.toISOString(),
-      onboardingCompleted: true,
-      ownerStatus: 'APPROVED',
+      onboardingCompleted: false,
+      ownerStatus,
     });
     await pgClient.query('COMMIT');
 
@@ -352,8 +356,16 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       trialDurationDays,
       trialStartDate: startDate.toISOString(),
       trialEndDate: endDate.toISOString(),
-      status: 'ACTIVE',
+      status: requireEmailVerification ? 'PENDING' : 'ACTIVE',
       details: { source: 'landing_free_trial' },
+    });
+
+    // Simultaneously push and save the welcome message into the header notification dropdown (Notice tab)
+    const cleanFinalName = provisioned.storeName || storeName;
+    const welcomeMsg = `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
+
+    await sendWelcomeMsg(provisioned.tenantId, welcomeMsg, ownerEmail).catch((welcomeErr) => {
+      console.warn('sendWelcomeMsg notice during store-request:', welcomeErr);
     });
 
     const ownerRes = await pgClient.query(
@@ -361,6 +373,64 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
     );
     const saOwner = ownerRes.rows[0];
 
+    // CASE 1: Verification is required (Default: REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL = true)
+    if (requireEmailVerification) {
+      await ensureEmailVerificationSchema();
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await pgClient.query(
+        'DELETE FROM email_verification_tokens WHERE user_id = $1',
+        [provisioned.adminUserId]
+      ).catch(() => {});
+
+      await pgClient.query(
+        'INSERT INTO email_verification_tokens (tenant_id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)',
+        [provisioned.tenantId, provisioned.adminUserId, verificationToken, tokenExpiresAt]
+      ).catch(() => {});
+
+      const requestOrigin =
+        (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+        (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+        `${req.protocol}://${req.get('host')}`;
+
+      const activationLink = `${requestOrigin.replace(/\/+$/, '')}/verify-email?token=${verificationToken}&email=${encodeURIComponent(ownerEmail)}&tenantId=${provisioned.tenantId}`;
+
+      const mailResult = await sendTrialActivationEmail({
+        to: ownerEmail,
+        userName: ownerName,
+        storeName: provisioned.storeName,
+        activationToken: verificationToken,
+        activationLink,
+        expiresAt: tokenExpiresAt,
+      }).catch((err) => ({
+        delivered: false,
+        provider: 'resend' as const,
+        sandbox: true,
+        sandboxRecipient: undefined as string | undefined,
+        error: err?.message || String(err),
+      }));
+
+      return res.status(201).json({
+        success: true,
+        message: `Store '${provisioned.storeName}' has been registered! Please check your email to activate your account.`,
+        tenantId: provisioned.tenantId,
+        storeName: provisioned.storeName,
+        requiresVerification: true,
+        verified: false,
+        active: false,
+        emailSent: mailResult.delivered,
+        sandbox: Boolean(mailResult.sandbox),
+        verificationToken,
+        verificationLink: activationLink,
+        loginUrl: `/verify-email?email=${encodeURIComponent(ownerEmail)}&tenantId=${provisioned.tenantId}`,
+        redirectUrl: `/verify-email?email=${encodeURIComponent(ownerEmail)}&tenantId=${provisioned.tenantId}`,
+        superAdminEmail: saOwner?.email || 'sarbaazsoft@gmail.com',
+        superAdminPhone: saOwner?.phone || '+92-321-2257340',
+      });
+    }
+
+    // CASE 2: Verification toggle is OFF
     const authUser: AuthUser = {
       id: provisioned.adminUserId,
       tenantId: provisioned.tenantId,
@@ -370,6 +440,7 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       avatarUrl: '',
       role: 'ADMIN',
       status: 'APPROVED',
+      onboardingCompleted: false,
     };
     const token = generateToken(authUser);
 
@@ -377,15 +448,17 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       success: true,
       message: `Congratulations! Store '${provisioned.storeName}' has been activated with a 30-day Free Trial.`,
       tenantId: provisioned.tenantId,
+      storeName: provisioned.storeName,
+      requiresVerification: false,
       user: {
         ...authUser,
         tenantName: provisioned.storeName,
         storeName: provisioned.storeName,
-        onboardingCompleted: true,
+        onboardingCompleted: false,
       },
       token,
-      loginUrl: `/?tenantId=${provisioned.tenantId}`,
-      redirectUrl: `/?tenantId=${provisioned.tenantId}`,
+      loginUrl: `/onboarding?tenantId=${provisioned.tenantId}`,
+      redirectUrl: `/onboarding?tenantId=${provisioned.tenantId}`,
       superAdminEmail: saOwner?.email || 'sarbaazsoft@gmail.com',
       superAdminPhone: saOwner?.phone || '+92-321-2257340',
     });

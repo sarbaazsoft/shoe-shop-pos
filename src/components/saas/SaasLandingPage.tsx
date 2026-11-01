@@ -949,7 +949,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       pricingMode: 'FIXED',
       logoUrl: '',
       currency: 'PKR',
-      onboardingCompleted: true,
+      onboardingCompleted: Boolean(user?.onboardingCompleted),
       appPath: `/?tenantId=${tenantId}`,
     };
     try {

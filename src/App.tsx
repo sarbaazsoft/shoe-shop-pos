@@ -1153,7 +1153,7 @@ export default function App() {
                     pricingMode: user?.pricingMode || 'FIXED',
                     logoUrl: '/pwa-512x512.png',
                     currency: user?.currency || 'PKR',
-                    onboardingCompleted: user?.onboardingCompleted ?? true,
+                    onboardingCompleted: user?.onboardingCompleted ?? false,
                     appPath: '/dashboard',
                   };
                   setActiveTenant(newTenant);
@@ -1194,7 +1194,11 @@ export default function App() {
               if (token && user) {
                 setAuthSession(token, user);
                 setCurrentUser(user);
-                handleNavigateDomain({ mode: 'TENANT', tenantId });
+                if (user.onboardingCompleted === false) {
+                  handleNavigateDomain({ mode: 'ONBOARDING', tenantId });
+                } else {
+                  handleNavigateDomain({ mode: 'TENANT', tenantId });
+                }
               } else {
                 setTenantIdParam(String(tenantId));
                 setIsLoginModalOpen(true);
@@ -1209,7 +1213,23 @@ export default function App() {
       {saasMode === 'VERIFY_EMAIL' && (
         <VerifyEmailNoticeView
           storeName={effectiveStoreName || 'SarbaazSoft Shoe POS'}
-          onNavigateLogin={(verifiedEmail) => {
+          onNavigateLogin={(verifiedEmail, sessionData) => {
+            if (sessionData?.token && sessionData?.user) {
+              setAuthSession(sessionData.token, sessionData.user);
+              setCurrentUser(sessionData.user);
+              const targetTenantId = Number(
+                sessionData.user.tenantId ||
+                sessionData.tenantId ||
+                activeTenant?.id ||
+                0
+              );
+              if (sessionData.user.onboardingCompleted === false) {
+                handleNavigateDomain({ mode: 'ONBOARDING', tenantId: targetTenantId });
+                return;
+              }
+              handleNavigateDomain({ mode: 'TENANT', tenantId: targetTenantId });
+              return;
+            }
             setSaasMode('LANDING');
             if (verifiedEmail) {
               window.history.pushState({}, '', `/?mode=login&email=${encodeURIComponent(verifiedEmail)}`);
