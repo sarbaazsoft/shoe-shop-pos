@@ -261,11 +261,21 @@ const StoreLogoBadge: React.FC<{
 const StoreSliderCard: React.FC<{
   tenant: StoreSliderItem;
   index: number;
-}> = ({ tenant, index }) => {
+  onSelect?: (tenant: TenantInfo) => void;
+}> = ({ tenant, index, onSelect }) => {
   return (
     <div
-      aria-label={`${tenant.name} store`}
-      className="group relative flex flex-col items-center justify-between rounded-2xl border border-indigo-400/25 lt:border-indigo-200/80 bg-gradient-to-b from-[#12154A]/80 lt:from-white to-[#0A0C2E]/90 lt:to-[#F8FAFF] p-4 sm:p-5 text-center shadow-[0_12px_28px_-12px_rgba(91,75,255,0.4)] lt:shadow-sm transition-all duration-200 select-none w-full h-[175px] sm:h-[185px]"
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(tenant)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect?.(tenant);
+        }
+      }}
+      aria-label={`${tenant.name} store — click to sign in`}
+      className="group relative flex flex-col items-center justify-between rounded-2xl border border-indigo-400/25 lt:border-indigo-200/80 bg-gradient-to-b from-[#12154A]/80 lt:from-white to-[#0A0C2E]/90 lt:to-[#F8FAFF] p-4 sm:p-5 text-center shadow-[0_12px_28px_-12px_rgba(91,75,255,0.4)] lt:shadow-sm hover:border-purple-400/60 hover:shadow-purple-500/25 hover:scale-[1.02] cursor-pointer transition-all duration-200 select-none w-full h-[175px] sm:h-[185px]"
     >
       {/* 1. Store Logo OR Store Name First and Second Letter as Fallback */}
       <StoreLogoBadge tenant={tenant} index={index} />
@@ -276,7 +286,7 @@ const StoreSliderCard: React.FC<{
       {/* 2. Store Name Below Logo (plain div, no anchor or h-tag) */}
       <div className="w-full flex-1 flex flex-col items-center justify-center min-w-0 px-2">
         <div
-          className="w-full text-sm sm:text-base font-bold text-white lt:text-slate-900 truncate"
+          className="w-full text-sm sm:text-base font-bold text-white lt:text-slate-900 truncate group-hover:text-purple-300 lt:group-hover:text-purple-600 transition-colors"
           title={tenant.name}
         >
           {tenant.name}
@@ -298,6 +308,7 @@ interface SaasLandingPageProps {
   onGlobalLogin: () => void;
   onOpenSuperAdmin: () => void;
   onStoreCreated?: (tenantId: number, loginUrl: string, user?: any, token?: string) => void;
+  onSelectStore?: (tenant: TenantInfo) => void;
 }
 
 export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
@@ -305,6 +316,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   onGlobalLogin,
   onOpenSuperAdmin,
   onStoreCreated,
+  onSelectStore,
 }) => {
   const [activeNav, setActiveNav] = useState<'home' | 'features' | 'stores' | 'pricing' | 'about'>('home');
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -1201,7 +1213,11 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                     key={`${tenant.id || tenant.name}-${index}`}
                     className="swiper-slide store-item shrink-0 h-auto w-[240px] max-w-[85%]"
                   >
-                    <StoreSliderCard tenant={tenant} index={index} />
+                    <StoreSliderCard
+                      tenant={tenant}
+                      index={index}
+                      onSelect={onSelectStore}
+                    />
                   </div>
                 ))}
               </div>

@@ -370,7 +370,31 @@ export const api = {
         headers: tenantId ? { 'X-Tenant-Id': String(tenantId) } : undefined,
       });
     },
-
+    checkEmailAvailability: (email: string) =>
+      apiFetch<{ available: boolean; message?: string }>(`/saas/check-email?email=${encodeURIComponent(email)}`),
+    getPublicStats: () =>
+      apiFetch<{
+        stores: number;
+        products: number;
+        invoicesToday: number;
+        platformRevenue: number;
+        superAdminEmail?: string;
+        superAdminPhone?: string;
+      }>('/saas/public-stats'),
+    getPlatformOwner: () =>
+      apiFetch<{
+        name?: string;
+        email?: string;
+        phone?: string;
+      }>('/saas/platform-owner'),
+    submitStoreRequest: (data: any) =>
+      apiFetch<any>('/saas/store-request', {
+        method: 'POST',
+        body: data,
+      }),
+  },
+  get tenant() {
+    return this.saas;
   },
 
   // SuperAdmin Control Panel Endpoints

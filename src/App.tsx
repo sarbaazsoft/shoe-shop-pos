@@ -23,6 +23,7 @@ import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
 import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel.tsx';
 import { TenantOnboardingWizard } from './components/saas/TenantOnboardingWizard.tsx';
 import { InstallationWizard } from './components/saas/InstallationWizard.tsx';
+import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
 import { NotificationsView } from './components/notifications/NotificationsView.tsx';
 import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
@@ -128,7 +129,17 @@ export default function App() {
   const [availableTenants, setAvailableTenants] = useState<TenantInfo[]>([]);
   const [storeLoginTarget, setStoreLoginTarget] = useState<TenantInfo | null>(null);
   const [tenantIdNotice, setTenantIdNotice] = useState('');
-  const tenantIdParam = initialRoute.tenantIdParam;
+  const [tenantIdParam, setTenantIdParam] = useState<string>(initialRoute.tenantIdParam);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return Boolean(initialRoute.tenantIdParam);
+    const sp = new URLSearchParams(window.location.search);
+    return Boolean(
+      initialRoute.tenantIdParam ||
+      sp.get('mode') === 'login' ||
+      sp.get('resetToken') ||
+      sp.get('email')
+    );
+  });
 
   const [currentUser, setCurrentUser] = useState<any | null>(() => {
     try {
@@ -564,6 +575,8 @@ export default function App() {
     if (saasMode !== 'TENANT_ACTIVE' || isInitializing || currentUser || !activeTenant) return;
     setStoreLoginTarget(activeTenant);
     setTenantIdNotice('');
+    setTenantIdParam(String(activeTenant.id));
+    setIsLoginModalOpen(true);
     setSaasMode('LANDING');
     window.history.replaceState({}, '', `/?tenantId=${encodeURIComponent(activeTenant.id)}`);
   }, [saasMode, isInitializing, currentUser, activeTenant]);
@@ -646,6 +659,43 @@ export default function App() {
     return () => window.removeEventListener('auth:require-email-verification', handleRequireVerification);
   }, []);
 
+  // Handle popstate so browser back/forward stays in sync with login modal / tenantId
+  useEffect(() => {
+    const handlePopState = () => {
+      const sp = new URLSearchParams(window.location.search);
+      const tid =
+        sp.get('tenantId') ||
+        sp.get('storeId') ||
+        sp.get('tenant_id') ||
+        sp.get('store_id') ||
+        '';
+      const mode = sp.get('mode');
+      const reset = sp.get('resetToken');
+      setTenantIdParam(tid);
+      setIsLoginModalOpen(Boolean(tid || mode === 'login' || reset));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleBackToStoreDirectory = useCallback(() => {
+    setStoreLoginTarget(null);
+    setTenantIdParam('');
+    setIsLoginModalOpen(false);
+    setActiveTenant(null);
+    setActiveTenantId(null);
+    setTenantIdNotice('');
+    try {
+      window.history.pushState({}, '', '/#shops');
+    } catch {}
+    setTimeout(() => {
+      const el = document.getElementById('shops') || document.getElementById('stores');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 60);
+  }, []);
+
   // Navigate between the shared portal and tenant paths.
   const handleNavigateDomain = async (target: {
     mode: 'LANDING' | 'SUPERADMIN' | 'TENANT' | 'NOT_FOUND' | 'ONBOARDING';
@@ -657,6 +707,10 @@ export default function App() {
       setSaasMode('LANDING');
       setActiveTenant(null);
       setActiveTenantId(null);
+      setTenantIdParam('');
+      setIsLoginModalOpen(false);
+      setStoreLoginTarget(null);
+      setTenantIdNotice('');
       window.history.pushState({}, '', '/');
       return;
     }
@@ -873,12 +927,16 @@ export default function App() {
       }
       setActiveTenantId(currentLogoutID);
       setTenantIdNotice('');
+      setTenantIdParam(String(currentLogoutID));
+      setIsLoginModalOpen(true);
       setSaasMode('LANDING');
       window.history.replaceState({}, '', `/?tenantId=${encodeURIComponent(currentLogoutID)}`);
     } else {
       setActiveTenant(null);
       setStoreLoginTarget(null);
       setTenantIdNotice('');
+      setTenantIdParam('');
+      setIsLoginModalOpen(false);
       setSaasMode('LANDING');
       window.history.replaceState({}, '', '/');
     }
@@ -1027,7 +1085,7 @@ export default function App() {
               </p>
             </div>
           </PublicLayout>
-        ) : (
+        ) : (isLoginModalOpen || Boolean(tenantIdParam)) ? (
           <>
             {tenantIdNotice && (
               <div role="alert" className="mx-auto mt-6 w-[min(92%,40rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
@@ -1042,11 +1100,11 @@ export default function App() {
                     : (tenantIdParam
                         ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '' }
                         : { name: 'SarbaazSoft Shoe POS' }))}
-              onBack={() => {
-                setStoreLoginTarget(null);
-              }}
+              onBack={handleBackToStoreDirectory}
               onSuccess={(user) => {
                 setStoreLoginTarget(null);
+                setTenantIdParam('');
+                setIsLoginModalOpen(false);
                 const userTenantId = Number(user?.tenantId);
 
                 // If switching stores, purge previous company settings immediately
@@ -1115,6 +1173,35 @@ export default function App() {
               }}
             />
           </>
+        ) : (
+          <SaasLandingPage
+            availableTenants={availableTenants}
+            onGlobalLogin={() => {
+              setTenantIdParam('');
+              setStoreLoginTarget(null);
+              setIsLoginModalOpen(true);
+              window.history.pushState({}, '', '/?mode=login');
+            }}
+            onSelectStore={(selectedStore) => {
+              setStoreLoginTarget(selectedStore);
+              setTenantIdParam(String(selectedStore.id));
+              setIsLoginModalOpen(true);
+              window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(selectedStore.id)}`);
+            }}
+            onOpenSuperAdmin={() => handleNavigateDomain({ mode: 'SUPERADMIN' })}
+            onStoreCreated={(tenantId, loginUrl, user, token) => {
+              refreshTenantDirectory('LANDING');
+              if (token && user) {
+                setAuthSession(token, user);
+                setCurrentUser(user);
+                handleNavigateDomain({ mode: 'TENANT', tenantId });
+              } else {
+                setTenantIdParam(String(tenantId));
+                setIsLoginModalOpen(true);
+                window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(tenantId)}`);
+              }
+            }}
+          />
         )
       )}
 

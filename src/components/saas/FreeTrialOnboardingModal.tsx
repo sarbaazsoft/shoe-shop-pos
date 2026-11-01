@@ -30,6 +30,7 @@ interface FreeTrialOnboardingModalProps {
   platformOwnerPhone?: string;
   onStoreCreated?: (tenantId: number, loginUrl: string, user?: any, token?: string) => void;
   theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> = ({
@@ -41,6 +42,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   platformOwnerPhone: _platformOwnerPhone,
   onStoreCreated,
   theme: propTheme,
+  onToggleTheme: _onToggleTheme,
 }) => {
   const globalTheme = useTheme();
 

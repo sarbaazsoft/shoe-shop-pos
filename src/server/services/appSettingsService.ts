@@ -299,14 +299,17 @@ export async function getAllAppSettings(
     system: [],
   };
 
-  const rows = res.rows.length > 0 ? res.rows : APP_SETTINGS_DEFAULTS.map((d) => ({
-    key: d.key,
-    value: settingsCache.get(d.key) ?? process.env[d.key]?.trim() ?? d.defaultValue,
-    category: d.category,
-    description: d.description,
-    isSecret: d.isSecret,
-    updatedAt: new Date().toISOString(),
-  }));
+  const rows = res.rows.length > 0 ? res.rows : APP_SETTINGS_DEFAULTS.map((d) => {
+    const isEmail = d.category === 'email' || d.key.startsWith('RESEND_') || d.key.startsWith('EMAIL_');
+    return {
+      key: d.key,
+      value: settingsCache.get(d.key) ?? (!isEmail ? process.env[d.key]?.trim() : undefined) ?? d.defaultValue,
+      category: d.category,
+      description: d.description,
+      isSecret: d.isSecret,
+      updatedAt: new Date().toISOString(),
+    };
+  });
 
   for (const item of rows) {
     byKey[item.key] = item.value ?? '';
@@ -320,7 +323,8 @@ export async function getAllAppSettings(
   // Ensure all known defaults appear in the response even if unseeded
   for (const def of APP_SETTINGS_DEFAULTS) {
     if (byKey[def.key] === undefined) {
-      const val = settingsCache.get(def.key) ?? def.defaultValue;
+      const isEmail = def.category === 'email' || def.key.startsWith('RESEND_') || def.key.startsWith('EMAIL_');
+      const val = settingsCache.get(def.key) ?? (!isEmail ? process.env[def.key]?.trim() : undefined) ?? def.defaultValue;
       byKey[def.key] = val;
       const item: AppSettingItem = {
         key: def.key,

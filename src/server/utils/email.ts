@@ -1,5 +1,6 @@
 // Centralized transactional email service powered exclusively by the Resend SDK
 import { Resend } from 'resend';
+import { pgClient } from '../../db/index.ts';
 import { getAllAppSettings, getCachedAppSetting } from '../services/appSettingsService.ts';
 
 export const DEFAULT_FROM_ADDRESS = 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>';
@@ -115,19 +116,34 @@ export interface SendEmailResult {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
-  const settings = (await getAllAppSettings().catch(() => ({ byKey: {} as Record<string, string> }))).byKey;
-  
-  // Database root app_settings is the single authoritative source of truth
-  const apiKey = (
-    settings.RESEND_API_KEY ||
-    getCachedAppSetting('RESEND_API_KEY') ||
-    ''
-  ).trim();
+  // Always query app_settings dynamically directly from the database to guarantee the latest API key is used
+  let apiKey = '';
+  let resendFrom = '';
+  let emailWebhookUrl = '';
+  let resendWebhookUrl = '';
+
+  try {
+    const res = await pgClient.query<{ key: string; value: string }>(
+      `SELECT key, value FROM public.app_settings 
+       WHERE key IN ('RESEND_API_KEY', 'RESEND_FROM', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
+    );
+    for (const row of res.rows) {
+      if (row.key === 'RESEND_API_KEY') apiKey = (row.value || '').trim();
+      else if (row.key === 'RESEND_FROM') resendFrom = (row.value || '').trim();
+      else if (row.key === 'EMAIL_WEBHOOK_URL') emailWebhookUrl = (row.value || '').trim();
+      else if (row.key === 'RESEND_WEBHOOK_URL') resendWebhookUrl = (row.value || '').trim();
+    }
+  } catch {
+    // In-memory cache fallback if DB query errors
+    apiKey = (getCachedAppSetting('RESEND_API_KEY') || '').trim();
+    resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
+    emailWebhookUrl = (getCachedAppSetting('EMAIL_WEBHOOK_URL') || '').trim();
+    resendWebhookUrl = (getCachedAppSetting('RESEND_WEBHOOK_URL') || '').trim();
+  }
 
   const rawFromCandidate = (
     opts.from ||
-    settings.RESEND_FROM ||
-    getCachedAppSetting('RESEND_FROM') ||
+    resendFrom ||
     DEFAULT_FROM_ADDRESS
   ).trim();
 
@@ -190,7 +206,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           const testEmailMatch = currentErrorMsg.match(/own email address \(([^)]+)\)/i);
           const authorizedTestEmail = (
             testEmailMatch?.[1] ||
-            settings.DEFAULT_SUPERADMIN_EMAIL ||
             'sarbaazsoft@gmail.com'
           ).trim().toLowerCase();
 
@@ -284,11 +299,10 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     }
   }
 
-  // 2. Optional secondary webhook dispatcher if configured
+  // 2. Optional secondary webhook dispatcher if configured exclusively in app_settings
   const webhookUrl = (
-    settings.EMAIL_WEBHOOK_URL ||
-    settings.RESEND_WEBHOOK_URL ||
-    process.env.EMAIL_WEBHOOK_URL ||
+    emailWebhookUrl ||
+    resendWebhookUrl ||
     ''
   ).trim();
 
@@ -764,12 +778,18 @@ export interface TestEmailDiagnostics {
 }
 
 export async function testResendConfiguration(testRecipient?: string): Promise<TestEmailDiagnostics> {
-  const settings = (await getAllAppSettings().catch(() => ({ byKey: {} as Record<string, string> }))).byKey;
-  const rawFromCandidate = (
-    settings.RESEND_FROM ||
-    getCachedAppSetting('RESEND_FROM') ||
-    DEFAULT_FROM_ADDRESS
-  ).trim();
+  let resendFrom = '';
+  try {
+    const res = await pgClient.query<{ value: string }>(
+      "SELECT value FROM public.app_settings WHERE key = 'RESEND_FROM' LIMIT 1"
+    );
+    if (res.rows[0]?.value) {
+      resendFrom = res.rows[0].value.trim();
+    }
+  } catch {
+    resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
+  }
+  const rawFromCandidate = (resendFrom || DEFAULT_FROM_ADDRESS).trim();
 
   const parsedSender = parseSenderAddress(rawFromCandidate);
   const targetRecipient = (testRecipient || parsedSender.email || 'sarbaazsoft@gmail.com').trim().toLowerCase();

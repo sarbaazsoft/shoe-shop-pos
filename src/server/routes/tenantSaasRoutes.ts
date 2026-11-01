@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pgClient } from '../../db/index.ts';
 import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, ensureEmailVerificationSchema, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
-import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest } from '../auth.ts';
+import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest, type AuthUser } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
 import { sendTrialActivationEmail } from '../utils/email.ts';
@@ -192,6 +192,212 @@ router.get('/saas/resolve', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to resolve tenant context: ' + err.message });
+  }
+});
+
+/**
+ * 2b. PUBLIC PLATFORM STATS & METRICS (`/api/saas/public-stats`)
+ */
+router.get('/saas/public-stats', async (_req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    const storesRes = await pgClient.query('SELECT COUNT(*)::int as c FROM tenants WHERE id > 0');
+    const prodsRes = await pgClient.query('SELECT COUNT(*)::int as c FROM products WHERE active != false');
+    const todayRes = await pgClient.query('SELECT COUNT(*)::int as c FROM sales WHERE DATE(sale_date) = CURRENT_DATE');
+    const revRes = await pgClient.query('SELECT COALESCE(SUM(total_amount), 0)::numeric as s FROM sales');
+    const ownerRes = await pgClient.query(
+      "SELECT email, phone FROM users WHERE UPPER(COALESCE(role::text, '')) = 'SUPERADMIN' ORDER BY id ASC LIMIT 1"
+    );
+    const owner = ownerRes.rows[0];
+    return res.json({
+      stores: Number(storesRes.rows[0]?.c || 0),
+      products: Number(prodsRes.rows[0]?.c || 0),
+      invoicesToday: Number(todayRes.rows[0]?.c || 0),
+      platformRevenue: Number(revRes.rows[0]?.s || 0),
+      superAdminEmail: owner?.email || 'sarbaazsoft@gmail.com',
+      superAdminPhone: owner?.phone || '+92-321-2257340',
+    });
+  } catch (_err) {
+    return res.json({
+      stores: 4,
+      products: 12,
+      invoicesToday: 0,
+      platformRevenue: 0,
+      superAdminEmail: 'sarbaazsoft@gmail.com',
+      superAdminPhone: '+92-321-2257340',
+    });
+  }
+});
+
+/**
+ * 2c. PLATFORM OWNER CONTACT INFO (`/api/saas/platform-owner`)
+ */
+router.get('/saas/platform-owner', async (_req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    const ownerRes = await pgClient.query(
+      "SELECT name, email, phone FROM users WHERE UPPER(COALESCE(role::text, '')) = 'SUPERADMIN' ORDER BY id ASC LIMIT 1"
+    );
+    const owner = ownerRes.rows[0];
+    return res.json({
+      name: owner?.name || 'Platform SuperAdmin',
+      email: owner?.email || 'sarbaazsoft@gmail.com',
+      phone: owner?.phone || '+92-321-2257340',
+    });
+  } catch {
+    return res.json({
+      name: 'Platform SuperAdmin',
+      email: 'sarbaazsoft@gmail.com',
+      phone: '+92-321-2257340',
+    });
+  }
+});
+
+/**
+ * 2d. CHECK EMAIL AVAILABILITY (`/api/saas/check-email`)
+ */
+router.get('/saas/check-email', async (req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    const email = String(req.query.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.json({ available: false, message: 'Email address is required.' });
+    }
+    const check = await pgClient.query('SELECT id FROM users WHERE LOWER(BTRIM(email)) = $1 LIMIT 1', [email]);
+    if (check.rows.length > 0) {
+      return res.json({
+        available: false,
+        message: 'This email is already in use. Please use a different email address or log in.',
+      });
+    }
+    return res.json({
+      available: true,
+      message: 'Email is available.',
+    });
+  } catch {
+    return res.json({ available: true, message: 'Email format is valid.' });
+  }
+});
+
+/**
+ * 2e. PUBLIC FREE TRIAL STORE ACTIVATION (`/api/saas/store-request`)
+ */
+router.post('/saas/store-request', async (req: Request, res: Response) => {
+  try {
+    await ensureSaasControlPlane();
+    const body = req.body || {};
+    const storeName = String(body.storeName || body.name || '').trim();
+    const ownerEmail = String(body.ownerEmail || body.email || '').trim().toLowerCase();
+    const ownerName = String(body.ownerName || body.name || storeName || 'Store Owner').trim();
+    const ownerPhone = String(body.ownerPhone || body.phone || '').trim();
+    const password = body.password ? String(body.password).trim() : 'admin123';
+    const plan = String(body.plan || 'TRIAL').toUpperCase();
+    const businessType: 'RETAIL' | 'WHOLESALE' =
+      String(body.businessType || 'RETAIL').toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
+    const pricingMode: 'FIXED' | 'NEGOTIABLE' =
+      businessType === 'WHOLESALE'
+        ? 'FIXED'
+        : String(body.pricingMode || 'FIXED').toUpperCase() === 'NEGOTIABLE'
+        ? 'NEGOTIABLE'
+        : 'FIXED';
+    const minSellingQuantity = body.minSellingQuantity !== undefined ? Number(body.minSellingQuantity) : 1.0;
+    const allowHalfCarton = body.allowHalfCarton !== undefined ? Boolean(body.allowHalfCarton) : true;
+
+    if (!storeName || !ownerEmail) {
+      return res.status(400).json({ error: 'Store name and owner email are required.' });
+    }
+
+    const check = await pgClient.query('SELECT id FROM users WHERE LOWER(BTRIM(email)) = $1 LIMIT 1', [ownerEmail]);
+    if (check.rows.length > 0) {
+      return res.status(409).json({
+        code: 'EMAIL_ALREADY_EXISTS',
+        error: 'This email is already in use. Please use a different email address or log in.',
+      });
+    }
+
+    const trialDurationDays = 30;
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + trialDurationDays * 86400000);
+
+    await pgClient.query('BEGIN');
+    const provisioned = await provisionNewTenantStore({
+      storeName,
+      ownerName,
+      ownerEmail,
+      password,
+      ownerPhone,
+      businessType,
+      pricingMode,
+      minSellingQuantity,
+      allowHalfCarton,
+      subscriptionPlan: 'free_tier',
+      subscriptionType: 'free_tier',
+      subscriptionStartDate: startDate.toISOString(),
+      subscriptionEndDate: endDate.toISOString(),
+      onboardingCompleted: true,
+      ownerStatus: 'APPROVED',
+    });
+    await pgClient.query('COMMIT');
+
+    await recordTrialActivation({
+      userId: provisioned.adminUserId,
+      tenantId: provisioned.tenantId,
+      email: ownerEmail,
+      userName: ownerName,
+      phone: ownerPhone,
+      storeName: provisioned.storeName,
+      businessType,
+      pricingMode,
+      plan: 'TRIAL',
+      trialDurationDays,
+      trialStartDate: startDate.toISOString(),
+      trialEndDate: endDate.toISOString(),
+      status: 'ACTIVE',
+      details: { source: 'landing_free_trial' },
+    });
+
+    const ownerRes = await pgClient.query(
+      "SELECT email, phone FROM users WHERE UPPER(COALESCE(role::text, '')) = 'SUPERADMIN' ORDER BY id ASC LIMIT 1"
+    );
+    const saOwner = ownerRes.rows[0];
+
+    const authUser: AuthUser = {
+      id: provisioned.adminUserId,
+      tenantId: provisioned.tenantId,
+      name: ownerName,
+      email: provisioned.adminEmail,
+      phone: ownerPhone,
+      avatarUrl: '',
+      role: 'ADMIN',
+      status: 'APPROVED',
+    };
+    const token = generateToken(authUser);
+
+    return res.status(201).json({
+      success: true,
+      message: `Congratulations! Store '${provisioned.storeName}' has been activated with a 30-day Free Trial.`,
+      tenantId: provisioned.tenantId,
+      user: {
+        ...authUser,
+        tenantName: provisioned.storeName,
+        storeName: provisioned.storeName,
+        onboardingCompleted: true,
+      },
+      token,
+      loginUrl: `/?tenantId=${provisioned.tenantId}`,
+      redirectUrl: `/?tenantId=${provisioned.tenantId}`,
+      superAdminEmail: saOwner?.email || 'sarbaazsoft@gmail.com',
+      superAdminPhone: saOwner?.phone || '+92-321-2257340',
+    });
+  } catch (err: any) {
+    await pgClient.query('ROLLBACK').catch(() => {});
+    if (err?.code === 'EMAIL_ALREADY_EXISTS') {
+      return res.status(409).json({
+        code: 'EMAIL_ALREADY_EXISTS',
+        error: 'This email is already in use. Please use a different email address.',
+      });
+    }
+    return res.status(500).json({ error: err.message || 'Failed to submit store request.' });
   }
 });
 
