@@ -18,7 +18,6 @@ import { UserProfileModal } from './components/auth/UserProfileModal.tsx';
 import { OfflineToastNotification } from './components/common/OfflineToastNotification.tsx';
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
-import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
 import { UnknownStore404View } from './components/saas/UnknownStore404View.tsx';
 import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
 import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel.tsx';
@@ -81,7 +80,6 @@ function resolveTargetTab(requestedTab: string | undefined | null, user: any): s
 function detectInitialRouteFromLocation(): {
   mode: SaasRouteMode;
   tenantIdParam: string;
-  isAuthRoute: boolean;
 } {
   const pathname = window.location.pathname;
   const searchParams = new URLSearchParams(window.location.search);
@@ -91,25 +89,18 @@ function detectInitialRouteFromLocation(): {
     searchParams.get('tenant_id') ||
     searchParams.get('store_id') ||
     '';
-  const isAuthRoute =
-    pathname === '/auth' ||
-    pathname === '/login' ||
-    pathname.startsWith('/auth/') ||
-    pathname.startsWith('/login/') ||
-    searchParams.get('mode') === 'auth' ||
-    searchParams.get('mode') === 'login';
 
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
-    return { mode: 'SUPERADMIN', tenantIdParam, isAuthRoute };
+    return { mode: 'SUPERADMIN', tenantIdParam };
   }
   if (pathname === '/install' || pathname.startsWith('/install/')) {
-    return { mode: 'INSTALLER', tenantIdParam, isAuthRoute };
+    return { mode: 'INSTALLER', tenantIdParam };
   }
   if (pathname === '/onboarding' || pathname.startsWith('/onboarding') || searchParams.get('mode') === 'onboarding') {
-    return { mode: 'TENANT_ONBOARDING', tenantIdParam, isAuthRoute };
+    return { mode: 'TENANT_ONBOARDING', tenantIdParam };
   }
   if (pathname === '/verify-email' || pathname.startsWith('/verify-email') || searchParams.get('mode') === 'verify-email') {
-    return { mode: 'VERIFY_EMAIL', tenantIdParam, isAuthRoute };
+    return { mode: 'VERIFY_EMAIL', tenantIdParam };
   }
 
   let pathTab = pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -124,22 +115,17 @@ function detectInitialRouteFromLocation(): {
       const tenantQuery = tenantIdParam ? `?tenantId=${encodeURIComponent(tenantIdParam)}` : '';
       window.history.replaceState({}, '', `${appPathForTab(requestedTab)}${tenantQuery}`);
     }
-  } else if (pathname !== '/' && pathname !== '/landing') {
+  } else if (pathname !== '/') {
     window.history.replaceState({}, '', `/${window.location.search}`);
   }
-  return { mode: 'LANDING', tenantIdParam, isAuthRoute };
+  return { mode: 'LANDING', tenantIdParam };
 }
 
 export default function App() {
   const initialRoute = detectInitialRouteFromLocation();
-  const initialSectionPath = APP_TAB_ROUTES.has(window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase());
-  const hasResetTokenParam = new URLSearchParams(window.location.search).has('resetToken');
   const [saasMode, setSaasMode] = useState<SaasRouteMode>(initialRoute.mode);
   const [activeTenant, setActiveTenant] = useState<TenantInfo | null>(null);
   const [availableTenants, setAvailableTenants] = useState<TenantInfo[]>([]);
-  const [globalLoginOpen, setGlobalLoginOpen] = useState(
-    hasResetTokenParam || initialRoute.isAuthRoute || Boolean(initialRoute.tenantIdParam)
-  );
   const [storeLoginTarget, setStoreLoginTarget] = useState<TenantInfo | null>(null);
   const [tenantIdNotice, setTenantIdNotice] = useState('');
   const tenantIdParam = initialRoute.tenantIdParam;
@@ -226,7 +212,7 @@ export default function App() {
 
   const effectiveStoreName = (() => {
     if (saasMode === 'SUPERADMIN') return 'POS SaaS C-Panel';
-    if (saasMode === 'LANDING' && !globalLoginOpen && !tenantIdParam) return 'SarbaazSoft Shoe POS';
+    if (saasMode === 'LANDING' && !tenantIdParam) return 'SarbaazSoft Shoe POS';
 
     if (
       saasMode === 'TENANT_ACTIVE' ||
@@ -440,7 +426,6 @@ export default function App() {
         overrideMode === 'INSTALLER'
       ) {
         setSaasMode('INSTALLER');
-        setGlobalLoginOpen(false);
         if (window.location.pathname !== '/install') window.history.replaceState({}, '', '/install');
         return;
       }
@@ -553,12 +538,6 @@ export default function App() {
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    if (initialSectionPath && !isInitializing && !currentUser && saasMode === 'LANDING') {
-      setGlobalLoginOpen(true);
-    }
-  }, [initialSectionPath, isInitializing, currentUser, saasMode]);
-
   // PWA launch URLs use /?tenantId=<tenant id>. Resolve the id against the
   // public tenant directory before presenting a tenant-scoped sign-in.
   useEffect(() => {
@@ -572,14 +551,12 @@ export default function App() {
       if (availableTenants.length > 0) {
         setStoreLoginTarget(null);
         setTenantIdNotice(`Store / Tenant ID “${tenantIdParam}” was not found. Check the store link or contact your administrator.`);
-        setGlobalLoginOpen(false);
       }
       return;
     }
 
     setStoreLoginTarget(target);
     setTenantIdNotice('');
-    setGlobalLoginOpen(true);
   }, [tenantIdParam, availableTenants, isInitializing, saasMode]);
 
   // Keep tenantId on the shared root only while a store sign-in is required.
@@ -587,7 +564,6 @@ export default function App() {
     if (saasMode !== 'TENANT_ACTIVE' || isInitializing || currentUser || !activeTenant) return;
     setStoreLoginTarget(activeTenant);
     setTenantIdNotice('');
-    setGlobalLoginOpen(true);
     setSaasMode('LANDING');
     window.history.replaceState({}, '', `/?tenantId=${encodeURIComponent(activeTenant.id)}`);
   }, [saasMode, isInitializing, currentUser, activeTenant]);
@@ -606,7 +582,6 @@ export default function App() {
   useEffect(() => {
     const role = String(currentUser?.originalRole || currentUser?.role || '').toUpperCase();
     if (saasMode !== 'SUPERADMIN' || isInitializing || role === 'SUPERADMIN') return;
-    setGlobalLoginOpen(true);
     window.history.replaceState({}, '', '/');
     setSaasMode('LANDING');
   }, [saasMode, isInitializing, currentUser]);
@@ -615,10 +590,10 @@ export default function App() {
   // their PWA start URL) goes straight to the admin destination.
   useEffect(() => {
     const role = String(currentUser?.originalRole || currentUser?.role || '').toUpperCase();
-    if (saasMode !== 'LANDING' || isInitializing || globalLoginOpen || tenantIdParam || role !== 'SUPERADMIN') return;
+    if (saasMode !== 'LANDING' || isInitializing || tenantIdParam || role !== 'SUPERADMIN') return;
     window.history.replaceState({}, '', '/admin');
     setSaasMode('SUPERADMIN');
-  }, [saasMode, isInitializing, globalLoginOpen, tenantIdParam, currentUser]);
+  }, [saasMode, isInitializing, tenantIdParam, currentUser]);
 
   // Automatically restrict access to POS/Dashboard if any API request reports SUBSCRIPTION_EXPIRED
   useEffect(() => {
@@ -661,7 +636,6 @@ export default function App() {
       const customEvent = event as CustomEvent;
       const detail = customEvent.detail;
       setSaasMode('VERIFY_EMAIL');
-      setGlobalLoginOpen(false);
       const queryParams = new URLSearchParams();
       if (detail?.email) queryParams.set('email', detail.email);
       if (detail?.tenantId) queryParams.set('tenantId', String(detail.tenantId));
@@ -864,60 +838,6 @@ export default function App() {
     };
   }, []);
 
-  const handleStoreCreated = async (tenantId: number, _loginUrl: string, user?: any, token?: string) => {
-    const isCompleted = user?.onboardingCompleted === true;
-    if (token && user) {
-      setAuthSession(token, user);
-      const role = String(user?.role || 'ADMIN').toUpperCase();
-      const authUser = {
-        ...user,
-        role,
-        originalRole: role,
-        onboardingCompleted: isCompleted,
-        isSimulatedCashier: false,
-      };
-      setCurrentUser(authUser);
-      try {
-        localStorage.setItem('pos_current_user', JSON.stringify(authUser));
-      } catch {}
-    }
-    const storeName = user?.storeName || 'New Shoe Store';
-    const initialTenant: TenantInfo = {
-      id: tenantId,
-      name: storeName,
-      status: 'ACTIVE',
-      subscriptionStatus: 'ACTIVE',
-      subscriptionPlan: 'free_tier',
-      businessType: user?.businessType || 'RETAIL',
-      pricingMode: user?.pricingMode || 'FIXED',
-      logoUrl: '/pwa-512x512.png',
-      currency: user?.currency || 'PKR',
-      onboardingCompleted: isCompleted,
-      appPath: '/dashboard',
-    };
-    setActiveTenant(initialTenant);
-    setCachedStoreName(storeName);
-    try {
-      localStorage.setItem('cached_store_name', storeName);
-    } catch {}
-    setAvailableTenants((prev) => [initialTenant, ...prev.filter((t) => t.id !== tenantId)]);
-    setActiveTenantId(tenantId);
-    setStoreLoginTarget(null);
-    setTenantIdNotice('');
-    setGlobalLoginOpen(false);
-
-    if (!isCompleted) {
-      setSaasMode('TENANT_ONBOARDING');
-      window.history.pushState({}, '', `/onboarding?tenantId=${encodeURIComponent(tenantId)}`);
-      return;
-    }
-
-    setSaasMode('TENANT_ACTIVE');
-    setCurrentTab('dashboard');
-    window.history.pushState({}, '', '/dashboard');
-    await initializeApp(tenantId, 'TENANT_ACTIVE');
-  };
-
   const handleLogout = () => {
     // Immediate logout, no prompt. The remembered login email is stored under its own key
     // (see utils/rememberedAccount.ts) and is intentionally NOT cleared here; only the
@@ -953,14 +873,12 @@ export default function App() {
       }
       setActiveTenantId(currentLogoutID);
       setTenantIdNotice('');
-      setGlobalLoginOpen(true);
       setSaasMode('LANDING');
       window.history.replaceState({}, '', `/?tenantId=${encodeURIComponent(currentLogoutID)}`);
     } else {
       setActiveTenant(null);
       setStoreLoginTarget(null);
       setTenantIdNotice('');
-      setGlobalLoginOpen(true);
       setSaasMode('LANDING');
       window.history.replaceState({}, '', '/');
     }
@@ -1086,7 +1004,6 @@ export default function App() {
               } catch {}
             }
             setSaasMode('SUPERADMIN');
-            setGlobalLoginOpen(false);
             window.history.replaceState({}, '', '/admin');
           }}
         />
@@ -1110,104 +1027,95 @@ export default function App() {
               </p>
             </div>
           </PublicLayout>
-        ) : globalLoginOpen ? (
-          <AuthModal
-            companySettings={storeLoginTarget
-              ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name }
-              : (activeTenant
-                  ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name }
-                  : (tenantIdParam
-                      ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '' }
-                      : { name: 'SarbaazSoft Shoe POS' }))}
-            onBack={() => {
-              setGlobalLoginOpen(false);
-              setStoreLoginTarget(null);
-            }}
-            onSuccess={(user) => {
-              setStoreLoginTarget(null);
-              const userTenantId = Number(user?.tenantId);
+        ) : (
+          <>
+            {tenantIdNotice && (
+              <div role="alert" className="mx-auto mt-6 w-[min(92%,40rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+                {tenantIdNotice}
+              </div>
+            )}
+            <AuthModal
+              companySettings={storeLoginTarget
+                ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name }
+                : (activeTenant
+                    ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name }
+                    : (tenantIdParam
+                        ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '' }
+                        : { name: 'SarbaazSoft Shoe POS' }))}
+              onBack={() => {
+                setStoreLoginTarget(null);
+              }}
+              onSuccess={(user) => {
+                setStoreLoginTarget(null);
+                const userTenantId = Number(user?.tenantId);
 
-              // If switching stores, purge previous company settings immediately
-              if (companySettings && Number(companySettings.tenantId || companySettings.tenant_id) !== userTenantId) {
-                setCompanySettings(null);
-                setCachedStoreName('');
-                try {
-                  localStorage.removeItem('cached_company_settings');
-                  localStorage.removeItem('cached_store_name');
-                } catch {}
-              }
+                // If switching stores, purge previous company settings immediately
+                if (companySettings && Number(companySettings.tenantId || companySettings.tenant_id) !== userTenantId) {
+                  setCompanySettings(null);
+                  setCachedStoreName('');
+                  try {
+                    localStorage.removeItem('cached_company_settings');
+                    localStorage.removeItem('cached_store_name');
+                  } catch {}
+                }
 
-              const role = String(user?.role || '').toUpperCase();
-              const authUser = {
-                ...user,
-                role,
-                originalRole: role,
-                onboardingCompleted: user?.onboardingCompleted ?? true,
-                isSimulatedCashier: false,
-              };
-              setCurrentUser(authUser);
-              try {
-                localStorage.setItem('pos_current_user', JSON.stringify(authUser));
-              } catch {}
-              if (role === 'CASHIER') {
-                setCurrentTab('pos');
-              } else {
-                setCurrentTab('dashboard');
-              }
-              if (role === 'SUPERADMIN') {
-                setActiveTenant(null);
-                setActiveTenantId(null);
-                setGlobalLoginOpen(false);
-                handleNavigateDomain({ mode: 'SUPERADMIN' });
-                return;
-              }
-              if (userTenantId) {
-                const matchingTenant = availableTenants.find((t) => Number(t.id) === userTenantId);
-                const storeName = matchingTenant?.name || user?.tenantName || user?.storeName || `Store #${userTenantId}`;
-                const newTenant: TenantInfo = matchingTenant || {
-                  id: userTenantId,
-                  name: storeName,
-                  status: user?.status || 'ACTIVE',
-                  subscriptionStatus: user?.subscriptionStatus || 'ACTIVE',
-                  subscriptionPlan: user?.subscriptionPlan || 'free_tier',
-                  businessType: user?.businessType || 'RETAIL',
-                  pricingMode: user?.pricingMode || 'FIXED',
-                  logoUrl: '/pwa-512x512.png',
-                  currency: user?.currency || 'PKR',
+                const role = String(user?.role || '').toUpperCase();
+                const authUser = {
+                  ...user,
+                  role,
+                  originalRole: role,
                   onboardingCompleted: user?.onboardingCompleted ?? true,
-                  appPath: '/dashboard',
+                  isSimulatedCashier: false,
                 };
-                setActiveTenant(newTenant);
-                setActiveTenantId(userTenantId);
-                setCachedStoreName(storeName);
+                setCurrentUser(authUser);
                 try {
-                  localStorage.setItem('cached_store_name', storeName);
+                  localStorage.setItem('pos_current_user', JSON.stringify(authUser));
                 } catch {}
-
-                setGlobalLoginOpen(false);
-                if (user?.onboardingCompleted === false && role === 'ADMIN') {
-                  handleNavigateDomain({ mode: 'ONBOARDING', tenantId: userTenantId, authenticated: true });
+                if (role === 'CASHIER') {
+                  setCurrentTab('pos');
+                } else {
+                  setCurrentTab('dashboard');
+                }
+                if (role === 'SUPERADMIN') {
+                  setActiveTenant(null);
+                  setActiveTenantId(null);
+                  handleNavigateDomain({ mode: 'SUPERADMIN' });
                   return;
                 }
-                handleNavigateDomain({ mode: 'TENANT', tenantId: userTenantId, authenticated: true });
-                return;
-              }
-              setGlobalLoginOpen(false);
-            }}
-          />
-        ) : <>
-          {tenantIdNotice && (
-            <div role="alert" className="mx-auto mt-6 w-[min(92%,40rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
-              {tenantIdNotice}
-            </div>
-          )}
-          <SaasLandingPage
-            availableTenants={availableTenants}
-            onGlobalLogin={() => setGlobalLoginOpen(true)}
-            onOpenSuperAdmin={() => handleNavigateDomain({ mode: 'SUPERADMIN' })}
-            onStoreCreated={handleStoreCreated}
-          />
-        </>
+                if (userTenantId) {
+                  const matchingTenant = availableTenants.find((t) => Number(t.id) === userTenantId);
+                  const storeName = matchingTenant?.name || user?.tenantName || user?.storeName || `Store #${userTenantId}`;
+                  const newTenant: TenantInfo = matchingTenant || {
+                    id: userTenantId,
+                    name: storeName,
+                    status: user?.status || 'ACTIVE',
+                    subscriptionStatus: user?.subscriptionStatus || 'ACTIVE',
+                    subscriptionPlan: user?.subscriptionPlan || 'free_tier',
+                    businessType: user?.businessType || 'RETAIL',
+                    pricingMode: user?.pricingMode || 'FIXED',
+                    logoUrl: '/pwa-512x512.png',
+                    currency: user?.currency || 'PKR',
+                    onboardingCompleted: user?.onboardingCompleted ?? true,
+                    appPath: '/dashboard',
+                  };
+                  setActiveTenant(newTenant);
+                  setActiveTenantId(userTenantId);
+                  setCachedStoreName(storeName);
+                  try {
+                    localStorage.setItem('cached_store_name', storeName);
+                  } catch {}
+
+                  if (user?.onboardingCompleted === false && role === 'ADMIN') {
+                    handleNavigateDomain({ mode: 'ONBOARDING', tenantId: userTenantId, authenticated: true });
+                    return;
+                  }
+                  handleNavigateDomain({ mode: 'TENANT', tenantId: userTenantId, authenticated: true });
+                  return;
+                }
+              }}
+            />
+          </>
+        )
       )}
 
       {/* EMAIL VERIFICATION REQUIRED NOTICE VIEW */}
@@ -1216,7 +1124,6 @@ export default function App() {
           storeName={effectiveStoreName || 'SarbaazSoft Shoe POS'}
           onNavigateLogin={(verifiedEmail) => {
             setSaasMode('LANDING');
-            setGlobalLoginOpen(true);
             if (verifiedEmail) {
               window.history.pushState({}, '', `/?mode=login&email=${encodeURIComponent(verifiedEmail)}`);
             } else {
@@ -1225,7 +1132,6 @@ export default function App() {
           }}
           onNavigateHome={() => {
             setSaasMode('LANDING');
-            setGlobalLoginOpen(false);
             window.history.pushState({}, '', '/');
           }}
         />

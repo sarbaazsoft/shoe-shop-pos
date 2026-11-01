@@ -2,8 +2,6 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
-/* Landing page light theme: applied by [data-landing-theme="light"] on the landing root. */
-@custom-variant lt (&:where([data-landing-theme="light"], [data-landing-theme="light"] *));
 
 :root {
   --primary: #9333EA;
@@ -137,9 +135,6 @@ aside button span:not(.font-mono):not(kbd),
 .nav-item,
 .nav-link,
 [data-nav],
-#landing-mobile-menu,
-#landing-mobile-menu button,
-#landing-mobile-menu a,
 [id*="mobile-menu"] button,
 [id*="mobile-menu"] a,
 .tab-button,
@@ -2544,9 +2539,7 @@ div:has(> button[data-tab]) {
 }
 
 /* ========================================================================= */
-/* LIGHT MODE ONLY: STORE PANEL + SUPERADMIN PANEL ALIGNED WITH SAAS LANDING */
-/* Tokens mirror SaasLandingPage `lt:` theme:                                */
-/*   wrapper  #F7F8FF   card  white -> #F3F4FF   border  indigo-200 #C7D2FE  */
+/* LIGHT MODE ONLY: STORE PANEL + SUPERADMIN PANEL THEME TOKENS               */
 /* Scoped to .saas-panel (store shell + superadmin shell) and gated by       */
 /* html:not(.dark) + @media screen, so dark mode and print are untouched.    */
 /* ========================================================================= */

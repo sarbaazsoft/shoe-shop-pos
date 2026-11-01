@@ -1333,7 +1333,6 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         platformOwnerPhone={platformOwnerPhone}
         onStoreCreated={handleStoreCreated}
         theme={landingTheme}
-        onToggleTheme={toggleLandingTheme}
       />
 
     </div>

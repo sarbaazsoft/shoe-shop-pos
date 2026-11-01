@@ -16,8 +16,6 @@ import {
   ShieldCheck,
   Sparkles,
   Check,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
 import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber } from '../../utils/textFormat.ts';
@@ -32,7 +30,6 @@ interface FreeTrialOnboardingModalProps {
   platformOwnerPhone?: string;
   onStoreCreated?: (tenantId: number, loginUrl: string, user?: any, token?: string) => void;
   theme?: 'light' | 'dark';
-  onToggleTheme?: () => void;
 }
 
 export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> = ({
@@ -44,7 +41,6 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   platformOwnerPhone: _platformOwnerPhone,
   onStoreCreated,
   theme: propTheme,
-  onToggleTheme,
 }) => {
   const globalTheme = useTheme();
 
@@ -70,20 +66,6 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   }, [propTheme, globalTheme?.theme]);
 
   const isDark = internalTheme === 'dark';
-
-  const handleToggleTheme = () => {
-    const next = isDark ? 'light' : 'dark';
-    setInternalTheme(next);
-    if (onToggleTheme) {
-      onToggleTheme();
-    } else if (globalTheme?.setThemeMode) {
-      globalTheme.setThemeMode(next);
-    }
-    try {
-      localStorage.setItem('pos_landing_theme', next);
-      localStorage.setItem('pos_theme', next);
-    } catch {}
-  };
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -394,36 +376,20 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                 </div>
               </div>
 
-              {/* Header Right Actions: Theme Toggle + Close */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleToggleTheme}
-                  aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                  className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                    isDark
-                      ? 'border-purple-700/60 bg-purple-900/40 text-purple-200 hover:bg-purple-800/60 hover:text-white'
-                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
-                >
-                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={isLoading}
-                  aria-label="Close dialog"
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                    isDark
-                      ? 'text-purple-300 hover:text-white hover:bg-white/10'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              {/* Header Right Action: Close */}
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isLoading}
+                aria-label="Close dialog"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isDark
+                    ? 'text-purple-300 hover:text-white hover:bg-white/10'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 

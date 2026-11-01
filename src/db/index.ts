@@ -431,28 +431,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: [{ ok: 1 } as unknown as T], rowCount: 1 };
   }
 
-  // Public landing page aggregate stats (/api/saas/public-stats)
-  if (upper.includes('AS STORE_COUNT') && upper.includes('AS PRODUCT_COUNT')) {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const storeCount = mockStore.tenants.length;
-    const productCount = mockStore.products.filter((p) => p.active !== false).length;
-    const platformRevenue = Math.round(
-      mockStore.sales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0)
-    );
-    const invoicesTodayCount = mockStore.sales.filter((s) => s.sale_date === todayStr).length;
-    return {
-      rows: [
-        {
-          store_count: String(storeCount),
-          product_count: String(productCount),
-          platform_revenue: String(platformRevenue),
-          invoices_today_count: String(invoicesTodayCount),
-        } as unknown as T,
-      ],
-      rowCount: 1,
-    };
-  }
-
   if (upper.includes('TO_REGCLASS')) {
     if (upper.includes('UNNEST')) {
       const tables: string[] = Array.isArray(params[0]) ? params[0] : [];
