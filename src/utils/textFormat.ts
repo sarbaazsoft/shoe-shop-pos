@@ -32,49 +32,33 @@ export function toLowerTrimmed(value: string | undefined | null): string {
 }
 
 /**
- * Live phone number formatter matching the Register Free Trial standard:
- * 1. Automatically adds hyphens after the country code and carrier code.
- * 2. Replaces leading "00" with a "+" sign.
- * 3. Removes the leading '0' immediately following the first hyphen/prefix
- *    (e.g., "0-321" becomes "321", "+92-0321" becomes "+92-321").
+ * Live phone number formatter:
+ * Automatically formats phone numbers with hyphens after the country code and carrier code
+ * as the user types (e.g., +92-300-1234567).
  *
  * @param value The raw input string
  * @param prevValue Optional previous value to detect backspacing on a separator hyphen
  */
 export function formatPhoneNumber(value: string, prevValue: string = ''): string {
   if (!value) return '';
-  let str = value.trim();
+  const trimmed = value.trim();
+  const startsWithPlus = trimmed.startsWith('+');
+  const startsWith00 = trimmed.startsWith('00');
 
-  // 1. Replace leading "00" with a "+" sign
-  if (str.startsWith('00')) {
-    str = '+' + str.slice(2);
-  } else if (str.startsWith('+00')) {
-    str = '+' + str.slice(3);
-  }
+  let rawDigits = trimmed.replace(/\D/g, '');
 
-  // 2. Remove leading "0-" prefix if present (e.g. "0-321" becomes "321")
-  if (str.startsWith('0-')) {
-    str = str.slice(2);
-  }
-
-  // 3. Remove leading '0' immediately following the first hyphen/prefix
-  // (e.g. "+92-0321" -> "+92-321", "+92-0-321" -> "+92-321", "+92-0" -> "+92-")
-  str = str.replace(/^(\+?\d{1,4}-)0+/, '$1');
-
-  const startsWithPlus = str.startsWith('+');
-  let rawDigits = str.replace(/\D/g, '');
-
-  // If user hit backspace on a hyphen (e.g. from "+92-300-" to "+92-300")
+  // If user hit backspace on a hyphen (e.g. from "+92-300-" to "+92-300" or "+92-" to "+92")
   if (prevValue && prevValue.length - value.length === 1 && prevValue.replace(/\D/g, '') === rawDigits) {
+    // A separator hyphen was deleted; delete the preceding digit as well to avoid being trapped
     rawDigits = rawDigits.slice(0, -1);
   }
 
-  if (!rawDigits && startsWithPlus) return '+';
+  if (!rawDigits && (startsWithPlus || startsWith00)) return '+';
   if (!rawDigits) return '';
 
   // Standard E.164 phone numbers do not exceed 15 digits
-  const isIntl = startsWithPlus || rawDigits.startsWith('92');
   const digits = rawDigits.slice(0, 15);
+  const isIntl = startsWithPlus || startsWith00 || digits.startsWith('92');
 
   if (isIntl) {
     const d = digits;
@@ -100,17 +84,12 @@ export function formatPhoneNumber(value: string, prevValue: string = ''): string
     const cc = d.slice(0, ccLen);
     let rest = d.slice(ccLen);
 
-    // Remove leading '0' immediately following the first hyphen/prefix
-    // (e.g. +92-0321 -> +92-321; +44-07123 -> +44-7123)
-    while (rest.startsWith('0')) {
+    // If domestic trunk 0 was included after country code (e.g. +92-0300...), strip it if more digits follow
+    if (cc === '92' && rest.startsWith('0') && rest.length > 1) {
       rest = rest.slice(1);
     }
 
-    if (!rest) {
-      return `+${cc}-`;
-    }
-
-    // Carrier code length (standard 3 digits e.g. 300/321, or 2 digits in UAE/KSA 50/55)
+    // Carrier code length (standard 3 digits e.g. 300, or 2 digits in UAE/KSA 50/55)
     const carrierLen = cc === '971' || cc === '966' ? 2 : 3;
 
     if (rest.length <= carrierLen) {
@@ -123,59 +102,14 @@ export function formatPhoneNumber(value: string, prevValue: string = ''): string
   }
 
   // Local number starting with 0 (e.g., 03001234567 -> 0300-1234567)
-  if (digits.startsWith('0')) {
-    if (digits.length > 4) {
-      return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-    }
-    return digits;
+  if (digits.startsWith('0') && digits.length > 4) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
   }
 
-  // Local number chunking (e.g. 321-1234567)
-  if (digits.length > 3) {
+  if (digits.length > 3 && digits.length <= 10) {
     return `${digits.slice(0, 3)}-${digits.slice(3)}`;
   }
 
   return digits;
 }
-
-/**
- * Standard phone validation helper matching the Register Free Trial form rules:
- * - Minimum 7 digits, maximum 15 digits (E.164 standard)
- */
-export function isPhoneNumberValid(phone: string | null | undefined): boolean {
-  if (!phone) return false;
-  const digits = String(phone).replace(/\D/g, '');
-  return digits.length >= 7 && digits.length <= 15;
-}
-
-/**
- * Extracts digit-only characters from a formatted phone string.
- */
-export function getPhoneNumberDigits(phone: string | null | undefined): string {
-  if (!phone) return '';
-  return String(phone).replace(/\D/g, '');
-}
-
-/**
- * Returns user-facing error message matching the Register Free Trial form.
- */
-export function getPhoneValidationError(
-  phone: string | null | undefined,
-  required: boolean = true,
-  fieldName: string = 'Phone number'
-): string | null {
-  const trimmed = String(phone || '').trim();
-  if (!trimmed) {
-    return required ? `${fieldName} is required.` : null;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length < 7) {
-    return `Please enter at least 7 digits (e.g. +92-300-1234567). Current: ${digits.length} digits.`;
-  }
-  if (digits.length > 15) {
-    return `${fieldName} cannot exceed 15 digits.`;
-  }
-  return null;
-}
-
 

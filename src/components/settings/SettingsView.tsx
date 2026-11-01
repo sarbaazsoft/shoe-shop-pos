@@ -7,7 +7,7 @@ import { UserAvatar } from '../common/UserAvatar.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isPhoneNumberValid, getPhoneNumberDigits, getPhoneValidationError } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
@@ -875,9 +875,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!formData.company_name.trim()) {
       errors.company_name = 'Company name is required.';
     }
-    const phoneError = getPhoneValidationError(formData.company_phone, true, 'Company phone');
-    if (phoneError) {
-      errors.company_phone = phoneError;
+    if (!formData.company_phone.trim()) {
+      errors.company_phone = 'Company phone is required.';
     }
     if (formData.company_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.company_email.trim())) {
       errors.company_email = 'Please provide a valid email address (e.g., info@company.com).';
