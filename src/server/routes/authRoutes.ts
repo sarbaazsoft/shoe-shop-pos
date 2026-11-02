@@ -542,20 +542,29 @@ const handleStoreRegister = async (req: Request, res: Response) => {
 
     const activationLink = `${requestOrigin.replace(/\/+$/, '')}/?verificationToken=${verificationToken}&email=${encodeURIComponent(cleanEmail)}&tenantId=${tenantId}`;
 
-    const mailResult = await sendTrialActivationEmail({
-      to: cleanEmail,
-      userName: String(name).trim(),
-      storeName: targetTenant?.name || 'SarbaazSoft Shoe POS',
-      activationToken: verificationToken,
-      activationLink,
-      expiresAt,
-    }).catch((err) => ({
-      delivered: false,
-      provider: 'resend' as const,
-      sandbox: true,
-      sandboxRecipient: undefined as string | undefined,
-      error: err?.message || String(err),
-    }));
+    let mailResult: any;
+    try {
+      mailResult = await sendTrialActivationEmail({
+        to: cleanEmail,
+        userName: String(name).trim(),
+        storeName: targetTenant?.name || 'SarbaazSoft Shoe POS',
+        activationToken: verificationToken,
+        activationLink,
+        expiresAt,
+      });
+      if (!mailResult.delivered) {
+        console.error(`[authRoutes.ts] Free trial activation email delivery failed for ${cleanEmail}:`, mailResult.error);
+      }
+    } catch (mailErr: any) {
+      console.error(`[authRoutes.ts] Exception sending trial activation email to ${cleanEmail}:`, mailErr);
+      mailResult = {
+        delivered: false,
+        provider: 'resend' as const,
+        sandbox: true,
+        sandboxRecipient: undefined as string | undefined,
+        error: mailErr?.message || String(mailErr),
+      };
+    }
 
     if (mailResult.delivered && !mailResult.sandbox) {
       return res.status(201).json({
@@ -728,20 +737,29 @@ router.all('/resend-verification', async (req: Request, res: Response) => {
 
     const activationLink = `${requestOrigin.replace(/\/+$/, '')}/verify-email?token=${verificationToken}&email=${encodeURIComponent(rawEmail)}&tenantId=${user.tenant_id || 1}`;
 
-    const mailResult = await sendTrialActivationEmail({
-      to: rawEmail,
-      userName: user.name || 'Store Owner',
-      storeName: user.store_name || 'SarbaazSoft Shoe POS',
-      activationToken: verificationToken,
-      activationLink,
-      expiresAt,
-    }).catch((err) => ({
-      delivered: false,
-      provider: 'resend' as const,
-      sandbox: true,
-      sandboxRecipient: undefined as string | undefined,
-      error: err?.message || String(err),
-    }));
+    let mailResult: any;
+    try {
+      mailResult = await sendTrialActivationEmail({
+        to: rawEmail,
+        userName: user.name || 'Store Owner',
+        storeName: user.store_name || 'SarbaazSoft Shoe POS',
+        activationToken: verificationToken,
+        activationLink,
+        expiresAt,
+      });
+      if (!mailResult.delivered) {
+        console.error(`[authRoutes.ts] Resend-verification email delivery failed for ${rawEmail}:`, mailResult.error);
+      }
+    } catch (mailErr: any) {
+      console.error(`[authRoutes.ts] Exception resending verification email to ${rawEmail}:`, mailErr);
+      mailResult = {
+        delivered: false,
+        provider: 'resend' as const,
+        sandbox: true,
+        sandboxRecipient: undefined as string | undefined,
+        error: mailErr?.message || String(mailErr),
+      };
+    }
 
     return res.json({
       success: true,
@@ -1007,14 +1025,27 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
     }
     const resetLink = `${requestOrigin.replace(/\/+$/, '')}/?${resetParams.toString()}`;
 
-    const mailResult = await sendPasswordResetEmail({
-      to: user.email,
-      userName: user.name,
-      storeName,
-      resetToken,
-      resetLink,
-      expiresAt,
-    });
+    let mailResult: any;
+    try {
+      mailResult = await sendPasswordResetEmail({
+        to: user.email,
+        userName: user.name,
+        storeName,
+        resetToken,
+        resetLink,
+        expiresAt,
+      });
+      if (!mailResult.delivered) {
+        console.error(`[authRoutes.ts] Password reset email delivery failed for ${user.email}:`, mailResult.error);
+      }
+    } catch (mailErr: any) {
+      console.error(`[authRoutes.ts] Exception sending password reset email to ${user.email}:`, mailErr);
+      mailResult = {
+        delivered: false,
+        provider: 'resend',
+        error: mailErr?.message || String(mailErr),
+      };
+    }
 
     console.log(
       `📧 [Password Reset Email] To: ${user.email} | Provider: ${mailResult.provider} | Delivered: ${mailResult.delivered} | Link: ${resetLink}`
@@ -1047,7 +1078,7 @@ const handleSendPasswordResetLink = async (req: Request, res: Response) => {
 
     // Delivery failed or email service unconfigured (e.g. missing API key or unverified domain)
     // Soft error returned with instant verification token/link in Super Admin diagnostic logs so users are never permanently locked out
-    console.warn(`[Password Reset Delivery Issue] Email to ${user.email} could not be delivered: ${mailResult.error || 'Unknown error'}`);
+    console.error(`[Password Reset Delivery Issue] Email to ${user.email} could not be delivered:`, mailResult.error || 'Unknown error');
     console.info(`🔑 [SuperAdmin Diagnostic Log] Instant Verification / Password Reset Token for ${user.email}: ${resetToken} | Direct Link: ${resetLink}`);
     return res.json({
       success: true,

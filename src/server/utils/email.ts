@@ -86,7 +86,11 @@ export function resolveSenderAddress(
   const candidate = (
     customFrom ||
     settings?.RESEND_FROM ||
+    settings?.RESEND_FROM_EMAIL ||
     getCachedAppSetting('RESEND_FROM') ||
+    getCachedAppSetting('RESEND_FROM_EMAIL') ||
+    process.env.RESEND_FROM ||
+    process.env.RESEND_FROM_EMAIL ||
     DEFAULT_FROM_ADDRESS
   ).trim();
 
@@ -119,26 +123,41 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   // Always query app_settings dynamically directly from the database to guarantee the latest API key is used
   let apiKey = '';
   let resendFrom = '';
+  let resendFromEmail = '';
   let emailWebhookUrl = '';
   let resendWebhookUrl = '';
 
   try {
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT key, value FROM public.app_settings 
-       WHERE key IN ('RESEND_API_KEY', 'RESEND_FROM', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
+       WHERE key IN ('RESEND_API_KEY', 'RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
     );
     for (const row of res.rows) {
       if (row.key === 'RESEND_API_KEY') apiKey = (row.value || '').trim();
-      else if (row.key === 'RESEND_FROM') resendFrom = (row.value || '').trim();
+      else if (row.key === 'RESEND_FROM' && row.value?.trim()) resendFrom = row.value.trim();
+      else if (row.key === 'RESEND_FROM_EMAIL' && row.value?.trim()) resendFromEmail = row.value.trim();
       else if (row.key === 'EMAIL_WEBHOOK_URL') emailWebhookUrl = (row.value || '').trim();
       else if (row.key === 'RESEND_WEBHOOK_URL') resendWebhookUrl = (row.value || '').trim();
     }
-  } catch {
+  } catch (dbErr) {
+    console.error('[email.ts] Error querying app_settings table for email configuration:', dbErr);
     // In-memory cache fallback if DB query errors
     apiKey = (getCachedAppSetting('RESEND_API_KEY') || '').trim();
     resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
+    resendFromEmail = (getCachedAppSetting('RESEND_FROM_EMAIL') || '').trim();
     emailWebhookUrl = (getCachedAppSetting('EMAIL_WEBHOOK_URL') || '').trim();
     resendWebhookUrl = (getCachedAppSetting('RESEND_WEBHOOK_URL') || '').trim();
+  }
+
+  // Cross-fallback between RESEND_FROM and RESEND_FROM_EMAIL
+  if (!resendFrom && resendFromEmail) {
+    resendFrom = `SarbaazSoft Shoe POS Security <${resendFromEmail}>`;
+  }
+  if (!apiKey) {
+    apiKey = (process.env.RESEND_API_KEY || '').trim();
+  }
+  if (!resendFrom) {
+    resendFrom = (process.env.RESEND_FROM || process.env.RESEND_FROM_EMAIL || '').trim();
   }
 
   const rawFromCandidate = (
@@ -148,7 +167,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   ).trim();
 
   const parsedSender = parseSenderAddress(rawFromCandidate);
-  const fromAddress = parsedSender.resendFrom;
+  let fromAddress = parsedSender.resendFrom;
   const replyToAddress = opts.replyTo || parsedSender.replyTo;
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
 
@@ -156,6 +175,28 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   if (isValidResendApiKey(apiKey)) {
     try {
       const resend = new Resend(apiKey);
+
+      // Verify sender domain in Resend if using a custom non-resend domain
+      const senderDomain = parsedSender.email.split('@')[1]?.toLowerCase();
+      if (senderDomain && senderDomain !== 'resend.dev' && !parsedSender.isPublicWebmail) {
+        try {
+          const domainsRes = await resend.domains.list();
+          if (domainsRes && Array.isArray(domainsRes.data)) {
+            const domainEntry = domainsRes.data.find(
+              (d: any) => d.name?.toLowerCase() === senderDomain
+            );
+            if (!domainEntry || domainEntry.status !== 'verified') {
+              console.warn(
+                `[Resend Sender Domain Warning] Sender domain "${senderDomain}" is not verified in Resend (status: ${domainEntry?.status || 'unregistered'}). Proactively falling back to onboarding@resend.dev to ensure delivery.`
+              );
+              fromAddress = `${parsedSender.displayName} <onboarding@resend.dev>`;
+            }
+          }
+        } catch (domainCheckErr) {
+          console.warn('[Resend Domain Verification Notice] Could not query domain list from Resend API:', domainCheckErr);
+        }
+      }
+
       const payload: any = {
         from: fromAddress,
         to: recipients,
@@ -170,12 +211,13 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
 
       // Automatic fallback: If custom domain fails domain verification on Resend, retry once via onboarding@resend.dev
       if (error) {
-        const errorMsg = String(error.message || error || '');
-        const isDomainError = /domain.*not.*verified|domain_not_found|validation_error|cannot send from/i.test(errorMsg);
+        console.error('[Resend Error Sending Email]: Initial attempt failed:', error);
+        const errorMsg = String(error.message || (error as any)?.name || error || '');
+        const isDomainError = /domain.*not.*verified|domain_not_found|validation_error|cannot send from|invalid from address|verify a domain|unverified domain|not match any verified domain/i.test(errorMsg);
 
         if (isDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
           const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
-          console.warn(`[Resend Auto-Fallback] Custom domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
+          console.warn(`[Resend Auto-Fallback] Sender domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
 
           const retryPayload = {
             ...payload,
@@ -183,26 +225,31 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
             replyTo: replyToAddress,
           };
 
-          const retryResult = await resend.emails.send(retryPayload);
-          if (!retryResult.error) {
-            console.log(`[Resend Email Sent via Fallback] ID: ${retryResult.data?.id} | To: ${recipients.join(', ')} | From: ${fallbackFrom}`);
-            return {
-              delivered: true,
-              provider: 'resend',
-              messageId: retryResult.data?.id,
-            };
+          try {
+            const retryResult = await resend.emails.send(retryPayload);
+            if (!retryResult.error) {
+              console.log(`[Resend Email Sent via Fallback] ID: ${retryResult.data?.id} | To: ${recipients.join(', ')} | From: ${fallbackFrom}`);
+              return {
+                delivered: true,
+                provider: 'resend',
+                messageId: retryResult.data?.id,
+              };
+            }
+            console.error('[Resend Auto-Fallback Error]: Fallback attempt failed:', retryResult.error);
+            error = retryResult.error;
+          } catch (retryErr) {
+            console.error('[Resend Auto-Fallback Exception]:', retryErr);
+            error = retryErr as any;
           }
-          error = retryResult.error;
         }
 
         // Automatic fallback for Resend Sandbox / Testing mode:
         // When using a free/testing key without a verified custom domain, Resend enforces:
-        // "You can only send testing emails to your own email address (sarbaazsoft@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain."
-        const currentErrorMsg = String(error.message || error || '');
+        // "You can only send testing emails to your own email address (sarbaazsoft@gmail.com)."
+        const currentErrorMsg = String(error?.message || (error as any)?.name || error || '');
         const isTestingEmailRestriction = /only send testing emails to your own email address|testing emails to your own email/i.test(currentErrorMsg);
 
         if (isTestingEmailRestriction) {
-          // Extract the authorized developer/owner email provided by Resend
           const testEmailMatch = currentErrorMsg.match(/own email address \(([^)]+)\)/i);
           const authorizedTestEmail = (
             testEmailMatch?.[1] ||
@@ -239,27 +286,31 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
               replyTo: replyToAddress,
             };
 
-            const sandboxResult = await resend.emails.send(sandboxPayload);
-            if (!sandboxResult.error) {
-              console.info(
-                `[Resend Sandbox Delivered] ID: ${sandboxResult.data?.id} | Forwarded To: ${authorizedTestEmail} | Intended: ${recipients.join(', ')}`
-              );
-              return {
-                delivered: true,
-                provider: 'resend',
-                sandbox: true,
-                intendedRecipient: recipients.join(', '),
-                sandboxRecipient: authorizedTestEmail,
-                messageId: sandboxResult.data?.id,
-              };
-            } else {
-              console.warn(
-                `[Resend Sandbox Forward Notice] Could not re-route to ${authorizedTestEmail}: ${sandboxResult.error.message || sandboxResult.error}`
-              );
+            try {
+              const sandboxResult = await resend.emails.send(sandboxPayload);
+              if (!sandboxResult.error) {
+                console.info(
+                  `[Resend Sandbox Delivered] ID: ${sandboxResult.data?.id} | Forwarded To: ${authorizedTestEmail} | Intended: ${recipients.join(', ')}`
+                );
+                return {
+                  delivered: true,
+                  provider: 'resend',
+                  sandbox: true,
+                  intendedRecipient: recipients.join(', '),
+                  sandboxRecipient: authorizedTestEmail,
+                  messageId: sandboxResult.data?.id,
+                };
+              } else {
+                console.error(
+                  `[Resend Sandbox Forward Error] Could not re-route to ${authorizedTestEmail}:`,
+                  sandboxResult.error
+                );
+              }
+            } catch (sandboxErr) {
+              console.error('[Resend Sandbox Forward Exception]:', sandboxErr);
             }
           }
 
-          // If forwarding was skipped or failed, treat gracefully as simulated sandbox delivery
           console.warn(
             `[Resend Sandbox Handled] Delivery for ${recipients.join(', ')} handled in sandbox. Direct external delivery requires verified custom domain.`
           );
@@ -273,8 +324,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           };
         }
 
-        const sanitized = sanitizeError(error.message || error);
-        console.warn(`[Resend API Notice] Notice while sending email to ${recipients.join(', ')}: ${sanitized}`);
+        const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
+        console.error(`[Resend API Error] Failed to send email to ${recipients.join(', ')}:`, sanitized);
         return {
           delivered: false,
           provider: 'resend',
@@ -290,7 +341,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
       };
     } catch (err: any) {
       const sanitized = sanitizeError(err);
-      console.warn(`[Resend Exception] Error sending to ${recipients.join(', ')}: ${sanitized}`);
+      console.error(`[Resend Exception in sendEmail] Error sending to ${recipients.join(', ')}:`, err);
       return {
         delivered: false,
         provider: 'resend',
@@ -327,8 +378,9 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           provider: 'webhook',
         };
       }
+      console.error(`[Webhook Dispatch Error] Server returned ${resp.status} ${resp.statusText}`);
     } catch (whErr) {
-      console.warn('Webhook email dispatch notice:', whErr);
+      console.error('[Webhook Email Dispatch Exception]:', whErr);
     }
   }
 
@@ -336,6 +388,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     ? 'Email delivery unavailable: RESEND_API_KEY is not configured in app_settings.'
     : 'Email delivery unavailable: RESEND_API_KEY format is invalid (must start with re_ and be >= 20 characters).';
 
+  console.error('[sendEmail Error]:', unconfiguredMsg);
   return {
     delivered: false,
     provider: 'resend',
@@ -461,17 +514,26 @@ function buildResetEmailText(opts: SendResetEmailOptions): string {
 export async function sendPasswordResetEmail(
   opts: SendResetEmailOptions
 ): Promise<SendResetEmailResult> {
-  const subject = `Password Reset Token & Link — ${opts.storeName || 'SarbaazSoft Shoe POS'}`;
-  const html = buildResetEmailHtml(opts);
-  const text = buildResetEmailText(opts);
+  try {
+    const subject = `Password Reset Token & Link — ${opts.storeName || 'SarbaazSoft Shoe POS'}`;
+    const html = buildResetEmailHtml(opts);
+    const text = buildResetEmailText(opts);
 
-  return sendEmail({
-    to: opts.to,
-    subject,
-    html,
-    text,
-    tags: [{ name: 'category', value: 'password_reset' }],
-  });
+    return await sendEmail({
+      to: opts.to,
+      subject,
+      html,
+      text,
+      tags: [{ name: 'category', value: 'password_reset' }],
+    });
+  } catch (err: any) {
+    console.error(`[sendPasswordResetEmail Error] Failed to send reset email to ${opts.to}:`, err);
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: err?.message || String(err),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -561,17 +623,26 @@ function buildWelcomeEmailHtml(opts: SendWelcomeEmailOptions): string {
 export async function sendWelcomeEmail(
   opts: SendWelcomeEmailOptions
 ): Promise<SendWelcomeEmailResult> {
-  const subject = `Welcome to ${opts.storeName} — Your Store Workspace is Ready`;
-  const html = buildWelcomeEmailHtml(opts);
-  const text = `Welcome to ${opts.storeName}!\n\nHello ${opts.ownerName || opts.to},\n\n${opts.welcomeMessage}\n\nAccess your workspace at: ${opts.loginUrl}`;
+  try {
+    const subject = `Welcome to ${opts.storeName} — Your Store Workspace is Ready`;
+    const html = buildWelcomeEmailHtml(opts);
+    const text = `Welcome to ${opts.storeName}!\n\nHello ${opts.ownerName || opts.to},\n\n${opts.welcomeMessage}\n\nAccess your workspace at: ${opts.loginUrl}`;
 
-  return sendEmail({
-    to: opts.to,
-    subject,
-    html,
-    text,
-    tags: [{ name: 'category', value: 'store_welcome' }],
-  });
+    return await sendEmail({
+      to: opts.to,
+      subject,
+      html,
+      text,
+      tags: [{ name: 'category', value: 'store_welcome' }],
+    });
+  } catch (err: any) {
+    console.error(`[sendWelcomeEmail Error] Failed to send welcome email to ${opts.to}:`, err);
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: err?.message || String(err),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -664,17 +735,26 @@ function buildStaffWelcomeEmailHtml(opts: SendStaffWelcomeEmailOptions): string 
 export async function sendStaffWelcomeEmail(
   opts: SendStaffWelcomeEmailOptions
 ): Promise<SendStaffWelcomeEmailResult> {
-  const subject = `Your Staff Account at ${opts.storeName} is Ready`;
-  const html = buildStaffWelcomeEmailHtml(opts);
-  const text = `Staff Account Created — ${opts.storeName}\n\nHello ${opts.staffName},\n\nYou have been assigned the role: ${opts.role}.\nLogin Email: ${opts.loginEmail}\n${opts.initialPassword ? `Temporary Password: ${opts.initialPassword}\n` : ''}Sign in at: ${opts.loginUrl}`;
+  try {
+    const subject = `Your Staff Account at ${opts.storeName} is Ready`;
+    const html = buildStaffWelcomeEmailHtml(opts);
+    const text = `Staff Account Created — ${opts.storeName}\n\nHello ${opts.staffName},\n\nYou have been assigned the role: ${opts.role}.\nLogin Email: ${opts.loginEmail}\n${opts.initialPassword ? `Temporary Password: ${opts.initialPassword}\n` : ''}Sign in at: ${opts.loginUrl}`;
 
-  return sendEmail({
-    to: opts.to,
-    subject,
-    html,
-    text,
-    tags: [{ name: 'category', value: 'staff_invitation' }],
-  });
+    return await sendEmail({
+      to: opts.to,
+      subject,
+      html,
+      text,
+      tags: [{ name: 'category', value: 'staff_invitation' }],
+    });
+  } catch (err: any) {
+    console.error(`[sendStaffWelcomeEmail Error] Failed to send staff welcome email to ${opts.to}:`, err);
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: err?.message || String(err),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -693,10 +773,11 @@ export interface SendTrialActivationEmailOptions {
 export async function sendTrialActivationEmail(
   opts: SendTrialActivationEmailOptions
 ): Promise<SendEmailResult> {
-  const store = opts.storeName || 'SarbaazSoft Shoe POS';
-  const name = opts.userName || opts.to;
-  const subject = `Activate your Free Trial Store — ${store}`;
-  const html = `
+  try {
+    const store = opts.storeName || 'SarbaazSoft Shoe POS';
+    const name = opts.userName || opts.to;
+    const subject = `Activate your Free Trial Store — ${store}`;
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -749,15 +830,23 @@ export async function sendTrialActivationEmail(
 </html>
   `.trim();
 
-  const text = `Hello ${name}!\n\nPlease activate your free trial account on ${store} by opening the following link:\n\n${opts.activationLink}\n\nActivation Token: ${opts.activationToken}\n\nExpires in 24 hours.`;
+    const text = `Hello ${name}!\n\nPlease activate your free trial account on ${store} by opening the following link:\n\n${opts.activationLink}\n\nActivation Token: ${opts.activationToken}\n\nExpires in 24 hours.`;
 
-  return sendEmail({
-    to: opts.to,
-    subject,
-    html,
-    text,
-    tags: [{ name: 'category', value: 'free_trial_activation' }],
-  });
+    return await sendEmail({
+      to: opts.to,
+      subject,
+      html,
+      text,
+      tags: [{ name: 'category', value: 'free_trial_activation' }],
+    });
+  } catch (err: any) {
+    console.error(`[sendTrialActivationEmail Error] Failed to send activation email to ${opts.to}:`, err);
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: err?.message || String(err),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -779,18 +868,34 @@ export interface TestEmailDiagnostics {
 
 export async function testResendConfiguration(testRecipient?: string): Promise<TestEmailDiagnostics> {
   let resendFrom = '';
-  try {
-    const res = await pgClient.query<{ value: string }>(
-      "SELECT value FROM public.app_settings WHERE key = 'RESEND_FROM' LIMIT 1"
-    );
-    if (res.rows[0]?.value) {
-      resendFrom = res.rows[0].value.trim();
-    }
-  } catch {
-    resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
-  }
-  const rawFromCandidate = (resendFrom || DEFAULT_FROM_ADDRESS).trim();
+  let resendFromEmail = '';
 
+  try {
+    const res = await pgClient.query<{ key: string; value: string }>(
+      "SELECT key, value FROM public.app_settings WHERE key IN ('RESEND_FROM', 'RESEND_FROM_EMAIL')"
+    );
+    for (const row of res.rows) {
+      if (row.key === 'RESEND_FROM' && row.value?.trim()) {
+        resendFrom = row.value.trim();
+      } else if (row.key === 'RESEND_FROM_EMAIL' && row.value?.trim()) {
+        resendFromEmail = row.value.trim();
+      }
+    }
+  } catch (dbErr) {
+    console.error('[testResendConfiguration] Error querying app_settings table for sender email:', dbErr);
+    resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
+    resendFromEmail = (getCachedAppSetting('RESEND_FROM_EMAIL') || '').trim();
+  }
+
+  // Cross-fallback between RESEND_FROM and RESEND_FROM_EMAIL
+  if (!resendFrom && resendFromEmail) {
+    resendFrom = `SarbaazSoft Shoe POS Security <${resendFromEmail}>`;
+  }
+  if (!resendFrom) {
+    resendFrom = (process.env.RESEND_FROM || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_ADDRESS).trim();
+  }
+
+  const rawFromCandidate = (resendFrom || DEFAULT_FROM_ADDRESS).trim();
   const parsedSender = parseSenderAddress(rawFromCandidate);
   const targetRecipient = (testRecipient || parsedSender.email || 'sarbaazsoft@gmail.com').trim().toLowerCase();
 
@@ -816,29 +921,46 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
 </html>
   `.trim();
 
-  const result = await sendEmail({
-    to: targetRecipient,
-    subject,
-    html,
-    text: `SarbaazSoft Shoe POS Resend Test Email\n\nSent to: ${targetRecipient}\nFrom: ${parsedSender.resendFrom}\nTimestamp: ${timestamp}`,
-  });
+  try {
+    const result = await sendEmail({
+      to: targetRecipient,
+      subject,
+      html,
+      text: `SarbaazSoft Shoe POS Resend Test Email\n\nSent to: ${targetRecipient}\nFrom: ${parsedSender.resendFrom}\nTimestamp: ${timestamp}`,
+    });
 
-  const infoMsg = result.sandbox
-    ? `Email dispatched via Resend Sandbox (forwarded to verified testing address ${result.sandboxRecipient || 'sarbaazsoft@gmail.com'} for recipient ${targetRecipient}).`
-    : result.delivered
-    ? `Email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
-    : `Email delivery failed: ${result.error}`;
+    const infoMsg = result.sandbox
+      ? `Email dispatched via Resend Sandbox (forwarded to verified testing address ${result.sandboxRecipient || 'sarbaazsoft@gmail.com'} for recipient ${targetRecipient}).`
+      : result.delivered
+      ? `Email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
+      : `Email delivery failed: ${result.error}`;
 
-  return {
-    success: result.delivered,
-    delivered: result.delivered,
-    provider: result.provider,
-    messageId: result.messageId,
-    from: parsedSender.resendFrom,
-    to: targetRecipient,
-    error: result.error,
-    info: infoMsg,
-    sandbox: result.sandbox,
-    sandboxRecipient: result.sandboxRecipient,
-  };
+    if (!result.delivered) {
+      console.error(`[testResendConfiguration] Test email delivery failed for ${targetRecipient}:`, result.error);
+    }
+
+    return {
+      success: result.delivered,
+      delivered: result.delivered,
+      provider: result.provider,
+      messageId: result.messageId,
+      from: parsedSender.resendFrom,
+      to: targetRecipient,
+      error: result.error,
+      info: infoMsg,
+      sandbox: result.sandbox,
+      sandboxRecipient: result.sandboxRecipient,
+    };
+  } catch (err: any) {
+    console.error(`[testResendConfiguration Exception] Failed to send test email to ${targetRecipient}:`, err);
+    return {
+      success: false,
+      delivered: false,
+      provider: 'resend',
+      from: parsedSender.resendFrom,
+      to: targetRecipient,
+      error: err?.message || String(err),
+      info: `Test email exception: ${err?.message || String(err)}`,
+    };
+  }
 }

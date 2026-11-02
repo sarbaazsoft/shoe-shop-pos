@@ -367,6 +367,7 @@ const mockStore: Record<string, any[]> = {
     { key: 'PURCHASE_PREFIX', value: 'PUR-', category: 'billing', description: 'Default prefix for supplier purchase orders and stock receipts', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_API_KEY', value: '', category: 'email', description: 'Resend API Key for transactional emails', is_secret: true, updated_at: new Date().toISOString() },
     { key: 'RESEND_FROM', value: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>', category: 'email', description: 'Verified default sender address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'RESEND_FROM_EMAIL', value: 'onboarding@resend.dev', category: 'email', description: 'Sender email address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'EMAIL_WEBHOOK_URL', value: '', category: 'email', description: 'Custom webhook URL to receive outgoing email payloads', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_WEBHOOK_URL', value: '', category: 'email', description: 'Resend delivery webhook URL', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', value: 'true', category: 'email', description: 'Require email verification for new free trial registrations before access is activated', is_secret: false, updated_at: new Date().toISOString() },

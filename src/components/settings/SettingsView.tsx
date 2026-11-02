@@ -632,6 +632,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [appSettingsForm, setAppSettingsForm] = useState<Record<string, string>>({
     RESEND_API_KEY: '',
     RESEND_FROM: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>',
+    RESEND_FROM_EMAIL: 'onboarding@resend.dev',
     EMAIL_WEBHOOK_URL: '',
     RESEND_WEBHOOK_URL: '',
     REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL: 'true',
@@ -685,7 +686,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       const res = await api.settings.getAppSettings();
       if (res?.appSettings) {
-        setAppSettingsForm((prev) => ({ ...prev, ...res.appSettings }));
+        const emailFromEnvOrDb = res.appSettings.RESEND_FROM_EMAIL ||
+          (res.appSettings.RESEND_FROM?.match(/<([^>]+)>/)?.[1] || res.appSettings.RESEND_FROM || 'onboarding@resend.dev').trim();
+        const fullFrom = res.appSettings.RESEND_FROM || `SarbaazSoft Shoe POS Security <${emailFromEnvOrDb}>`;
+        setAppSettingsForm((prev) => ({
+          ...prev,
+          ...res.appSettings,
+          RESEND_FROM: fullFrom,
+          RESEND_FROM_EMAIL: emailFromEnvOrDb,
+        }));
       }
       if (res?.appSettingsGrouped) {
         setAppSettingsGrouped(res.appSettingsGrouped);
@@ -696,7 +705,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       try {
         const fullRes = await api.settings.get();
         if (fullRes?.appSettings) {
-          setAppSettingsForm((prev) => ({ ...prev, ...fullRes.appSettings }));
+          const emailFromEnvOrDb = fullRes.appSettings.RESEND_FROM_EMAIL ||
+            (fullRes.appSettings.RESEND_FROM?.match(/<([^>]+)>/)?.[1] || fullRes.appSettings.RESEND_FROM || 'onboarding@resend.dev').trim();
+          const fullFrom = fullRes.appSettings.RESEND_FROM || `SarbaazSoft Shoe POS Security <${emailFromEnvOrDb}>`;
+          setAppSettingsForm((prev) => ({
+            ...prev,
+            ...fullRes.appSettings,
+            RESEND_FROM: fullFrom,
+            RESEND_FROM_EMAIL: emailFromEnvOrDb,
+          }));
         }
         if (fullRes?.appSettingsGrouped) {
           setAppSettingsGrouped(fullRes.appSettingsGrouped);
@@ -716,10 +733,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setAppSettingsSuccess(false);
     setAppSettingsError(null);
     try {
-      const res = await api.settings.saveAppSettings(appSettingsForm);
+      const emailValue = (appSettingsForm.RESEND_FROM_EMAIL || '').trim() ||
+        (appSettingsForm.RESEND_FROM?.match(/<([^>]+)>/)?.[1] || appSettingsForm.RESEND_FROM || 'onboarding@resend.dev').trim();
+      const fromValue = (appSettingsForm.RESEND_FROM || '').trim() || `SarbaazSoft Shoe POS Security <${emailValue}>`;
+
+      const payload = {
+        ...appSettingsForm,
+        RESEND_FROM: fromValue,
+        RESEND_FROM_EMAIL: emailValue,
+      };
+
+      const res = await api.settings.saveAppSettings(payload);
       setAppSettingsSuccess(true);
       if (res?.appSettings) {
-        setAppSettingsForm((prev) => ({ ...prev, ...res.appSettings }));
+        setAppSettingsForm((prev) => ({
+          ...prev,
+          ...res.appSettings,
+          RESEND_FROM: res.appSettings.RESEND_FROM || fromValue,
+          RESEND_FROM_EMAIL: res.appSettings.RESEND_FROM_EMAIL || emailValue,
+        }));
       }
       setTimeout(() => setAppSettingsSuccess(false), 4500);
       onSettingsUpdated();
@@ -2699,17 +2731,54 @@ setFormErrors(errors);
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Verified Sender Address (RESEND_FROM)
+                    Sender Email Address (RESEND_FROM_EMAIL)
+                  </label>
+                  <input
+                    type="email"
+                    value={appSettingsForm.RESEND_FROM_EMAIL ?? ''}
+                    onChange={(e) => {
+                      const emailVal = e.target.value;
+                      setAppSettingsForm((prev) => {
+                        const prevFrom = prev.RESEND_FROM || '';
+                        const nameMatch = prevFrom.match(/^([^<]+)</);
+                        const displayName = nameMatch ? nameMatch[1].trim() : 'SarbaazSoft Shoe POS Security';
+                        return {
+                          ...prev,
+                          RESEND_FROM_EMAIL: emailVal,
+                          RESEND_FROM: emailVal ? `${displayName} <${emailVal.trim()}>` : prevFrom,
+                        };
+                      });
+                    }}
+                    placeholder="onboarding@resend.dev"
+                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                  />
+                  <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
+                    The raw sender email address. For testing without a verified custom domain, use <code>onboarding@resend.dev</code> (Resend sandbox default).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Verified Sender Header &amp; Display Name (RESEND_FROM)
                   </label>
                   <input
                     type="text"
                     value={appSettingsForm.RESEND_FROM ?? ''}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, RESEND_FROM: e.target.value }))}
+                    onChange={(e) => {
+                      const fromVal = e.target.value;
+                      const emailMatch = fromVal.match(/<([^>]+)>/);
+                      const emailVal = emailMatch ? emailMatch[1].trim() : (fromVal.includes('@') ? fromVal.trim() : '');
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        RESEND_FROM: fromVal,
+                        ...(emailVal ? { RESEND_FROM_EMAIL: emailVal } : {}),
+                      }));
+                    }}
                     placeholder="SarbaazSoft Shoe POS Security <onboarding@resend.dev>"
                     className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                   />
                   <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                    Stored in root database <code>app_settings</code>. If using a personal address (e.g. <code>@gmail.com</code>), the server automatically routes the envelope as <code>Display Name &lt;onboarding@resend.dev&gt;</code> with your address as Reply-To so Resend delivers without domain verification errors.
+                    Stored in root database <code>app_settings</code>. If using an unverified domain or personal webmail (e.g. <code>@gmail.com</code>), the server automatically safely routes via <code>Display Name &lt;onboarding@resend.dev&gt;</code> with your address in Reply-To.
                   </p>
                 </div>
 

@@ -495,6 +495,7 @@ router.post('/test-email', requireAuth, requireSuperAdmin, async (req: Authentic
       });
     }
 
+    console.error(`[settingsRoutes.ts] Test email failed to deliver to ${cleanRecipient}:`, diagnostics.error);
     return res.status(200).json({
       success: false,
       delivered: false,
@@ -502,6 +503,7 @@ router.post('/test-email', requireAuth, requireSuperAdmin, async (req: Authentic
       details: diagnostics,
     });
   } catch (err: any) {
+    console.error('[settingsRoutes.ts] Exception in /api/settings/test-email:', err);
     return res.status(500).json({
       success: false,
       delivered: false,
@@ -978,7 +980,7 @@ router.post('/users', requireAuth, requireAdmin, async (req: AuthenticatedReques
         origin,
       });
     } catch (notifErr: any) {
-      console.warn('Could not dispatch staff welcome notification/email:', notifErr?.message || notifErr);
+      console.error('[settingsRoutes.ts] Could not dispatch staff welcome notification/email:', notifErr?.message || notifErr);
     }
 
     res.status(201).json({

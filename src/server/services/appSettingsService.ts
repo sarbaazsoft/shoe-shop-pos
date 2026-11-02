@@ -43,6 +43,13 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     isSecret: false,
   },
   {
+    key: 'RESEND_FROM_EMAIL',
+    defaultValue: 'onboarding@resend.dev',
+    category: 'email',
+    description: 'Sender email address for Resend emails (RESEND_FROM_EMAIL)',
+    isSecret: false,
+  },
+  {
     key: 'EMAIL_WEBHOOK_URL',
     defaultValue: '',
     category: 'email',
@@ -210,56 +217,97 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
     await loadAppSettingsCache();
   }
   const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
-  const isEmailCategory = def?.category === 'email' || key.startsWith('RESEND_') || key.startsWith('EMAIL_');
 
   if (settingsCache.has(key)) {
     const cached = settingsCache.get(key)!;
-    if (cached !== '' || isEmailCategory) {
+    if (cached !== '') {
       return cached;
     }
   }
 
-  // Email configurations must NEVER read from static environment flags
-  if (isEmailCategory) {
-    if (key === 'RESEND_API_KEY') return '';
-    return fallback ?? def?.defaultValue ?? '';
+  // Cross-key fallback for sender address and email
+  if (key === 'RESEND_FROM' && settingsCache.has('RESEND_FROM_EMAIL')) {
+    const emailVal = settingsCache.get('RESEND_FROM_EMAIL')?.trim();
+    if (emailVal) {
+      return `SarbaazSoft Shoe POS Security <${emailVal}>`;
+    }
+  } else if (key === 'RESEND_FROM_EMAIL' && settingsCache.has('RESEND_FROM')) {
+    const fromVal = settingsCache.get('RESEND_FROM')?.trim() || '';
+    const match = fromVal.match(/<([^>]+)>/);
+    const emailVal = match ? match[1].trim() : fromVal;
+    if (emailVal && emailVal.includes('@')) {
+      return emailVal;
+    }
   }
 
+  // Environment variable fallback if not set in database
   const envVal = process.env[key]?.trim();
   if (envVal !== undefined && envVal !== '') {
     return envVal;
   }
+  if (key === 'RESEND_FROM_EMAIL') {
+    const altEnv = process.env.RESEND_FROM?.trim();
+    if (altEnv) {
+      const match = altEnv.match(/<([^>]+)>/);
+      return match ? match[1].trim() : altEnv;
+    }
+  } else if (key === 'RESEND_FROM') {
+    const altEnv = process.env.RESEND_FROM_EMAIL?.trim();
+    if (altEnv) {
+      return `SarbaazSoft Shoe POS Security <${altEnv}>`;
+    }
+  }
+
   return fallback ?? def?.defaultValue ?? '';
 }
 
 /**
  * Synchronous getter for hot paths (e.g. middleware, request headers).
  * If cache is loaded, returns the cached value from PostgreSQL app_settings.
- * Email configurations (RESEND_API_KEY, RESEND_FROM, etc.) are strictly read from app_settings, never from .env.
  */
 export function getCachedAppSetting(key: string, fallback?: string): string {
   const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
-  const isEmailCategory = def?.category === 'email' || key.startsWith('RESEND_') || key.startsWith('EMAIL_');
 
   if (settingsCache.has(key)) {
     const val = settingsCache.get(key)!;
-    if (val !== '' || isEmailCategory) return val;
+    if (val !== '') return val;
   }
   if (!cacheLoaded) {
-    // Initiate background load without awaiting
     loadAppSettingsCache().catch(() => {});
   }
 
-  // Email configurations must NEVER read from static environment flags
-  if (isEmailCategory) {
-    if (key === 'RESEND_API_KEY') return '';
-    return fallback ?? def?.defaultValue ?? '';
+  // Cross-key fallback for sender address and email
+  if (key === 'RESEND_FROM' && settingsCache.has('RESEND_FROM_EMAIL')) {
+    const emailVal = settingsCache.get('RESEND_FROM_EMAIL')?.trim();
+    if (emailVal) {
+      return `SarbaazSoft Shoe POS Security <${emailVal}>`;
+    }
+  } else if (key === 'RESEND_FROM_EMAIL' && settingsCache.has('RESEND_FROM')) {
+    const fromVal = settingsCache.get('RESEND_FROM')?.trim() || '';
+    const match = fromVal.match(/<([^>]+)>/);
+    const emailVal = match ? match[1].trim() : fromVal;
+    if (emailVal && emailVal.includes('@')) {
+      return emailVal;
+    }
   }
 
   const envVal = process.env[key]?.trim();
   if (envVal !== undefined && envVal !== '') {
     return envVal;
   }
+  if (key === 'RESEND_FROM_EMAIL') {
+    const altEnv = process.env.RESEND_FROM?.trim();
+    if (altEnv) {
+      const match = altEnv.match(/<([^>]+)>/);
+      return match ? match[1].trim() : altEnv;
+    }
+  } else if (key === 'RESEND_FROM') {
+    const altEnv = process.env.RESEND_FROM_EMAIL?.trim();
+    if (altEnv) {
+      return `SarbaazSoft Shoe POS Security <${altEnv}>`;
+    }
+  }
+
   return fallback ?? def?.defaultValue ?? '';
 }
 
@@ -364,6 +412,20 @@ export async function updateAppSettings(
   for (const [k, v] of Object.entries(updates)) {
     if (v === undefined || v === null) continue;
     cleanUpdates[k] = String(v).trim();
+  }
+
+  // Cross-synchronize sender address and sender email for Resend routines
+  if (cleanUpdates.RESEND_FROM && !cleanUpdates.RESEND_FROM_EMAIL) {
+    const match = cleanUpdates.RESEND_FROM.match(/<([^>]+)>/);
+    const emailVal = match ? match[1].trim() : cleanUpdates.RESEND_FROM.trim();
+    if (emailVal.includes('@')) {
+      cleanUpdates.RESEND_FROM_EMAIL = emailVal;
+    }
+  } else if (cleanUpdates.RESEND_FROM_EMAIL && (!cleanUpdates.RESEND_FROM || cleanUpdates.RESEND_FROM === 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>')) {
+    const emailVal = cleanUpdates.RESEND_FROM_EMAIL.trim();
+    if (emailVal.includes('@')) {
+      cleanUpdates.RESEND_FROM = `SarbaazSoft Shoe POS Security <${emailVal}>`;
+    }
   }
 
   for (const [key, value] of Object.entries(cleanUpdates)) {

@@ -2837,10 +2837,16 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
       req.body?.welcomeMsg ||
       `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
 
-    const welcomeResult = await sendWelcomeMsg(tenant.id, finalWelcomeMsg, finalEmail).catch((welcomeErr) => {
-      console.warn('sendWelcomeMsg notice during onboarding completion:', welcomeErr);
-      return null;
-    });
+    let welcomeResult: any = null;
+    try {
+      welcomeResult = await sendWelcomeMsg(tenant.id, finalWelcomeMsg, finalEmail);
+      if (welcomeResult && !welcomeResult.emailDelivered) {
+        console.error(`[tenantSaasRoutes.ts] Welcome email delivery failed for tenant ${tenant.id} (${finalEmail})`);
+      }
+    } catch (welcomeErr) {
+      console.error('[tenantSaasRoutes.ts] sendWelcomeMsg exception during onboarding completion:', welcomeErr);
+      welcomeResult = null;
+    }
 
     return res.json({
       success: true,
