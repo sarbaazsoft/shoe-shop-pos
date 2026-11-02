@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Building2, Plus, Search, Phone, Mail, Truck, Edit2, Trash2, X, FileText, DollarSign, AlertCircle, AlertTriangle, CreditCard, RefreshCw } from 'lucide-react';
+import { Building2, Plus, Search, Phone, Mail, Truck, Edit2, Trash2, X, FileText, DollarSign, AlertCircle, AlertTriangle, CreditCard, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
 import { SupplierReturnModal } from '../purchases/SupplierReturnModal.tsx';
@@ -10,7 +10,7 @@ import { SupplierLedgerModal } from './SupplierLedgerModal.tsx';
 import { supplierOpeningBalanceSchema } from '../../schemas/openingBalanceSchema.ts';
 import type { SupplierOpeningBalanceType } from '../../schemas/openingBalanceSchema.ts';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 
 interface SupplierManagementProps {
   currentUser: any;
@@ -116,6 +116,11 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
     e.preventDefault();
     if (!name.trim()) {
       setError('Supplier name is required.');
+      return;
+    }
+
+    if (phone.trim() && !isValidPhoneNumber(phone)) {
+      setError('Contact phone number must contain between 10 and 15 digits without a leading 0 right after a hyphen.');
       return;
     }
 
@@ -636,14 +641,33 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-purple-200 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +92 300 1122334"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400 font-mono text-xs transition"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700 dark:text-purple-200">Contact Phone</label>
+                    {phone && isValidPhoneNumber(phone) && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
+                        <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                        <span>Valid</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. +92 300 1122334"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                      className={`w-full px-3 py-2 rounded-xl font-mono text-xs outline-none transition ${
+                        phone && isValidPhoneNumber(phone)
+                          ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
+                          : 'border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400'
+                      }`}
+                    />
+                    {phone && isValidPhoneNumber(phone) && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>

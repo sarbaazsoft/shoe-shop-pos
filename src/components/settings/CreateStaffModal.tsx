@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, Phone, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield, ExternalLink, Terminal, Copy } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 
 interface CreateStaffModalProps {
   isOpen: boolean;
@@ -469,21 +469,44 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
 
                   {/* Phone */}
                   <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Contact Phone (Optional)
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                        Contact Phone (Optional)
+                      </label>
+                      {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
+                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({formData.phone.replace(/\D/g, '').length} digits)
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200 ${
+                        formData.phone && isValidPhoneNumber(formData.phone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
+                      }`}>
                         <Phone className="w-3.5 h-3.5" />
                       </div>
                       <input
-                        type="text"
-                        placeholder="+92 300 1234567"
+                        type="tel"
+                        placeholder="e.g. 0300-1234567 or +92-300-1234567"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#0F172A] border border-gray-300 dark:border-purple-500/30 rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs font-mono"
+                        onChange={(e) => setFormData({ ...formData, phone: formatPhoneNumber(e.target.value, formData.phone) })}
+                        className={`w-full pl-9 pr-9 py-2.5 bg-white dark:bg-[#0F172A] rounded-xl text-xs font-medium placeholder-slate-400 outline-none transition-all duration-200 shadow-2xs font-mono ${
+                          formData.phone && isValidPhoneNumber(formData.phone, 10, 15)
+                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
+                            : 'border border-gray-300 dark:border-purple-500/30 text-gray-900 dark:text-white focus:border-indigo-600 dark:focus:border-purple-400'
+                        }`}
                       />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                        {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        )}
+                      </div>
                     </div>
+                    {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

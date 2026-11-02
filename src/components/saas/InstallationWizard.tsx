@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, Phone, Server, ShieldCheck, Sparkles, User, UserRoundPlus, X } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api';
 import { PublicLayout } from '../common/PublicLayout';
-import { toTitleCaseLive } from '../../utils/textFormat';
+import { toTitleCaseLive, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
 
 interface InstallationWizardProps {
   onCompleted: (user?: any) => void;
@@ -70,9 +70,8 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
         setError("Enter the superadmin's phone / WhatsApp number.");
         return;
       }
-      const digits = cleanPhone.replace(/\D/g, '');
-      if (digits.length < 7 || digits.length > 15) {
-        setError('Enter a valid phone / WhatsApp number (7-15 digits, e.g. +923001234567 or +15550199).');
+      if (!isValidPhoneNumber(cleanPhone)) {
+        setError('Enter a valid phone / WhatsApp number (10 to 15 digits, without a leading 0 right after a hyphen).');
         return;
       }
       if (password.length < 8) {
@@ -295,22 +294,37 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                       <span>
                         Phone / WhatsApp <span className="text-rose-500 font-bold">*</span>
                       </span>
+                      {phone && isValidPhoneNumber(phone) && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>Valid phone</span>
+                        </span>
+                      )}
                     </span>
                     <div className="relative">
-                      <Phone className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                      <Phone className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors ${phone && isValidPhoneNumber(phone) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-purple-400'}`} />
                       <input
                         required
                         type="tel"
                         autoComplete="tel"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
                         placeholder="+92 300 1234567"
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono font-medium text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20"
+                        className={`w-full h-11 pl-10 pr-10 rounded-xl font-mono font-medium text-xs outline-none transition-all ${
+                          phone && isValidPhoneNumber(phone)
+                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
+                            : 'border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
+                        }`}
                       />
+                      {phone && isValidPhoneNumber(phone) && (
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                      <span>WhatsApp notifications &amp; recovery contact</span>
+                      <span>WhatsApp notifications &amp; recovery contact (10 to 15 digits)</span>
                     </p>
                   </label>
                 </div>

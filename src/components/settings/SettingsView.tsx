@@ -7,7 +7,7 @@ import { UserAvatar } from '../common/UserAvatar.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
@@ -1652,9 +1652,16 @@ setFormErrors(errors);
                   <span>
                     Company Phone <span className="text-rose-500 font-bold">*</span>
                   </span>
+                  {isValidPhoneNumber(formData.company_phone, 10, 15) && (
+                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({formData.company_phone.replace(/\D/g, '').length} digits)
+                    </span>
+                  )}
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                  <Phone className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
+                    isValidPhoneNumber(formData.company_phone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
+                  }`} />
                   <input
                     type="tel"
                     autoComplete="tel"
@@ -1667,16 +1674,28 @@ setFormErrors(errors);
                       }
                     }}
                     placeholder="e.g. 0321-1234567 or +92-321-1234567"
-                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 text-xs font-mono font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
+                    className={`w-full h-11 pl-10 pr-9 rounded-xl border text-xs font-mono font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all duration-200 ${
                       formErrors.company_phone
-                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10'
-                        : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10 text-rose-900 dark:text-rose-100'
+                        : isValidPhoneNumber(formData.company_phone, 10, 15)
+                        ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100 focus:border-emerald-600 focus:ring-emerald-500/30'
+                        : 'border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                     }`}
                     required
                   />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                    {isValidPhoneNumber(formData.company_phone, 10, 15) && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                    )}
+                  </div>
                 </div>
                 {formErrors.company_phone && (
                   <p className="text-rose-600 dark:text-rose-400 text-[11px] mt-1.5">{formErrors.company_phone}</p>
+                )}
+                {!formErrors.company_phone && isValidPhoneNumber(formData.company_phone, 10, 15) && (
+                  <p className="text-emerald-600 dark:text-emerald-400 text-[11px] mt-1.5 font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
+                  </p>
                 )}
               </div>
 

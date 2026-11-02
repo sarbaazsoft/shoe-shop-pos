@@ -601,14 +601,16 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                     {phone ? (
                       <span className="text-[11px] font-mono">
                         {isPhoneValid ? (
-                          <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                          <span className="text-emerald-500 font-semibold flex items-center gap-1 animate-in fade-in duration-200">
                             <Check className="w-3 h-3 stroke-[3]" /> Valid ({phoneDigits.length} digits)
                           </span>
                         ) : (
                           <span className="text-rose-500 font-medium">
-                            {phoneDigits.length < 7
-                              ? `Need min 7 digits (${phoneDigits.length}/7)`
-                              : 'Exceeds 15 digits'}
+                            {phoneDigits.length < 10
+                              ? `Need min 10 digits (${phoneDigits.length}/10)`
+                              : phoneDigits.length > 15
+                              ? 'Exceeds 15 digits'
+                              : 'Invalid format'}
                           </span>
                         )}
                       </span>
@@ -618,12 +620,14 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                           isDark ? 'text-slate-400' : 'text-slate-500'
                         }`}
                       >
-                        7 to 15 digits
+                        10 to 15 digits
                       </span>
                     )}
                   </div>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors duration-200 ${
+                      isPhoneValid ? 'text-emerald-500' : 'text-slate-400'
+                    }`}>
                       <Phone className="w-4 h-4" />
                     </div>
                     <input
@@ -643,27 +647,27 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
                       placeholder="e.g. 0321-1234567 or +92-300-1234567"
                       disabled={isLoading}
-                      className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                      className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition-all duration-200 focus:ring-2 ${
                         isDark
                           ? 'bg-[#151E33] text-white placeholder-slate-500'
                           : 'bg-white text-slate-900 placeholder-slate-400'
                       } ${
-                        touched.phone && !isPhoneValid
+                        isPhoneValid
+                          ? isDark
+                            ? 'border-2 border-emerald-500/90 bg-emerald-950/25 ring-2 ring-emerald-500/25 focus:border-emerald-400 focus:ring-emerald-500/30'
+                            : 'border-2 border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/25 focus:border-emerald-600 focus:ring-emerald-500/30'
+                          : touched.phone && !isPhoneValid
                           ? isDark
                             ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
                             : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
-                          : touched.phone && isPhoneValid
-                          ? isDark
-                            ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
-                            : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
                           : isDark
                           ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
                           : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
                       }`}
                     />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      {touched.phone && isPhoneValid && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                      {isPhoneValid && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                       )}
                       {touched.phone && !isPhoneValid && (
                         <AlertCircle className="w-4 h-4 text-rose-500" />
@@ -682,8 +686,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       </span>
                     </div>
                   )}
-                  {touched.phone && isPhoneValid && (
-                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium">
+                  {isPhoneValid && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium animate-in fade-in duration-200">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                       <span>Phone format verified ({phoneDigits.length} digits). Hyphens added automatically.</span>
                     </div>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Building2, UserCheck, UserPlus, Phone, Mail, X, Check, Calendar, CornerDownLeft, ArrowUp, ArrowDown, Sparkles, AlertCircle, Wallet } from 'lucide-react';
+import { Search, Building2, UserCheck, UserPlus, Phone, Mail, X, Check, Calendar, CornerDownLeft, ArrowUp, ArrowDown, Sparkles, AlertCircle, Wallet, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import type { Supplier } from '../../types.ts';
 
 interface SupplierPickerProps {
@@ -378,6 +378,11 @@ export const SupplierPicker: React.FC<SupplierPickerProps> = ({
       return;
     }
 
+    if (newSupplierPhone.trim() && !isValidPhoneNumber(newSupplierPhone)) {
+      setCreateError('Phone number must contain between 10 and 15 digits without a leading 0 right after a hyphen.');
+      return;
+    }
+
     setIsCreatingSupplier(true);
     try {
       const res = await api.suppliers.create({
@@ -577,13 +582,24 @@ export const SupplierPicker: React.FC<SupplierPickerProps> = ({
               className="capitalize app-input w-full px-3 py-2 text-xs"
               autoFocus
             />
-            <input
-              type="tel"
-              placeholder="Mobile / Phone (optional)"
-              value={newSupplierPhone}
-              onChange={(e) => setNewSupplierPhone(e.target.value)}
-              className="app-input w-full px-3 py-2 text-xs font-mono"
-            />
+            <div className="relative">
+              <input
+                type="tel"
+                placeholder="Mobile / Phone (optional)"
+                value={newSupplierPhone}
+                onChange={(e) => setNewSupplierPhone(formatPhoneNumber(e.target.value))}
+                className={`app-input w-full px-3 py-2 text-xs font-mono transition ${
+                  newSupplierPhone && isValidPhoneNumber(newSupplierPhone)
+                    ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-8'
+                    : ''
+                }`}
+              />
+              {newSupplierPhone && isValidPhoneNumber(newSupplierPhone) && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              )}
+            </div>
             <input
               type="email"
               placeholder="Email Address (optional)"
@@ -953,16 +969,35 @@ export const SupplierPicker: React.FC<SupplierPickerProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                      Phone / Mobile Number (Optional)
-                    </label>
-                    <input
-                      type="tel"
-                      value={newSupplierPhone}
-                      onChange={(e) => setNewSupplierPhone(e.target.value)}
-                      placeholder="e.g. +92 300 1234567"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white border border-slate-200 dark:border-purple-800/60 rounded-xl outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono font-medium text-xs"
-                    />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                        Phone / Mobile Number (Optional)
+                      </label>
+                      {newSupplierPhone && isValidPhoneNumber(newSupplierPhone) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                          <span>Valid</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        value={newSupplierPhone}
+                        onChange={(e) => setNewSupplierPhone(formatPhoneNumber(e.target.value))}
+                        placeholder="e.g. +92 300 1234567"
+                        className={`w-full px-3.5 py-2.5 rounded-xl font-mono font-medium text-xs outline-none transition ${
+                          newSupplierPhone && isValidPhoneNumber(newSupplierPhone)
+                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
+                            : 'bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white border border-slate-200 dark:border-purple-800/60 focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500'
+                        }`}
+                      />
+                      {newSupplierPhone && isValidPhoneNumber(newSupplierPhone) && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="sm:col-span-2">
