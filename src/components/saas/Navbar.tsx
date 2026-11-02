@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, X, Sun, Moon, LogIn, ArrowRight } from 'lucide-react';
+import { Menu, X, Sun, Moon, Monitor, LogIn, ArrowRight } from 'lucide-react';
 import { ShoeIcon } from '../common/ShoeIcon.tsx';
+import { ThemeDropdown } from '../common/ThemeDropdown.tsx';
+import { useTheme } from '../../context/ThemeContext.tsx';
 
 export interface NavItem {
   key: string;
@@ -14,8 +16,8 @@ export interface NavbarProps {
   onNavigate: (section: string, navKey: any) => void;
   onLogin: () => void;
   onStartFreeTrial: () => void;
-  landingTheme: 'light' | 'dark';
-  onToggleTheme: () => void;
+  landingTheme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,7 +30,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isDark = landingTheme === 'dark';
+  const { theme, themeMode, setThemeMode } = useTheme();
+  const isDark = (landingTheme || theme) === 'dark';
 
   const handleNavClick = (section: string, key: string) => {
     setMobileMenuOpen(false);
@@ -107,16 +110,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* DESKTOP & MOBILE RIGHT ACTIONS */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Theme Mode Toggle (Sun/Moon) */}
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              className="p-2 rounded-xl border border-indigo-400/30 lt:border-slate-300 bg-indigo-950/40 lt:bg-slate-100 text-yellow-300 lt:text-slate-700 hover:scale-105 transition-all cursor-pointer"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              aria-label="Toggle color theme"
-            >
-              {isDark ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-            </button>
+            {/* 3-Way Theme Dropdown (Light, Dark, System) matching store header */}
+            <ThemeDropdown
+              id="navbar-theme-dropdown-trigger"
+              dropdownAlign="right"
+              showLabel={true}
+            />
 
             {/* Desktop-only action buttons */}
             <div className="hidden md:flex items-center gap-2.5">
@@ -164,6 +163,56 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })}
           </nav>
+
+          {/* Mobile Theme Preference Selector */}
+          <div className="pt-2 border-t border-indigo-900/30 lt:border-slate-200">
+            <div className="flex items-center justify-between px-3 py-1.5 mb-1.5">
+              <span className="text-[11px] font-bold text-slate-300 lt:text-slate-700 uppercase tracking-wider">
+                Theme Preference
+              </span>
+              <span className="text-[10px] font-semibold text-purple-400 lt:text-purple-600 bg-purple-500/10 lt:bg-purple-50 px-2 py-0.5 rounded-full border border-purple-400/30 lt:border-purple-200 capitalize">
+                {themeMode}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => setThemeMode('light')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+                  themeMode === 'light'
+                    ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25'
+                    : 'bg-indigo-950/40 lt:bg-slate-100 text-slate-300 lt:text-slate-700 border-indigo-400/20 lt:border-slate-200 hover:text-white lt:hover:text-slate-900'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setThemeMode('dark')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+                  themeMode === 'dark'
+                    ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25'
+                    : 'bg-indigo-950/40 lt:bg-slate-100 text-slate-300 lt:text-slate-700 border-indigo-400/20 lt:border-slate-200 hover:text-white lt:hover:text-slate-900'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5" />
+                <span>Dark</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setThemeMode('system')}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+                  themeMode === 'system'
+                    ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25'
+                    : 'bg-indigo-950/40 lt:bg-slate-100 text-slate-300 lt:text-slate-700 border-indigo-400/20 lt:border-slate-200 hover:text-white lt:hover:text-slate-900'
+                }`}
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>System</span>
+              </button>
+            </div>
+          </div>
 
           <div className="pt-2 border-t border-indigo-900/30 lt:border-slate-200 flex flex-col gap-2.5">
             <button

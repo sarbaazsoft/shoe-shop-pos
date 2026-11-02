@@ -330,22 +330,22 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const statsSectionRef = useRef<HTMLElement>(null);
   const storesSwiperRef = useRef<HTMLDivElement>(null);
   const swiperInstanceRef = useRef<any>(null);
-  const { setThemeMode } = useTheme();
-  const [landingTheme, setLandingTheme] = useState<'dark' | 'light'>(() => {
+  const { theme, themeMode, setThemeMode } = useTheme();
+  const landingTheme = theme;
+
+  useEffect(() => {
     try {
-      return localStorage.getItem('pos_landing_theme') === 'light' ? 'light' : 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
-  const toggleLandingTheme = () => {
-    const next = landingTheme === 'dark' ? 'light' : 'dark';
-    try {
-      localStorage.setItem('pos_landing_theme', next);
+      localStorage.setItem('pos_landing_theme', theme);
     } catch {}
-    setLandingTheme(next);
+  }, [theme]);
+
+  const toggleLandingTheme = () => {
+    const nextMode = theme === 'dark' ? 'light' : 'dark';
     try {
-      setThemeMode(next);
+      localStorage.setItem('pos_landing_theme', nextMode);
+    } catch {}
+    try {
+      setThemeMode(nextMode);
     } catch {}
   };
 
