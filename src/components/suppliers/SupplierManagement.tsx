@@ -652,7 +652,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
                   </div>
                   <div className="relative">
                     <input
-                      type="text"
+                      type="tel"
+                      autoComplete="tel"
                       placeholder="e.g. +92 300 1122334"
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
