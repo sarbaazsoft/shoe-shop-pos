@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, X, Sun, Moon, LogIn, ArrowRight, Store } from 'lucide-react';
+import { Menu, X, Sun, Moon, LogIn, ArrowRight } from 'lucide-react';
+import { ShoeIcon } from '../common/ShoeIcon.tsx';
 
 export interface NavItem {
   key: string;
@@ -67,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="SarbaazSoft Shoe POS Home"
             >
               <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform group-hover:scale-105">
-                <Store className="w-4.5 h-4.5 stroke-[2.2]" />
+                <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">

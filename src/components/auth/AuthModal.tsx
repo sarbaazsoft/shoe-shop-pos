@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Fingerprint, Store, ArrowRight, ArrowLeft } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
+import { ShoeIcon } from '../common/ShoeIcon.tsx';
 import { ShowroomBackground } from '../common/ShowroomBackground.tsx';
 import { PublicHeader } from '../common/PublicHeader.tsx';
 import { PublicFooter } from '../common/PublicFooter.tsx';
@@ -356,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Store Icon Header */}
               <div className="text-center mb-6">
                 <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 dark:border-purple-400/50">
-                  <Store className="w-6 h-6" />
+                  <ShoeIcon className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <div
                   id="auth-card-heading"
