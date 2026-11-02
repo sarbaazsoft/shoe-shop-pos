@@ -7,6 +7,7 @@ import { InstallAppModal } from '../common/InstallAppModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface UserProfileModalProps {
@@ -698,9 +699,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {/* New Password */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  <span className="flex items-center space-x-1.5">
-                    <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>New Password *</span>
+                  <span className="flex items-center justify-between">
+                    <span className="flex items-center space-x-1.5">
+                      <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>New Password *</span>
+                    </span>
+                    <PasswordRequirementsTooltip minChars={6} password={newPassword} />
                   </span>
                 </label>
                 <div className="relative">
@@ -709,7 +713,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     type={showNewPassword ? 'text' : 'password'}
                     required
                     minLength={6}
-                    placeholder="At least 6 characters"
+                    placeholder="Enter new password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className={`w-full pl-3.5 pr-16 py-2.5 bg-white dark:bg-slate-950/60 border rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition ${

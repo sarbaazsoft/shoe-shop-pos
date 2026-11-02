@@ -23,7 +23,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   storeName = 'SarbaazSoft Shoe POS',
   badgeText = 'Terminal Online',
   badgeVariant = 'online',
-  subtitle = 'Multi-Tenant Shoe POS & Inventory',
+  subtitle = 'Multi-tenant shoe shop POS',
   dbText = 'Cloud Synced',
   actionText,
   actionIcon,

@@ -17,6 +17,7 @@ import { CustomerPicker } from './CustomerPicker.tsx';
 import { PosToast, type PosToastNotification } from './PosToast.tsx';
 import { CartQuantityInput } from './CartQuantityInput.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 export interface CartItem {
@@ -2835,7 +2836,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Admin Password</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-medium text-slate-700 dark:text-slate-300">Admin Password</label>
+                    <PasswordRequirementsTooltip minChars={6} password={overrideAdminPassword} />
+                  </div>
                   <div className="relative">
                     <input
                       type={showOverridePassword ? 'text' : 'password'}

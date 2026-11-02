@@ -21,6 +21,7 @@ import { api, setAuthSession } from '../../services/api.ts';
 import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface FreeTrialOnboardingModalProps {
@@ -714,13 +715,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                             >
                               Owner Password <span className="text-purple-500">*</span>
                             </label>
-                            <span
-                              className={`text-[10px] font-mono ${
-                                isDark ? 'text-slate-400' : 'text-slate-500'
-                              }`}
-                            >
-                              Min 6 chars
-                            </span>
+                            <PasswordRequirementsTooltip minChars={6} password={password} />
                           </div>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -737,7 +732,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                                 if (errorMessage) setErrorMessage(null);
                               }}
                               onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-                              placeholder="At least 6 characters"
+                              placeholder="Enter password"
                               disabled={isLoading}
                               className={`w-full pl-10 pr-16 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
                                 isDark

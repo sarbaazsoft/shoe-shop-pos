@@ -5,6 +5,7 @@ import { api, setAuthSession } from '../../services/api';
 import { PublicLayout } from '../common/PublicLayout';
 import { toTitleCaseLive, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 
 interface InstallationWizardProps {
@@ -340,7 +341,7 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                     <span>2. Security &amp; Password Credentials</span>
                   </h5>
                   <span className="text-[10px] text-purple-600 dark:text-purple-300 font-semibold bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800">
-                    Step 2 of 2 • Min 8 Chars
+                    Step 2 of 2
                   </span>
                 </div>
 
@@ -358,6 +359,7 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                             <span>
                               Password <span className="text-rose-500 font-bold">*</span>
                             </span>
+                            <PasswordRequirementsTooltip minChars={8} password={password} />
                           </span>
                           <div className="relative">
                             <Lock className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -368,7 +370,7 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                               autoComplete="new-password"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              placeholder="At least 8 characters"
+                              placeholder="Enter master password"
                               className={`w-full h-11 pl-10 pr-16 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
                                 password
                                   ? strength.borderColorClass
@@ -391,10 +393,6 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                               </button>
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
-                            <KeyRound className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
-                            <span>Minimum 8 characters required</span>
-                          </p>
                         </label>
 
                         {/* Confirm password */}

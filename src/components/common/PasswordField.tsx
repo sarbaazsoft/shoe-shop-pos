@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from './PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength, type PasswordStrengthResult } from '../../utils/passwordStrength.ts';
 
 export interface PasswordFieldProps {
@@ -39,7 +40,6 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
   disabled = false,
   minChars = 8,
   showStrengthIndicator = false,
-  showChecklist = true,
   compactStrength = false,
   helperText,
   className = '',
@@ -49,7 +49,7 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
   onStrengthChange,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [_isFocused, setIsFocused] = useState(false);
 
   const strength = evaluatePasswordStrength(value, minChars);
 
@@ -71,9 +71,14 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
     <div className={`w-full ${className}`}>
       {label && (
         <div className="flex items-center justify-between mb-1.5">
-          <label htmlFor={id} className="text-xs font-bold text-slate-700 dark:text-slate-300">
-            {label}
-          </label>
+          <div className="flex items-center gap-1.5">
+            <label htmlFor={id} className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              {label}
+            </label>
+            {!isConfirmation && (
+              <PasswordRequirementsTooltip minChars={minChars} password={value} />
+            )}
+          </div>
           {isConfirmation && value.length > 0 && (
             <span
               className={`text-[11px] font-semibold flex items-center gap-1 ${
@@ -117,13 +122,17 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
           className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-16 transition outline-none text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 ${dynamicBorderClass} ${inputClassName}`}
         />
 
-        {/* Right side icon grouping: Success feedback icon & Toggle Password Eye */}
+        {/* Right side icon grouping: Info Tooltip (if no label) + Success feedback icon & Toggle Password Eye */}
         <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
-          {/* Success icon feedback when Strong */}
+          {!label && !isConfirmation && (
+            <PasswordRequirementsTooltip minChars={minChars} password={value} />
+          )}
+
+          {/* Success icon feedback when Strong or Very Strong */}
           {!isConfirmation && strength.isStrong && (
             <div
               className="flex items-center text-emerald-500 animate-in fade-in zoom-in duration-200"
-              title="Strong Password Verified"
+              title={strength.level === 'very-strong' ? 'Very Strong Password Verified' : 'Strong Password Verified'}
             >
               <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
             </div>
@@ -166,12 +175,11 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{helperText}</p>
       )}
 
-      {/* Real-time Strength Indicator */}
+      {/* Real-time Strength Indicator (Meter Only, Weak–Very Strong) */}
       {showStrengthIndicator && (
         <PasswordStrengthIndicator
           password={value}
           minChars={minChars}
-          showChecklist={showChecklist}
           compact={compactStrength}
           onStrengthChange={onStrengthChange}
         />

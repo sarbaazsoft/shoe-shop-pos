@@ -4,19 +4,19 @@ export interface PasswordRequirement {
   met: boolean;
 }
 
-export type PasswordStrengthLevel = 'none' | 'weak' | 'medium' | 'strong';
+export type PasswordStrengthLevel = 'none' | 'weak' | 'medium' | 'strong' | 'very-strong';
 
 export interface PasswordStrengthResult {
   score: number; // 0 to 4
   level: PasswordStrengthLevel;
-  label: 'Weak' | 'Medium' | 'Strong' | '';
+  label: 'Weak' | 'Medium' | 'Strong' | 'Very Strong' | '';
   color: 'rose' | 'amber' | 'emerald' | 'slate';
   textColor: string;
   bgColor: string;
   borderColorClass: string;
   barColor: string;
   requirements: PasswordRequirement[];
-  percent: number; // 0, 33, 66, 100
+  percent: number; // 0, 25, 50, 75, 100
   isStrong: boolean;
   isValid: boolean;
 }
@@ -66,27 +66,33 @@ export function evaluatePasswordStrength(
     { id: 'symbol', label: 'At least one special character (!@#$%...)', met: hasSpecial },
   ];
 
-  let score = 0;
-  if (hasMinLength) score += 1;
-  if (hasCasing) score += 1;
-  if (hasNumber) score += 1;
-  if (hasSpecial) score += 1;
+  let rawScore = 0;
+  if (hasMinLength) rawScore += 1;
+  if (hasCasing) rawScore += 1;
+  if (hasNumber) rawScore += 1;
+  if (hasSpecial) rawScore += 1;
 
-  // Extra credit if lengthy (>= 12 chars) with at least 2 other conditions
-  if (safePassword.length >= 12 && score >= 2) {
-    score = Math.max(score, 3);
-  }
-
+  let score = rawScore;
   let level: PasswordStrengthLevel = 'weak';
-  let label: 'Weak' | 'Medium' | 'Strong' = 'Weak';
+  let label: 'Weak' | 'Medium' | 'Strong' | 'Very Strong' = 'Weak';
   let color: 'rose' | 'amber' | 'emerald' = 'rose';
   let textColor = 'text-rose-600 dark:text-rose-400';
   let bgColor = 'bg-rose-50 dark:bg-rose-950/40';
   let borderColorClass = 'password-border-weak border-rose-500 dark:border-rose-500';
   let barColor = 'bg-rose-500';
-  let percent = 33;
+  let percent = 25;
 
-  if (score >= 4 || (score === 3 && safePassword.length >= 10)) {
+  if (rawScore === 4 && (safePassword.length >= minChars + 2 || (hasSpecial && hasNumber && hasCasing))) {
+    level = 'very-strong';
+    label = 'Very Strong';
+    color = 'emerald';
+    textColor = 'text-emerald-700 dark:text-emerald-300 font-bold';
+    bgColor = 'bg-emerald-100 dark:bg-emerald-950/60';
+    borderColorClass = 'password-border-strong border-emerald-600 dark:border-emerald-400';
+    barColor = 'bg-emerald-600';
+    percent = 100;
+    score = 4;
+  } else if (rawScore >= 3 || (rawScore >= 2 && safePassword.length >= minChars + 2)) {
     level = 'strong';
     label = 'Strong';
     color = 'emerald';
@@ -94,8 +100,9 @@ export function evaluatePasswordStrength(
     bgColor = 'bg-emerald-50 dark:bg-emerald-950/40';
     borderColorClass = 'password-border-strong border-emerald-500 dark:border-emerald-500';
     barColor = 'bg-emerald-500';
-    percent = 100;
-  } else if (score >= 2 && safePassword.length >= 6) {
+    percent = 75;
+    score = 3;
+  } else if (rawScore >= 2 || (hasMinLength && safePassword.length >= 6)) {
     level = 'medium';
     label = 'Medium';
     color = 'amber';
@@ -103,7 +110,8 @@ export function evaluatePasswordStrength(
     bgColor = 'bg-amber-50 dark:bg-amber-950/40';
     borderColorClass = 'password-border-medium border-amber-500 dark:border-amber-500';
     barColor = 'bg-amber-500';
-    percent = 66;
+    percent = 50;
+    score = 2;
   } else {
     level = 'weak';
     label = 'Weak';
@@ -112,7 +120,8 @@ export function evaluatePasswordStrength(
     bgColor = 'bg-rose-50 dark:bg-rose-950/40';
     borderColorClass = 'password-border-weak border-rose-500 dark:border-rose-500';
     barColor = 'bg-rose-500';
-    percent = 33;
+    percent = 25;
+    score = Math.max(1, rawScore);
   }
 
   return {
@@ -126,7 +135,7 @@ export function evaluatePasswordStrength(
     barColor,
     requirements,
     percent,
-    isStrong: level === 'strong',
+    isStrong: level === 'strong' || level === 'very-strong',
     isValid: safePassword.length >= (minChars >= 8 ? 6 : minChars),
   };
 }

@@ -4,6 +4,7 @@ import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, U
 import { api } from '../../services/api.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface CreateStaffModalProps {
@@ -692,9 +693,6 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                     <Lock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                     <span>Login Password</span>
                   </h5>
-                  <span className="text-[10px] text-purple-600 dark:text-purple-300 font-semibold bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800">
-                    Min 6 Characters
-                  </span>
                 </div>
 
                 {(() => {
@@ -707,9 +705,12 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Password */}
                         <div>
-                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                            Account Password <span className="text-red-500 dark:text-pink-400">*</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                              Account Password <span className="text-red-500 dark:text-pink-400">*</span>
+                            </label>
+                            <PasswordRequirementsTooltip minChars={6} password={formData.password} />
+                          </div>
                           <div className="relative">
                             <input
                               type={showPassword ? 'text' : 'password'}

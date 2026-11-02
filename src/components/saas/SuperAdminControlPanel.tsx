@@ -18,6 +18,7 @@ import { SettingsView } from '../settings/SettingsView';
 import { useTheme } from '../../context/ThemeContext';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
@@ -1149,31 +1150,19 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           placeholder="••••••••"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-16 transition outline-none ${
-                            password
-                              ? evaluatePasswordStrength(password, { minChars: 6 }).borderColorClass
-                              : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
-                          }`}
+                          className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-12 transition outline-none"
                         />
-                        <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center space-x-1.5">
-                          {password && evaluatePasswordStrength(password, { minChars: 6 }).isStrong && (
-                            <span title="Strong password">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
-                            </span>
-                          )}
+                        <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center">
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                            className="p-1 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
                             title={showPassword ? 'Hide password' : 'Show password'}
                           >
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
-                      {password && (
-                        <PasswordStrengthIndicator password={password} minChars={6} showChecklist={false} />
-                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -1283,9 +1272,12 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        New Password
-                      </label>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          New Password
+                        </label>
+                        <PasswordRequirementsTooltip minChars={6} password={newPassword} />
+                      </div>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
                           <Lock className="w-4 h-4" />
@@ -1293,7 +1285,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                         <input
                           type={showResetPassword ? 'text' : 'password'}
                           required
-                          placeholder="Enter new password (min 6 characters)"
+                          placeholder="Enter new password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-16 outline-none font-medium transition ${
@@ -5327,9 +5319,12 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Password */}
                         <div>
-                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                            Password <span className="text-red-500 dark:text-pink-400">*</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                              Password <span className="text-red-500 dark:text-pink-400">*</span>
+                            </label>
+                            <PasswordRequirementsTooltip minChars={6} password={newOwnerPassword} />
+                          </div>
                           <div className="relative">
                             <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input

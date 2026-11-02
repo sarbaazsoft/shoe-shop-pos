@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Sun, Moon, LogIn, ArrowRight } from 'lucide-react';
-import { BrandLogo } from '../common/BrandLogo';
+import { Menu, X, Sun, Moon, LogIn, ArrowRight, Store } from 'lucide-react';
 
 export interface NavItem {
   key: string;
@@ -44,9 +43,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md border-b border-indigo-900/30 lt:border-slate-200 bg-[#070A24]/85 lt:bg-white/90 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
           {/* MOBILE VIEWPORT: Hamburger on Left */}
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center md:hidden shrink-0">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -58,24 +57,29 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* BRAND LOGO & TITLE:
-              Mobile: Centered with reduced sizing.
-              Desktop: Left-aligned with standard spacing. */}
-          <div className="flex items-center md:flex-none">
+          {/* BRAND LOGO, TITLE & SUBTITLE:
+              Matches and aligns identically with the auth route header styling */}
+          <div className="flex items-center min-w-0 md:flex-none">
             <button
               type="button"
               onClick={() => handleNavClick('top', 'home')}
-              className="flex items-center gap-2 sm:gap-2.5 text-left select-none group cursor-pointer"
+              className="flex items-center gap-2.5 sm:gap-3 text-left select-none group cursor-pointer min-w-0"
+              aria-label="SarbaazSoft Shoe POS Home"
             >
-              <BrandLogo
-                logo="/pwa-192x192.png"
-                name="SarbaazSoft POS"
-                size="sm"
-                className="transition-transform group-hover:scale-105"
-              />
-              <span className="font-montserrat font-extrabold text-sm sm:text-lg tracking-tight text-white lt:text-slate-900 truncate">
-                SarbaazSoft <span className="text-[#8B7CFF] lt:text-[#5B4BFF]">POS</span>
-              </span>
+              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform group-hover:scale-105">
+                <Store className="w-4.5 h-4.5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white lt:text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
+                    SarbaazSoft Shoe POS
+                  </span>
+                </div>
+                <span className="text-[11px] sm:text-xs text-slate-300/80 lt:text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5">
+                  <span className="text-purple-400 lt:text-purple-600 dark:text-purple-400">👟</span>
+                  <span>Multi-tenant shoe shop POS</span>
+                </span>
+              </div>
             </button>
           </div>
 

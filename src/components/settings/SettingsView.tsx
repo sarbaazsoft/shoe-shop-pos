@@ -10,6 +10,7 @@ import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface SettingsViewProps {
@@ -3379,11 +3380,14 @@ setFormErrors(errors);
               </div>
             ) : (
               <form onSubmit={handleUnlockInstaller} className="space-y-3 max-w-xl">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <span>Authorizing account:</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {currentUser?.email || 'Store Owner (admin@shoepos.com)'}
-                  </span>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span>Authorizing account:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {currentUser?.email || 'Store Owner (admin@shoepos.com)'}
+                    </span>
+                  </div>
+                  <PasswordRequirementsTooltip minChars={6} password={resetPasswordInput} />
                 </div>
 
                 <div className="space-y-2">

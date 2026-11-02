@@ -6,6 +6,7 @@ import { PublicHeader } from '../common/PublicHeader';
 import { PublicFooter } from '../common/PublicFooter';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import type { User } from '../../types';
 
@@ -690,9 +691,12 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                            Administrator Password <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">(Optional)</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                              Administrator Password <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">(Optional)</span>
+                            </label>
+                            <PasswordRequirementsTooltip minChars={6} password={adminPassword} />
+                          </div>
                           <div className="relative">
                             <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
@@ -917,9 +921,12 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                              Cashier Password *
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                Cashier Password *
+                              </label>
+                              <PasswordRequirementsTooltip minChars={6} password={cashierPassword} />
+                            </div>
                             <div className="relative">
                               <input
                                 type={showCashierPassword ? 'text' : 'password'}
