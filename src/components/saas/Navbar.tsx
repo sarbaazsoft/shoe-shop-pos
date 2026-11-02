@@ -92,10 +92,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   key={item.key}
                   type="button"
                   onClick={() => handleNavClick(item.section, item.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer bg-transparent ${
                     isActive
-                      ? 'text-[#A99CFF] lt:text-[#5B4BFF] bg-indigo-500/15 lt:bg-indigo-50 font-bold'
-                      : 'text-slate-300 lt:text-slate-600 hover:text-white lt:hover:text-slate-900 hover:bg-indigo-500/10 lt:hover:bg-indigo-50/60'
+                      ? 'text-[#A99CFF] lt:text-[#5B4BFF] font-bold'
+                      : 'text-slate-300 lt:text-slate-600 hover:text-[#A99CFF] lt:hover:text-[#5B4BFF]'
                   }`}
                 >
                   {item.label}
@@ -152,10 +152,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   key={item.key}
                   type="button"
                   onClick={() => handleNavClick(item.section, item.key)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  className={`w-full text-left px-3 py-2.5 text-sm font-semibold transition-colors cursor-pointer bg-transparent ${
                     isActive
-                      ? 'text-[#A99CFF] lt:text-[#5B4BFF] bg-indigo-500/15 lt:bg-indigo-50 font-bold'
-                      : 'text-slate-300 lt:text-slate-700 hover:text-white lt:hover:text-slate-900 hover:bg-indigo-500/10 lt:hover:bg-indigo-50'
+                      ? 'text-[#A99CFF] lt:text-[#5B4BFF] font-bold'
+                      : 'text-slate-300 lt:text-slate-700 hover:text-[#A99CFF] lt:hover:text-[#5B4BFF]'
                   }`}
                 >
                   {item.label}
