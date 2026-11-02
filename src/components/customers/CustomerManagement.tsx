@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Plus, Search, Mail, ShoppingBag, X, Edit2, Trash2, Coins, TrendingUp, LayoutGrid, List, Eye, RefreshCw, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Users, Plus, Search, Phone, ShoppingBag, X, Edit2, Trash2, Coins, TrendingUp, LayoutGrid, List, Eye, RefreshCw, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
 import { CustomerFormModal } from './CustomerFormModal.tsx';
@@ -246,7 +246,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
           <Search className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search by customer name or email..."
+            placeholder="Search by customer name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && loadCustomers()}
@@ -374,7 +374,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
                 <tr>
                   <th className="py-3 px-4 w-20">ID</th>
                   <th className="py-3 px-4">Name & Dealer</th>
-                  <th className="py-3 px-4">Email</th>
+                  <th className="py-3 px-4">Phone</th>
                   <th className="py-3 px-4">Shop / Market</th>
                   <th className="py-3 px-4 text-right">Khata Balance</th>
                   <th className="py-3 px-4 text-center w-28">Actions</th>
@@ -429,8 +429,8 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
 
                       <td className="py-3.5 px-4">
                         <div className="font-mono text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
-                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{c.email || c.phone || '-'}</span>
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{c.phone}</span>
                         </div>
                       </td>
 
@@ -549,8 +549,8 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
 
                   <div className="mt-4 space-y-1.5 text-slate-600 dark:text-slate-300">
                     <div className="flex items-center space-x-2">
-                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-mono text-xs">{c.email || c.phone || '-'}</span>
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="font-mono text-xs">{c.phone}</span>
                     </div>
                   </div>
                 </div>

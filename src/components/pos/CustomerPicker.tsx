@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Users, UserCheck, UserPlus, Mail, X, Check, CheckCircle2, CornerDownLeft, ArrowUp, ArrowDown, Sparkles, AlertCircle, Wallet } from 'lucide-react';
+import { Search, Users, UserCheck, UserPlus, Phone, X, Check, CheckCircle2, CornerDownLeft, ArrowUp, ArrowDown, Sparkles, AlertCircle, Wallet } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, cleanEmail, isValidEmail } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { customerOpeningBalanceSchema } from '../../schemas/openingBalanceSchema.ts';
 
 interface CustomerPickerProps {
@@ -84,7 +84,7 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInModal, setQuickAddInModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newShopName, setNewShopName] = useState('');
   const [newOpeningBalance, setNewOpeningBalance] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -260,12 +260,12 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
   const openQuickAdd = (inModal = false, prefillText = '') => {
     setCreateError(null);
     const clean = prefillText.trim();
-    if (clean && clean.includes('@')) {
-      setNewEmail(clean);
+    if (clean && /^[0-9+\-\s()]{4,}$/.test(clean)) {
+      setNewPhone(clean);
       setNewName('');
     } else {
       setNewName(clean);
-      setNewEmail('');
+      setNewPhone('');
     }
     setNewShopName('');
     setNewOpeningBalance('');
@@ -288,12 +288,8 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
       setCreateError('Customer name is required.');
       return;
     }
-    if (!newEmail.trim()) {
-      setCreateError('Customer email address is required.');
-      return;
-    }
-    if (!isValidEmail(newEmail)) {
-      setCreateError('Please provide a valid email address (e.g. customer@example.com).');
+    if (!newPhone.trim()) {
+      setCreateError('Customer phone number is required.');
       return;
     }
 
@@ -311,12 +307,12 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
     try {
       const res: any = await api.customers.create({
         name: toTitleCaseTrimmed(newName),
-        email: cleanEmail(newEmail),
-        phone: cleanEmail(newEmail),
+        phone: newPhone.trim(),
         customerType: isWholesaleStore ? 'WHOLESALER' : 'RETAILER',
         customer_type: isWholesaleStore ? 'WHOLESALER' : 'RETAILER',
         ...(isWholesaleStore && newShopName.trim() ? { shopName: toTitleCaseTrimmed(newShopName) } : {}),
         ...(isWholesaleStore ? { openingBalance: openingBalanceValue } : {}),
+        email: '',
         address: '',
         notes: '',
       });
@@ -324,7 +320,7 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
       if (!created) throw new Error('Customer was not returned by the server.');
       onCustomerCreated(created);
       setNewName('');
-      setNewEmail('');
+      setNewPhone('');
       setNewShopName('');
       setNewOpeningBalance('');
       setIsQuickAddOpen(false);
@@ -461,20 +457,17 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
       />
       <div className="relative">
         <input
-          type="email"
-          placeholder="Customer Email Address *"
-          value={newEmail}
-          onChange={(e) => {
-            setNewEmail(e.target.value);
-            if (createError) setCreateError(null);
-          }}
+          type="tel"
+          placeholder="Mobile / Phone *"
+          value={newPhone}
+          onChange={(e) => setNewPhone(formatPhoneNumber(e.target.value, newPhone))}
           className={`app-input w-full px-3 pr-8 py-2 text-xs font-mono transition-all duration-200 ${
-            newEmail && isValidEmail(newEmail)
+            isValidPhoneNumber(newPhone, 10, 15)
               ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
               : ''
           }`}
         />
-        {newEmail && isValidEmail(newEmail) && (
+        {isValidPhoneNumber(newPhone, 10, 15) && (
           <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 animate-in fade-in zoom-in duration-200" />
           </div>

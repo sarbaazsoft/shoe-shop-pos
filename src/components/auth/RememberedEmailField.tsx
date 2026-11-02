@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Mail, UserX, Users, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Mail, UserX, Users } from 'lucide-react';
 import type { useRememberedAccount } from '../../hooks/useRememberedAccount.ts';
-import { isValidEmail } from '../../utils/textFormat.ts';
 
 type RememberedAccountState = ReturnType<typeof useRememberedAccount>;
 
@@ -163,20 +162,11 @@ export const RememberedEmailField: React.FC<RememberedEmailFieldProps> = ({
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor={inputId} className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-              {label}
-            </label>
-            {isValidEmail(email) && (
-              <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                <CheckCircle2 className="w-3 h-3" /> Valid email
-              </span>
-            )}
-          </div>
+          <label htmlFor={inputId} className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            {label}
+          </label>
           <div className="relative">
-            <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200 ${
-              isValidEmail(email) ? 'text-emerald-500' : 'text-purple-600 dark:text-purple-400'
-            }`}>
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
               <Mail className="w-4 h-4" />
             </div>
             <input
@@ -189,17 +179,8 @@ export const RememberedEmailField: React.FC<RememberedEmailFieldProps> = ({
               placeholder={placeholder}
               value={email}
               onChange={(e) => onEmailChange(e.target.value)}
-              className={`${inputClassName} transition-all duration-200 ${
-                isValidEmail(email)
-                  ? '!border-2 !border-emerald-500 dark:!border-emerald-500/80 !ring-2 !ring-emerald-500/20 pr-9'
-                  : ''
-              }`}
+              className={inputClassName}
             />
-            {isValidEmail(email) && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-emerald-500 animate-in fade-in zoom-in duration-200">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-            )}
           </div>
 
           {rememberedEmail && (

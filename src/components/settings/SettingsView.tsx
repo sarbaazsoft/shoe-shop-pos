@@ -7,7 +7,7 @@ import { UserAvatar } from '../common/UserAvatar.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, cleanEmail, isValidEmail, getEmailValidationError } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 
 interface SettingsViewProps {
@@ -926,9 +926,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!formData.company_name.trim()) {
       errors.company_name = 'Company name is required.';
     }
-    const emailError = getEmailValidationError(formData.company_email, { label: 'Company contact email', required: true });
-    if (emailError) {
-      errors.company_email = emailError;
+    const phoneError = getPhoneValidationError(formData.company_phone, { label: 'Company phone' });
+    if (phoneError) {
+      errors.company_phone = phoneError;
+    }
+    if (formData.company_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.company_email.trim())) {
+      errors.company_email = 'Please provide a valid email address (e.g., info@company.com).';
     }
     if (!formData.currency_name.trim()) {
       errors.currency_name = 'Currency name is required (e.g., "Pakistani Rupee", "US Dollar").';
@@ -937,7 +940,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       errors.currency_symbol = 'Currency symbol is required (e.g., "Rs.", "$", "PKR").';
     }
 
-    setFormErrors(errors);
+setFormErrors(errors);
 
     if (Object.keys(errors).length > 0) {
       return;
@@ -949,9 +952,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const sanitizedFormData: any = {
         ...formData,
         company_name: toTitleCaseTrimmed(formData.company_name),
-        company_phone: cleanEmail(formData.company_email),
+        company_phone: cleanPhoneNumber(formData.company_phone),
         company_address: toTitleCaseTrimmed(formData.company_address),
-        company_email: cleanEmail(formData.company_email),
+        company_email: toLowerTrimmed(formData.company_email),
         website: toLowerTrimmed(formData.website),
         currency_name: toTitleCaseTrimmed(formData.currency_name),
         invoice_footer: toTitleCaseTrimmed(formData.invoice_footer),
@@ -1643,25 +1646,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 )}
               </div>
 
-              {/* company_email (Primary Email, Required) */}
+              {/* company_phone (Text, Required) */}
               <div>
                 <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
                   <span>
-                    Primary Contact Email <span className="text-rose-500 font-bold">*</span>
+                    Company Phone <span className="text-rose-500 font-bold">*</span>
                   </span>
-                  {formData.company_email && isValidEmail(formData.company_email) && (
+                  {isValidPhoneNumber(formData.company_phone, 10, 15) && (
                     <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({formData.company_phone.replace(/\D/g, '').length} digits)
                     </span>
                   )}
                 </label>
                 <div className="relative">
-                  <Mail className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
-                    formData.company_email && isValidEmail(formData.company_email) ? 'text-emerald-500' : 'text-slate-400'
+                  <Phone className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
+                    isValidPhoneNumber(formData.company_phone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
                   }`} />
                   <input
+                    type="tel"
+                    autoComplete="tel"
+                    value={formData.company_phone}
+                    onChange={(e) => {
+                      const formatted = formatPhoneNumber(e.target.value, formData.company_phone);
+                      setFormData({ ...formData, company_phone: formatted });
+                      if (formErrors.company_phone) {
+                        setFormErrors({ ...formErrors, company_phone: '' });
+                      }
+                    }}
+                    placeholder="e.g. 0321-1234567 or +92-321-1234567"
+                    className={`w-full h-11 pl-10 pr-9 rounded-xl border text-xs font-mono font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all duration-200 ${
+                      formErrors.company_phone
+                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10 text-rose-900 dark:text-rose-100'
+                        : isValidPhoneNumber(formData.company_phone, 10, 15)
+                        ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100 focus:border-emerald-600 focus:ring-emerald-500/30'
+                        : 'border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                    }`}
+                    required
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                    {isValidPhoneNumber(formData.company_phone, 10, 15) && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                    )}
+                  </div>
+                </div>
+                {formErrors.company_phone && (
+                  <p className="text-rose-600 dark:text-rose-400 text-[11px] mt-1.5">{formErrors.company_phone}</p>
+                )}
+                {!formErrors.company_phone && isValidPhoneNumber(formData.company_phone, 10, 15) && (
+                  <p className="text-emerald-600 dark:text-emerald-400 text-[11px] mt-1.5 font-medium flex items-center gap-1 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
+                  </p>
+                )}
+              </div>
+
+              {/* company_email (Email format) */}
+              <div>
+                <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
+                  <span>
+                    Company Email
+                 </span>
+                 <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 px-2 py-0.5 rounded-full">
+                    Optional
+                  </span>
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                  <input
                     type="email"
-                    autoComplete="email"
                     value={formData.company_email}
                     onChange={(e) => {
                       setFormData({ ...formData, company_email: e.target.value });
@@ -1669,71 +1720,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         setFormErrors({ ...formErrors, company_email: '' });
                       }
                     }}
-                    placeholder="e.g. info@shoestore.com"
-                    className={`w-full h-11 pl-10 pr-9 rounded-xl border text-xs font-mono font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all duration-200 ${
+                    placeholder="e.g., info@store.com"
+                    className={`w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
                       formErrors.company_email
-                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10 text-rose-900 dark:text-rose-100'
-                        : formData.company_email && isValidEmail(formData.company_email)
-                        ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100 focus:border-emerald-600 focus:ring-emerald-500/30'
-                        : 'border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10'
+                        : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                     }`}
-                    required
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                    {formData.company_email && isValidEmail(formData.company_email) && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
-                    )}
-                  </div>
                 </div>
                 {formErrors.company_email && (
                   <p className="text-rose-600 dark:text-rose-400 text-[11px] mt-1.5">{formErrors.company_email}</p>
                 )}
-                {!formErrors.company_email && formData.company_email && isValidEmail(formData.company_email) && (
-                  <p className="text-emerald-600 dark:text-emerald-400 text-[11px] mt-1.5 font-medium flex items-center gap-1 animate-in fade-in duration-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Verified business contact email.
-                  </p>
-                )}
-              </div>
-
-              {/* company_phone (Alternate / Support Email, Optional) */}
-              <div>
-                <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
-                  <span>
-                    Billing / Support Email
-                  </span>
-                  {formData.company_phone && isValidEmail(formData.company_phone) ? (
-                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 px-2 py-0.5 rounded-full">
-                      Optional
-                    </span>
-                  )}
-                </label>
-                <div className="relative">
-                  <Mail className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
-                    formData.company_phone && isValidEmail(formData.company_phone) ? 'text-emerald-500' : 'text-slate-400'
-                  }`} />
-                  <input
-                    type="email"
-                    value={formData.company_phone}
-                    onChange={(e) => {
-                      setFormData({ ...formData, company_phone: e.target.value });
-                    }}
-                    placeholder="e.g., support@shoestore.com"
-                    className={`w-full h-11 pl-10 pr-9 rounded-xl border text-xs font-mono font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all duration-200 ${
-                      formData.company_phone && isValidEmail(formData.company_phone)
-                        ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100 focus:border-emerald-600'
-                        : 'border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
-                    }`}
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                    {formData.company_phone && isValidEmail(formData.company_phone) && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* strn (Text, Optional - Sales Tax Registration Number) */}
@@ -2386,8 +2383,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <thead className="bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 text-slate-700 dark:text-white font-bold border-b border-slate-200 dark:border-purple-800/80 text-[11px] uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Staff Name</th>
-                  <th className="py-3 px-4">Login Email</th>
-                  <th className="py-3 px-4">Contact / Alternate Email</th>
+                  <th className="py-3 px-4">Email Address</th>
+                  <th className="py-3 px-4">Phone</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Access Status</th>
                   <th className="py-3 px-4 text-center">Actions</th>
@@ -2427,7 +2424,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-600 dark:text-purple-200/80">{u.email}</td>
-                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-mono text-xs">{u.phone || u.alternateEmail || '-'}</td>
+                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-mono text-xs">{u.phone || '-'}</td>
                       <td className="py-3 px-4">
                         <select
                           value={u.role}

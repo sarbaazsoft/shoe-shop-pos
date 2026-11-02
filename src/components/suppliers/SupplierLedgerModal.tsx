@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, CreditCard, Truck, AlertTriangle, Printer, RefreshCw, X, Trash2, Mail } from 'lucide-react';
+import { FileText, CreditCard, Truck, AlertTriangle, Printer, RefreshCw, X, Trash2, Phone, Mail } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
 import { SupplierPaymentModal } from './SupplierPaymentModal.tsx';
@@ -128,16 +128,16 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
-                  {(supplier?.email || supplier?.phone) && (
-                    <span className="flex items-center font-mono">
-                      <Mail className="w-3 h-3 mr-1 text-slate-400" />
-                      {supplier.email || supplier.phone}
+                  {supplier?.phone && (
+                    <span className="flex items-center">
+                      <Phone className="w-3 h-3 mr-1" />
+                      {supplier.phone}
                     </span>
                   )}
-                  {supplier?.email && supplier?.phone && supplier.email !== supplier.phone && (
-                    <span className="flex items-center font-mono">
-                      <Mail className="w-3 h-3 mr-1 text-slate-400" />
-                      {supplier.phone}
+                  {supplier?.email && (
+                    <span className="flex items-center">
+                      <Mail className="w-3 h-3 mr-1" />
+                      {supplier.email}
                     </span>
                   )}
                 </div>

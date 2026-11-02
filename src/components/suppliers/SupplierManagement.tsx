@@ -10,7 +10,7 @@ import { SupplierLedgerModal } from './SupplierLedgerModal.tsx';
 import { supplierOpeningBalanceSchema } from '../../schemas/openingBalanceSchema.ts';
 import type { SupplierOpeningBalanceType } from '../../schemas/openingBalanceSchema.ts';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, isValidEmail, cleanEmail } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
 
 interface SupplierManagementProps {
   currentUser: any;
@@ -31,8 +31,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any | null>(null);
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [alternateEmail, setAlternateEmail] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
   const [openingBalanceType, setOpeningBalanceType] = useState<SupplierOpeningBalanceType>('PAYABLE');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,8 +95,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
   const handleOpenAddModal = () => {
     setEditingSupplier(null);
     setName('');
+    setPhone('');
     setEmail('');
-    setAlternateEmail('');
     setOpeningBalance('');
     setOpeningBalanceType('PAYABLE');
     setError(null);
@@ -106,8 +106,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
   const handleOpenEditModal = (sup: any) => {
     setEditingSupplier(sup);
     setName(sup.name || '');
-    setEmail(sup.email || sup.phone || '');
-    setAlternateEmail(sup.email && sup.phone && sup.phone !== sup.email ? sup.phone : '');
+    setPhone(sup.phone || '');
+    setEmail(sup.email || '');
     setError(null);
     setIsModalOpen(true);
   };
@@ -119,18 +119,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
       return;
     }
 
-    if (!email.trim()) {
-      setError('Primary contact email is required.');
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      setError('Please provide a valid primary email address (e.g. sales@supplier.com).');
-      return;
-    }
-
-    if (alternateEmail.trim() && !isValidEmail(alternateEmail)) {
-      setError('Please provide a valid alternate email address format.');
+    if (phone.trim() && !isValidPhoneNumber(phone)) {
+      setError('Contact phone number must contain between 10 and 15 digits without a leading 0 right after a hyphen.');
       return;
     }
 
@@ -150,8 +140,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
     try {
       const payload = {
         name: toTitleCaseTrimmed(name),
-        email: cleanEmail(email),
-        phone: cleanEmail(alternateEmail || email),
+        phone: phone.trim(),
+        email: toLowerTrimmed(email),
         ...openingPayload,
       };
 
@@ -415,8 +405,8 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
             <thead className="bg-slate-50/90 dark:bg-gradient-to-r dark:from-purple-900/90 dark:via-indigo-950/85 dark:to-slate-900 text-slate-600 dark:text-white font-bold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-purple-800/80">
               <tr>
                 <th className="py-3 px-4">Supplier / Vendor</th>
-                <th className="py-3 px-4">Contact Email</th>
-                <th className="py-3 px-4">Billing / Alternate Email</th>
+                <th className="py-3 px-4">Phone Contact</th>
+                <th className="py-3 px-4">Email Address</th>
                 <th className="py-3 px-3 text-center">Purchases</th>
                 <th className="py-3 px-3 text-center">Returns</th>
                 <th className="py-3 px-3 text-right">Total Purchased</th>
@@ -464,13 +454,13 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
                       </td>
 
                       <td className="py-3 px-4 font-mono">
-                        {sup.email || sup.phone ? (
+                        {sup.phone ? (
                           <a
-                            href={`mailto:${sup.email || sup.phone}`}
+                            href={`tel:${sup.phone}`}
                             className="inline-flex items-center text-slate-700 dark:text-purple-200 hover:text-blue-600 dark:hover:text-purple-300 font-medium transition"
                           >
-                            <Mail className="w-3 h-3 mr-1 text-slate-400 dark:text-purple-300/60" />
-                            {sup.email || sup.phone}
+                            <Phone className="w-3 h-3 mr-1 text-slate-400 dark:text-purple-300/60" />
+                            {sup.phone}
                           </a>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-600">-</span>
@@ -652,75 +642,43 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-slate-700 dark:text-purple-200">
-                      Primary Contact Email <span className="text-red-500">*</span>
-                    </label>
-                    {email && isValidEmail(email) && (
+                    <label className="block font-bold text-slate-700 dark:text-purple-200">Contact Phone</label>
+                    {phone && isValidPhoneNumber(phone) && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
                         <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
-                        <span>Valid email</span>
+                        <span>Valid</span>
                       </span>
                     )}
                   </div>
                   <div className="relative">
                     <input
-                      type="email"
-                      required
-                      placeholder="e.g. sales@nike.pk"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (error) setError(null);
-                      }}
+                      type="text"
+                      placeholder="e.g. +92 300 1122334"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
                       className={`w-full px-3 py-2 rounded-xl font-mono text-xs outline-none transition ${
-                        email && isValidEmail(email)
+                        phone && isValidPhoneNumber(phone)
                           ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
                           : 'border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400'
                       }`}
                     />
-                    {email && isValidEmail(email) && (
+                    {phone && isValidPhoneNumber(phone) && (
                       <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
                     )}
                   </div>
-                  {email && isValidEmail(email) && (
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Email address verified and formatted.
-                    </p>
-                  )}
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-slate-700 dark:text-purple-200">
-                      Billing / Alternate Email (Optional)
-                    </label>
-                    {alternateEmail && isValidEmail(alternateEmail) && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
-                        <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
-                        <span>Valid email</span>
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      placeholder="e.g. accounts@nike.pk"
-                      value={alternateEmail}
-                      onChange={(e) => setAlternateEmail(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl font-mono text-xs outline-none transition ${
-                        alternateEmail && isValidEmail(alternateEmail)
-                          ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
-                          : 'border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400'
-                      }`}
-                    />
-                    {alternateEmail && isValidEmail(alternateEmail) && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
+                  <label className="block font-bold text-slate-700 dark:text-purple-200 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. wholesale@nike.pk"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400 font-mono text-xs transition"
+                  />
                 </div>
 
                 {!editingSupplier && (

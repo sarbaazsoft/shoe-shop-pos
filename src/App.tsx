@@ -1594,9 +1594,14 @@ export default function App() {
                   <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
                   <span>
                     Powered by{' '}
-                    <span className="font-semibold text-slate-900 dark:text-white">
+                    <a
+                      href="https://portpolio-eight-pi.vercel.app/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline transition-colors"
+                    >
                       SarbaazSoft Shoe POS
-                    </span>
+                    </a>
                   </span>
                   <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
                   <span>&copy; 2026 All rights reserved.</span>

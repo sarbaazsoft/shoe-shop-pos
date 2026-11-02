@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, Server, ShieldCheck, Sparkles, User, UserRoundPlus, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, Phone, Server, ShieldCheck, Sparkles, User, UserRoundPlus, X } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api';
 import { PublicLayout } from '../common/PublicLayout';
-import { toTitleCaseLive, isValidEmail, cleanEmail } from '../../utils/textFormat';
+import { toTitleCaseLive, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
 
 interface InstallationWizardProps {
   onCompleted: (user?: any) => void;
@@ -21,7 +21,7 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
   const [status, setStatus] = useState<InstallStatus | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -55,19 +55,23 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    const normalizedEmail = cleanEmail(email);
-    const normalizedRecoveryEmail = cleanEmail(recoveryEmail);
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
     if (!status?.hasSuperAdmin) {
       if (!name.trim()) {
         setError('Enter the superadmin name.');
         return;
       }
-      if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
-        setError('Enter a valid superadmin email address (e.g. admin@example.com).');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizedEmail)) {
+        setError('Enter a valid email address.');
         return;
       }
-      if (normalizedRecoveryEmail && !isValidEmail(normalizedRecoveryEmail)) {
-        setError('Enter a valid alternate/recovery email address format.');
+      if (!cleanPhone) {
+        setError("Enter the superadmin's phone / WhatsApp number.");
+        return;
+      }
+      if (!isValidPhoneNumber(cleanPhone)) {
+        setError('Enter a valid phone / WhatsApp number (10 to 15 digits, without a leading 0 right after a hyphen).');
         return;
       }
       if (password.length < 8) {
@@ -84,8 +88,8 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
       const res: any = await api.install.installPlatform({
         name: name.trim(),
         email: normalizedEmail,
-        phone: normalizedRecoveryEmail || normalizedEmail,
-        whatsapp: normalizedRecoveryEmail || normalizedEmail,
+        phone: cleanPhone,
+        whatsapp: cleanPhone,
         password,
       });
       if (res?.token && res?.user) {
@@ -265,17 +269,9 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                       <span>
                         Superadmin email <span className="text-rose-500 font-bold">*</span>
                       </span>
-                      {email && isValidEmail(email) && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
-                          <CheckCircle2 className="w-3 h-3 shrink-0" />
-                          <span>Valid email</span>
-                        </span>
-                      )}
                     </span>
                     <div className="relative">
-                      <Mail className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
-                        email && isValidEmail(email) ? 'text-emerald-500' : 'text-slate-400 dark:text-purple-400'
-                      }`} />
+                      <Mail className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
                       <input
                         required
                         type="email"
@@ -283,77 +279,53 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="admin@example.com"
-                        className={`w-full h-11 pl-10 pr-10 rounded-xl font-mono font-medium text-xs outline-none transition-all duration-200 ${
-                          email && isValidEmail(email)
-                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
-                            : 'border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
-                        }`}
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono font-medium text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20"
                       />
-                      {email && isValidEmail(email) && (
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                      )}
                     </div>
-                    {email && isValidEmail(email) ? (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Verified email format for SuperAdmin C-Panel</span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                        <span>Master login email for SuperAdmin C-Panel</span>
-                      </p>
-                    )}
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                      <span>Master login email for SuperAdmin C-Panel</span>
+                    </p>
                   </label>
 
-                  {/* Superadmin Recovery / Alternate Email */}
+                  {/* Superadmin Phone / WhatsApp */}
                   <label className="block sm:col-span-2 lg:col-span-1">
                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
                       <span>
-                        Alternate / Recovery Email (Optional)
+                        Phone / WhatsApp <span className="text-rose-500 font-bold">*</span>
                       </span>
-                      {recoveryEmail && isValidEmail(recoveryEmail) && (
+                      {phone && isValidPhoneNumber(phone) && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
                           <CheckCircle2 className="w-3 h-3 shrink-0" />
-                          <span>Valid email</span>
+                          <span>Valid phone</span>
                         </span>
                       )}
                     </span>
                     <div className="relative">
-                      <Mail className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-200 ${
-                        recoveryEmail && isValidEmail(recoveryEmail) ? 'text-emerald-500' : 'text-slate-400 dark:text-purple-400'
-                      }`} />
+                      <Phone className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none transition-colors ${phone && isValidPhoneNumber(phone) ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-purple-400'}`} />
                       <input
-                        type="email"
-                        autoComplete="email"
-                        value={recoveryEmail}
-                        onChange={(e) => setRecoveryEmail(e.target.value)}
-                        placeholder="recovery@example.com"
-                        className={`w-full h-11 pl-10 pr-10 rounded-xl font-mono font-medium text-xs outline-none transition-all duration-200 ${
-                          recoveryEmail && isValidEmail(recoveryEmail)
+                        required
+                        type="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                        placeholder="+92 300 1234567"
+                        className={`w-full h-11 pl-10 pr-10 rounded-xl font-mono font-medium text-xs outline-none transition-all ${
+                          phone && isValidPhoneNumber(phone)
                             ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
                             : 'border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
                         }`}
                       />
-                      {recoveryEmail && isValidEmail(recoveryEmail) && (
+                      {phone && isValidPhoneNumber(phone) && (
                         <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
                       )}
                     </div>
-                    {recoveryEmail && isValidEmail(recoveryEmail) ? (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Verified alternate contact email</span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 dark:text-purple-400 shrink-0" />
-                        <span>Security alerts &amp; account recovery address</span>
-                      </p>
-                    )}
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      <span>WhatsApp notifications &amp; recovery contact (10 to 15 digits)</span>
+                    </p>
                   </label>
                 </div>
               </div>

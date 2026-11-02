@@ -4,7 +4,7 @@ import { api, setAuthSession } from '../../services/api';
 import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
 import { PublicFooter } from '../common/PublicFooter';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, cleanEmail, isValidEmail, getEmailValidationError } from '../../utils/textFormat';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
 import type { User } from '../../types';
 
 interface TenantOnboardingWizardProps {
@@ -171,12 +171,8 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
       setError('Owner / Admin full name is required.');
       return false;
     }
-    if (!ownerEmail.trim() || !isValidEmail(ownerEmail)) {
+    if (!ownerEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(ownerEmail.trim())) {
       setError('A valid owner email address is required.');
-      return false;
-    }
-    if (phone.trim() && !isValidEmail(phone)) {
-      setError('Please provide a valid administrator recovery email address.');
       return false;
     }
     if (adminPassword.trim() && adminPassword.trim().length < 6) {
@@ -192,12 +188,8 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
         setError('Cashier name is required when cashier account is enabled.');
         return false;
       }
-      if (!cashierEmail.trim() || !isValidEmail(cashierEmail)) {
+      if (!cashierEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cashierEmail.trim())) {
         setError('A valid cashier email address is required when cashier account is enabled.');
-        return false;
-      }
-      if (cashierPhone.trim() && !isValidEmail(cashierPhone)) {
-        setError('Please provide a valid cashier alternate email address.');
         return false;
       }
       if (!cashierPassword || cashierPassword.length < 6) {
@@ -230,15 +222,15 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
       const res = await api.saas.completeOnboarding({
         storeName: toTitleCaseTrimmed(storeName),
         address: toTitleCaseTrimmed(address),
-        phone: cleanEmail(phone || ownerEmail),
-        email: cleanEmail(ownerEmail),
+        phone: phone.trim(),
+        email: toLowerTrimmed(ownerEmail),
         ownerName: toTitleCaseTrimmed(ownerName),
         adminPassword: adminPassword.trim() || undefined,
         // Cashier account (Only created if explicitly enabled and filled; if skipped, false is sent and no cashier is created):
         createCashier: willCreateCashier,
         cashierName: willCreateCashier ? toTitleCaseTrimmed(cashierName) : undefined,
-        cashierEmail: willCreateCashier ? cleanEmail(cashierEmail) : undefined,
-        cashierPhone: willCreateCashier ? cleanEmail(cashierPhone || cashierEmail) : undefined,
+        cashierEmail: willCreateCashier ? toLowerTrimmed(cashierEmail) : undefined,
+        cashierPhone: willCreateCashier ? cashierPhone.trim() : undefined,
         cashierPassword: willCreateCashier ? cashierPassword.trim() : undefined,
         // POS & Accounting Defaults:
         taxId: taxId.trim(),
@@ -636,37 +628,19 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                         </div>
 
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                              Administrator Login Email *
-                            </label>
-                            {ownerEmail && isValidEmail(ownerEmail) && (
-                              <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
-                              </span>
-                            )}
-                          </div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Administrator Login Email *
+                          </label>
                           <div className="relative">
-                            <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                              ownerEmail && isValidEmail(ownerEmail) ? 'text-emerald-500' : 'text-slate-400'
-                            }`} />
+                            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                             <input
                               type="email"
                               required
                               value={ownerEmail}
                               onChange={(e) => setOwnerEmail(e.target.value)}
                               placeholder="admin@shoepos.com"
-                              className={`app-input w-full pl-9 pr-9 py-2.5 rounded-xl text-sm font-mono transition-all duration-200 ${
-                                ownerEmail && isValidEmail(ownerEmail)
-                                  ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
-                                  : 'bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800/60 text-slate-900 dark:text-white focus:border-purple-500'
-                              }`}
+                              className="app-input w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800/60 text-slate-900 dark:text-white text-sm"
                             />
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                              {ownerEmail && isValidEmail(ownerEmail) && (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
-                              )}
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -675,38 +649,38 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                              Administrator Recovery / Alternate Email (Optional)
+                              Contact Phone Number
                             </label>
-                            {phone && isValidEmail(phone) && (
+                            {isValidPhoneNumber(phone, 10, 15) && (
                               <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({phone.replace(/\D/g, '').length} digits)
                               </span>
                             )}
                           </div>
                           <div className="relative">
-                            <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                              phone && isValidEmail(phone) ? 'text-emerald-500' : 'text-slate-400'
+                            <Phone className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                              isValidPhoneNumber(phone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
                             }`} />
                             <input
-                              type="email"
+                              type="tel"
                               value={phone}
-                              onChange={(e) => setPhone(e.target.value)}
-                              placeholder="e.g. backup.admin@shoepos.com"
+                              onChange={(e) => setPhone(formatPhoneNumber(e.target.value, phone))}
+                              placeholder="e.g. 0321-1234567 or +92-300-1234567"
                               className={`app-input w-full pl-9 pr-9 py-2.5 rounded-xl text-sm font-mono transition-all duration-200 ${
-                                phone && isValidEmail(phone)
+                                isValidPhoneNumber(phone, 10, 15)
                                   ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
                                   : 'bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800/60 text-slate-900 dark:text-white focus:border-purple-500'
                               }`}
                             />
                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                              {phone && isValidEmail(phone) && (
+                              {isValidPhoneNumber(phone, 10, 15) && (
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                               )}
                             </div>
                           </div>
-                          {phone && isValidEmail(phone) && (
+                          {isValidPhoneNumber(phone, 10, 15) && (
                             <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Verified alternate admin email.
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
                             </p>
                           )}
                         </div>
@@ -866,36 +840,18 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                           </div>
 
                           <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                                Cashier Email / Login ID *
-                              </label>
-                              {cashierEmail && isValidEmail(cashierEmail) && (
-                                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
-                                </span>
-                              )}
-                            </div>
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                              Cashier Email / Login ID *
+                            </label>
                             <div className="relative">
-                              <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                                cashierEmail && isValidEmail(cashierEmail) ? 'text-emerald-500' : 'text-slate-400'
-                              }`} />
+                              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                               <input
                                 type="email"
                                 value={cashierEmail}
                                 onChange={(e) => setCashierEmail(e.target.value)}
                                 placeholder="cashier@store.com"
-                                className={`app-input w-full pl-9 pr-9 py-2.5 rounded-xl text-sm font-mono transition-all duration-200 ${
-                                  cashierEmail && isValidEmail(cashierEmail)
-                                    ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
-                                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white'
-                                }`}
+                                className="app-input w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white text-sm"
                               />
-                              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                                {cashierEmail && isValidEmail(cashierEmail) && (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
-                                )}
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -904,38 +860,38 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                                Cashier Alternate Email (Optional)
+                                Cashier Phone Number (Optional)
                               </label>
-                              {cashierPhone && isValidEmail(cashierPhone) && (
+                              {cashierPhone && isValidPhoneNumber(cashierPhone, 10, 15) && (
                                 <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({cashierPhone.replace(/\D/g, '').length} digits)
                                 </span>
                               )}
                             </div>
                             <div className="relative">
-                              <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                                cashierPhone && isValidEmail(cashierPhone) ? 'text-emerald-500' : 'text-slate-400'
+                              <Phone className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                cashierPhone && isValidPhoneNumber(cashierPhone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
                               }`} />
                               <input
-                                type="email"
+                                type="tel"
                                 value={cashierPhone}
-                                onChange={(e) => setCashierPhone(e.target.value)}
-                                placeholder="e.g. backup.cashier@store.com"
+                                onChange={(e) => setCashierPhone(formatPhoneNumber(e.target.value, cashierPhone))}
+                                placeholder="e.g. 0300-0000000 or +92-300-0000000"
                                 className={`app-input w-full pl-9 pr-9 py-2.5 rounded-xl text-sm font-mono transition-all duration-200 ${
-                                  cashierPhone && isValidEmail(cashierPhone)
+                                  cashierPhone && isValidPhoneNumber(cashierPhone, 10, 15)
                                     ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
                                     : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white'
                                 }`}
                               />
                               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                                {cashierPhone && isValidEmail(cashierPhone) && (
+                                {cashierPhone && isValidPhoneNumber(cashierPhone, 10, 15) && (
                                   <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                                 )}
                               </div>
                             </div>
-                            {cashierPhone && isValidEmail(cashierPhone) && (
+                            {cashierPhone && isValidPhoneNumber(cashierPhone, 10, 15) && (
                               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
-                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Verified alternate cashier email.
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Cashier phone verified.
                               </p>
                             )}
                           </div>
