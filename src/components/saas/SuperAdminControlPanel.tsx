@@ -17,6 +17,8 @@ import { SuperAdminReportsView } from './SuperAdminReportsView';
 import { SettingsView } from '../settings/SettingsView';
 import { useTheme } from '../../context/ThemeContext';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -112,6 +114,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [rememberMe, setRememberMe] = useState(true);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authInfo, setAuthInfo] = useState<string | null>(null);
@@ -1146,17 +1149,31 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           placeholder="••••••••"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-9 transition outline-none"
+                          className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-16 transition outline-none ${
+                            password
+                              ? evaluatePasswordStrength(password, { minChars: 6 }).borderColorClass
+                              : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
+                          }`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
-                          title={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                        <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center space-x-1.5">
+                          {password && evaluatePasswordStrength(password, { minChars: 6 }).isStrong && (
+                            <span title="Strong password">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                            title={showPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
+                      {password && (
+                        <PasswordStrengthIndicator password={password} minChars={6} showChecklist={false} />
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -1274,14 +1291,36 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           <Lock className="w-4 h-4" />
                         </div>
                         <input
-                          type="password"
+                          type={showResetPassword ? 'text' : 'password'}
                           required
                           placeholder="Enter new password (min 6 characters)"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-3 outline-none font-medium"
+                          className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-16 outline-none font-medium transition ${
+                            newPassword
+                              ? evaluatePasswordStrength(newPassword, { minChars: 6 }).borderColorClass
+                              : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
+                          }`}
                         />
+                        <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center space-x-1.5">
+                          {newPassword && evaluatePasswordStrength(newPassword, { minChars: 6 }).isStrong && (
+                            <span title="Strong password">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowResetPassword(!showResetPassword)}
+                            className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                            title={showResetPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
+                      {newPassword && (
+                        <PasswordStrengthIndicator password={newPassword} minChars={6} showChecklist={true} />
+                      )}
                     </div>
 
                     <div className="flex gap-3 pt-2">
@@ -5278,77 +5317,114 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Password */}
-                  <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Password <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type={showNewOwnerPassword ? 'text' : 'password'}
-                        required
-                        minLength={4}
-                        value={newOwnerPassword}
-                        onChange={(e) => setNewOwnerPassword(e.target.value)}
-                        placeholder="Set initial Owner password"
-                        className="w-full pl-9 pr-10 py-2.5 bg-white dark:bg-purple-500/20 border border-gray-300 dark:border-purple-400/40 rounded-xl text-xs font-medium font-mono text-gray-900 dark:text-purple-100 placeholder-slate-400 dark:placeholder-purple-300/40 hover:bg-slate-50 dark:hover:bg-purple-500/30 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewOwnerPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-                        title={showNewOwnerPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showNewOwnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                {(() => {
+                  const strength = evaluatePasswordStrength(newOwnerPassword, { minChars: 6 });
+                  const isMatch = Boolean(newOwnerPassword && newOwnerConfirmPassword && newOwnerPassword === newOwnerConfirmPassword);
+                  const isMismatch = Boolean(newOwnerPassword && newOwnerConfirmPassword && newOwnerPassword !== newOwnerConfirmPassword);
 
-                  {/* Confirm Password */}
-                  <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Confirm Password <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type={showNewOwnerPassword ? 'text' : 'password'}
-                        required
-                        minLength={4}
-                        value={newOwnerConfirmPassword}
-                        onChange={(e) => setNewOwnerConfirmPassword(e.target.value)}
-                        placeholder="Enter the password again"
-                        autoComplete="new-password"
-                        className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-purple-500/20 border border-gray-300 dark:border-purple-400/40 rounded-xl text-xs font-medium font-mono text-gray-900 dark:text-purple-100 placeholder-slate-400 dark:placeholder-purple-300/40 hover:bg-slate-50 dark:hover:bg-purple-500/30 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Password */}
+                        <div>
+                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
+                            Password <span className="text-red-500 dark:text-pink-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type={showNewOwnerPassword ? 'text' : 'password'}
+                              required
+                              minLength={6}
+                              value={newOwnerPassword}
+                              onChange={(e) => setNewOwnerPassword(e.target.value)}
+                              placeholder="Set initial Owner password"
+                              className={`w-full pl-9 pr-16 py-2.5 bg-white dark:bg-purple-500/20 border rounded-xl text-xs font-medium font-mono text-gray-900 dark:text-purple-100 placeholder-slate-400 dark:placeholder-purple-300/40 hover:bg-slate-50 dark:hover:bg-purple-500/30 outline-none transition shadow-2xs ${
+                                newOwnerPassword
+                                  ? strength.borderColorClass
+                                  : 'border-gray-300 dark:border-purple-400/40 focus:border-indigo-600 dark:focus:border-purple-400'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                              {newOwnerPassword && strength.isStrong && (
+                                <span title="Strong password">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowNewOwnerPassword((prev) => !prev)}
+                                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                                title={showNewOwnerPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showNewOwnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
 
-                {/* Real-time Password Match Indicator */}
-                {newOwnerPassword && newOwnerConfirmPassword && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
-                      newOwnerPassword === newOwnerConfirmPassword
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
-                        : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
-                    }`}
-                  >
-                    {newOwnerPassword === newOwnerConfirmPassword ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Passwords match securely.</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>Passwords do not match yet.</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                        {/* Confirm Password */}
+                        <div>
+                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
+                            Confirm Password <span className="text-red-500 dark:text-pink-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type={showNewOwnerPassword ? 'text' : 'password'}
+                              required
+                              minLength={6}
+                              value={newOwnerConfirmPassword}
+                              onChange={(e) => setNewOwnerConfirmPassword(e.target.value)}
+                              placeholder="Enter the password again"
+                              autoComplete="new-password"
+                              className={`w-full pl-9 pr-10 py-2.5 bg-white dark:bg-purple-500/20 border rounded-xl text-xs font-medium font-mono text-gray-900 dark:text-purple-100 placeholder-slate-400 dark:placeholder-purple-300/40 hover:bg-slate-50 dark:hover:bg-purple-500/30 outline-none transition shadow-2xs ${
+                                newOwnerConfirmPassword
+                                  ? isMatch
+                                    ? 'password-border-match'
+                                    : 'password-border-mismatch'
+                                  : 'border-gray-300 dark:border-purple-400/40 focus:border-indigo-600 dark:focus:border-purple-400'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                              {newOwnerConfirmPassword && isMatch && (
+                                <span title="Passwords match">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password Strength Indicator & Checklist */}
+                      <PasswordStrengthIndicator password={newOwnerPassword} minChars={6} showChecklist={true} />
+
+                      {/* Real-time Password Match Indicator */}
+                      {newOwnerPassword && newOwnerConfirmPassword && (
+                        <div
+                          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
+                            isMatch
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
+                              : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60'
+                          }`}
+                        >
+                          {isMatch ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span className="font-medium">Passwords match securely.</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                              <span className="font-medium">Passwords do not match yet.</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* CARD 4: SUBSCRIPTION PLAN & TENANT PROVISIONING */}

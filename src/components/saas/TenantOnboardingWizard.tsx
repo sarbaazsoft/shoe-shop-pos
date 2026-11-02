@@ -5,6 +5,8 @@ import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
 import { PublicFooter } from '../common/PublicFooter';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import type { User } from '../../types';
 
 interface TenantOnboardingWizardProps {
@@ -696,16 +698,30 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                               value={adminPassword}
                               onChange={(e) => setAdminPassword(e.target.value)}
                               placeholder="Leave blank to use password set during registration"
-                              className="app-input w-full pl-9 pr-10 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800/60 text-slate-900 dark:text-white text-sm font-mono"
+                              className={`app-input w-full pl-9 pr-16 py-2.5 rounded-xl bg-white dark:bg-slate-900 border text-slate-900 dark:text-white text-sm font-mono transition-colors ${
+                                adminPassword
+                                  ? evaluatePasswordStrength(adminPassword, { minChars: 6 }).borderColorClass
+                                  : 'border-purple-200 dark:border-purple-800/60'
+                              }`}
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowAdminPassword(!showAdminPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                            >
-                              {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                              {adminPassword && evaluatePasswordStrength(adminPassword, { minChars: 6 }).isStrong && (
+                                <span title="Strong password">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowAdminPassword(!showAdminPassword)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                              >
+                                {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
                           </div>
+                          {adminPassword && (
+                            <PasswordStrengthIndicator password={adminPassword} minChars={6} showChecklist={true} />
+                          )}
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                             Leave blank to keep the password you set during the free trial registration.
                           </p>
@@ -906,16 +922,30 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                 value={cashierPassword}
                                 onChange={(e) => setCashierPassword(e.target.value)}
                                 placeholder="Enter cashier password"
-                                className="app-input w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white text-sm font-mono"
+                                className={`app-input w-full pl-3.5 pr-16 py-2.5 rounded-xl bg-white dark:bg-slate-900 border text-slate-900 dark:text-white text-sm font-mono transition-colors ${
+                                  cashierPassword
+                                    ? evaluatePasswordStrength(cashierPassword, { minChars: 6 }).borderColorClass
+                                    : 'border-slate-200 dark:border-purple-800/60'
+                                }`}
                               />
-                              <button
-                                type="button"
-                                onClick={() => setShowCashierPassword(!showCashierPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                              >
-                                {showCashierPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                                {cashierPassword && evaluatePasswordStrength(cashierPassword, { minChars: 6 }).isStrong && (
+                                  <span title="Strong password">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCashierPassword(!showCashierPassword)}
+                                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                                >
+                                  {showCashierPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                              </div>
                             </div>
+                            {cashierPassword && (
+                              <PasswordStrengthIndicator password={cashierPassword} minChars={6} showChecklist={true} />
+                            )}
                           </div>
                         </div>
 

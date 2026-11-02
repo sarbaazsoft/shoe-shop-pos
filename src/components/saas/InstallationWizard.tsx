@@ -4,6 +4,8 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, Lock, M
 import { api, setAuthSession } from '../../services/api';
 import { PublicLayout } from '../common/PublicLayout';
 import { toTitleCaseLive, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 
 interface InstallationWizardProps {
   onCompleted: (user?: any) => void;
@@ -342,98 +344,135 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Password */}
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
-                      <span>
-                        Password <span className="text-rose-500 font-bold">*</span>
-                      </span>
-                    </span>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
-                      <input
-                        required
-                        minLength={8}
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="At least 8 characters"
-                        className="w-full h-11 pl-10 pr-10 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                        title={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
-                      <span>Minimum 8 characters required</span>
-                    </p>
-                  </label>
+                {(() => {
+                  const strength = evaluatePasswordStrength(password, { minChars: 8 });
+                  const isMatch = Boolean(password && confirmPassword && password === confirmPassword);
+                  const isMismatch = Boolean(password && confirmPassword && password !== confirmPassword);
 
-                  {/* Confirm password */}
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
-                      <span>
-                        Confirm password <span className="text-rose-500 font-bold">*</span>
-                      </span>
-                    </span>
-                    <div className="relative">
-                      <KeyRound className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
-                      <input
-                        required
-                        minLength={8}
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Enter the password again"
-                        className="w-full h-11 pl-10 pr-10 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                        title={showConfirmPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                      <span>Re-enter password to confirm</span>
-                    </p>
-                  </label>
-                </div>
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Password */}
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
+                            <span>
+                              Password <span className="text-rose-500 font-bold">*</span>
+                            </span>
+                          </span>
+                          <div className="relative">
+                            <Lock className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                            <input
+                              required
+                              minLength={8}
+                              type={showPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="At least 8 characters"
+                              className={`w-full h-11 pl-10 pr-16 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
+                                password
+                                  ? strength.borderColorClass
+                                  : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                              {password && strength.isStrong && (
+                                <span title="Strong password">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                                title={showPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                            <KeyRound className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+                            <span>Minimum 8 characters required</span>
+                          </p>
+                        </label>
 
-                {/* Real-time Password Match Indicator */}
-                {password && confirmPassword && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
-                      password === confirmPassword
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
-                        : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
-                    }`}
-                  >
-                    {password === confirmPassword ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Passwords match securely.</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>Passwords do not match yet.</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                        {/* Confirm password */}
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
+                            <span>
+                              Confirm password <span className="text-rose-500 font-bold">*</span>
+                            </span>
+                          </span>
+                          <div className="relative">
+                            <KeyRound className="w-4 h-4 text-slate-400 dark:text-purple-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                            <input
+                              required
+                              minLength={8}
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              placeholder="Enter the password again"
+                              className={`w-full h-11 pl-10 pr-16 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
+                                confirmPassword
+                                  ? isMatch
+                                    ? 'password-border-match'
+                                    : 'password-border-mismatch'
+                                  : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                              {confirmPassword && isMatch && (
+                                <span title="Passwords match">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                                title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                            <span>Re-enter password to confirm</span>
+                          </p>
+                        </label>
+                      </div>
+
+                      {/* Password Strength Indicator & Checklist */}
+                      <PasswordStrengthIndicator password={password} minChars={8} showChecklist={true} />
+
+                      {/* Real-time Password Match Indicator */}
+                      {password && confirmPassword && (
+                        <div
+                          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
+                            isMatch
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
+                              : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60'
+                          }`}
+                        >
+                          {isMatch ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span className="font-medium">Passwords match securely.</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                              <span className="font-medium">Passwords do not match yet.</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </>
           )}

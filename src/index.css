@@ -226,6 +226,109 @@ html.dark .form-select:focus,
   --tw-ring-offset-shadow: none !important;
 }
 
+/* ========================================================================= */
+/* REAL-TIME PASSWORD STRENGTH DYNAMIC BORDER COLORS & FOCUS GLOWS           */
+/* ========================================================================= */
+input.password-border-weak,
+.app-input.password-border-weak,
+html.dark input.password-border-weak,
+html.dark .app-input.password-border-weak {
+  border: 1.5px solid #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+input.password-border-weak:focus,
+input.password-border-weak:focus-visible,
+.app-input.password-border-weak:focus,
+.app-input.password-border-weak:focus-visible,
+html.dark input.password-border-weak:focus,
+html.dark input.password-border-weak:focus-visible,
+html.dark .app-input.password-border-weak:focus,
+html.dark .app-input.password-border-weak:focus-visible {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+}
+
+input.password-border-medium,
+.app-input.password-border-medium,
+html.dark input.password-border-medium,
+html.dark .app-input.password-border-medium {
+  border: 1.5px solid #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+input.password-border-medium:focus,
+input.password-border-medium:focus-visible,
+.app-input.password-border-medium:focus,
+.app-input.password-border-medium:focus-visible,
+html.dark input.password-border-medium:focus,
+html.dark input.password-border-medium:focus-visible,
+html.dark .app-input.password-border-medium:focus,
+html.dark .app-input.password-border-medium:focus-visible {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 8px 0 rgba(245, 158, 11, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(245, 158, 11, 0.45) !important;
+}
+
+input.password-border-strong,
+.app-input.password-border-strong,
+html.dark input.password-border-strong,
+html.dark .app-input.password-border-strong {
+  border: 1.5px solid #10b981 !important;
+  border-color: #10b981 !important;
+}
+input.password-border-strong:focus,
+input.password-border-strong:focus-visible,
+.app-input.password-border-strong:focus,
+.app-input.password-border-strong:focus-visible,
+html.dark input.password-border-strong:focus,
+html.dark input.password-border-strong:focus-visible,
+html.dark .app-input.password-border-strong:focus,
+html.dark .app-input.password-border-strong:focus-visible {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+}
+
+input.password-border-match,
+.app-input.password-border-match,
+html.dark input.password-border-match,
+html.dark .app-input.password-border-match {
+  border: 1.5px solid #10b981 !important;
+  border-color: #10b981 !important;
+}
+input.password-border-match:focus,
+input.password-border-match:focus-visible,
+.app-input.password-border-match:focus,
+.app-input.password-border-match:focus-visible,
+html.dark input.password-border-match:focus,
+html.dark input.password-border-match:focus-visible,
+html.dark .app-input.password-border-match:focus,
+html.dark .app-input.password-border-match:focus-visible {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+}
+
+input.password-border-mismatch,
+.app-input.password-border-mismatch,
+html.dark input.password-border-mismatch,
+html.dark .app-input.password-border-mismatch {
+  border: 1.5px solid #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+input.password-border-mismatch:focus,
+input.password-border-mismatch:focus-visible,
+.app-input.password-border-mismatch:focus,
+.app-input.password-border-mismatch:focus-visible,
+html.dark input.password-border-mismatch:focus,
+html.dark input.password-border-mismatch:focus-visible,
+html.dark .app-input.password-border-mismatch:focus,
+html.dark .app-input.password-border-mismatch:focus-visible {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+}
+
 /* 3. Input Icons Styled to Purple (#9333ea in light mode, #c084fc in dark mode):
    All icons located inside input containers, search bars, modals, profile editors,
    and settings forms (including Lucide icons, prefixes, currency badges, and password toggles) */

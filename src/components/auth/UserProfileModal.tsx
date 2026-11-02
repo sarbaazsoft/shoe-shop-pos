@@ -6,6 +6,8 @@ import { UserAvatar } from '../common/UserAvatar.tsx';
 import { InstallAppModal } from '../common/InstallAppModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -710,16 +712,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     placeholder="At least 6 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full pl-3.5 pr-10 py-2.5 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                    className={`w-full pl-3.5 pr-16 py-2.5 bg-white dark:bg-slate-950/60 border rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition ${
+                      newPassword
+                        ? evaluatePasswordStrength(newPassword, { minChars: 6 }).borderColorClass
+                        : 'border-slate-300 dark:border-slate-700/80 focus:border-blue-600 dark:focus:border-blue-400'
+                    }`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                    {newPassword && evaluatePasswordStrength(newPassword, { minChars: 6 }).isStrong && (
+                      <span title="Strong password">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
+                <PasswordStrengthIndicator password={newPassword} minChars={6} showChecklist={true} />
               </div>
 
               {/* Confirm New Password */}
@@ -739,21 +753,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     placeholder="Repeat new password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={`w-full pl-3.5 pr-10 py-2.5 bg-white dark:bg-slate-950/60 border rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition ${
-                      isPasswordMismatch
-                        ? 'border-red-400 focus:ring-2 focus:ring-red-500'
-                        : isPasswordMatch
-                        ? 'border-emerald-400 focus:ring-2 focus:ring-emerald-500'
+                    className={`w-full pl-3.5 pr-16 py-2.5 bg-white dark:bg-slate-950/60 border rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition ${
+                      confirmPassword
+                        ? isPasswordMatch
+                          ? 'password-border-match focus:ring-2 focus:ring-emerald-500/20'
+                          : 'password-border-mismatch focus:ring-2 focus:ring-red-500/20'
                         : 'border-slate-300 dark:border-slate-700/80 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20'
                     }`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                    {confirmPassword && isPasswordMatch && (
+                      <span title="Passwords match">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Match indicator */}

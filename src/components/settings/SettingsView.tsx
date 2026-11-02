@@ -9,6 +9,8 @@ import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError, isValidPhoneNumber } from '../../utils/textFormat.ts';
 import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface SettingsViewProps {
   currentUser: any;
@@ -3382,33 +3384,50 @@ setFormErrors(errors);
                   </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <input
-                      type={showResetPassword ? 'text' : 'password'}
-                      placeholder="Enter Store Owner / Admin password"
-                      value={resetPasswordInput}
-                      onChange={(e) => setResetPasswordInput(e.target.value)}
-                      className="w-full h-11 pl-3.5 pr-9 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      required
-                    />
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type={showResetPassword ? 'text' : 'password'}
+                        placeholder="Enter Store Owner / Admin password"
+                        value={resetPasswordInput}
+                        onChange={(e) => setResetPasswordInput(e.target.value)}
+                        className={`w-full h-11 pl-3.5 pr-16 bg-slate-50 dark:bg-slate-900 border rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none transition ${
+                          resetPasswordInput
+                            ? evaluatePasswordStrength(resetPasswordInput, { minChars: 6 }).borderColorClass
+                            : 'border-slate-300 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                        }`}
+                        required
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                        {resetPasswordInput && evaluatePasswordStrength(resetPasswordInput, { minChars: 6 }).isStrong && (
+                          <span title="Strong password">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword(!showResetPassword)}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                        >
+                          {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
                     <button
-                      type="button"
-                      onClick={() => setShowResetPassword(!showResetPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      type="submit"
+                      disabled={isResettingInstall || !resetPasswordInput}
+                      className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 dark:border-purple-400/50 font-bold px-5 h-11 rounded-xl text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.3)] shrink-0 active:scale-95"
                     >
-                      {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      <Unlock className="w-3.5 h-3.5" />
+                      <span>{isResettingInstall ? 'Verifying...' : 'Unlock Install Wizard'}</span>
                     </button>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={isResettingInstall || !resetPasswordInput}
-                    className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 dark:border-purple-400/50 font-bold px-5 h-11 rounded-xl text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.3)] shrink-0 active:scale-95"
-                  >
-                    <Unlock className="w-3.5 h-3.5" />
-                    <span>{isResettingInstall ? 'Verifying...' : 'Unlock Install Wizard'}</span>
-                  </button>
+                  {resetPasswordInput && (
+                    <PasswordStrengthIndicator password={resetPasswordInput} minChars={6} showChecklist={false} />
+                  )}
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-800/80">

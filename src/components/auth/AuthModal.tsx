@@ -10,6 +10,8 @@ import { useRememberedAccount } from '../../hooks/useRememberedAccount.ts';
 import { getRememberedEmail, normalizeRememberedEmail } from '../../utils/rememberedAccount.ts';
 import { RememberedEmailField } from './RememberedEmailField.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface AuthModalProps {
   onSuccess: (user: any) => void;
@@ -40,6 +42,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [rememberMe, setRememberMe] = useState(true);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -555,34 +558,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         Forgot Password?
                       </button>
                     </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="login-password-input"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="current-password"
-                        autoFocus={account.isShowingRemembered}
-                        required
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setMatchingStores([]);
-                        }}
-                        className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-9 transition outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
-                        title={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
+                    {(() => {
+                      const loginStrength = evaluatePasswordStrength(password, 6);
+                      return (
+                        <>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
+                              <Lock className="w-4 h-4" />
+                            </div>
+                            <input
+                              id="login-password-input"
+                              name="password"
+                              type={showPassword ? 'text' : 'password'}
+                              autoComplete="current-password"
+                              autoFocus={account.isShowingRemembered}
+                              required
+                              placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                setMatchingStores([]);
+                              }}
+                              className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-16 transition outline-none ${
+                                password.length > 0
+                                  ? loginStrength.borderColorClass
+                                  : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                              {password.length > 0 && loginStrength.isStrong && (
+                                <div title="Strong Password" className="flex items-center text-emerald-500 animate-in fade-in zoom-in">
+                                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                                title={showPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          {password.length > 0 && (
+                            <PasswordStrengthIndicator
+                              password={password}
+                              minChars={6}
+                              showChecklist={false}
+                              compact={true}
+                            />
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
@@ -738,19 +767,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       New Password
                     </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Enter new password (min 6 characters)"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-3 outline-none font-medium"
-                      />
-                    </div>
+                    {(() => {
+                      const resetStrength = evaluatePasswordStrength(newPassword, 6);
+                      return (
+                        <>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
+                              <Lock className="w-4 h-4" />
+                            </div>
+                            <input
+                              type={showResetPassword ? 'text' : 'password'}
+                              required
+                              placeholder="Enter new password (min 6 characters)"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-16 outline-none font-medium transition ${
+                                newPassword.length > 0
+                                  ? resetStrength.borderColorClass
+                                  : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                              {newPassword.length > 0 && resetStrength.isStrong && (
+                                <div title="Strong Password" className="flex items-center text-emerald-500 animate-in fade-in zoom-in">
+                                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowResetPassword(!showResetPassword)}
+                                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                                title={showResetPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          <PasswordStrengthIndicator
+                            password={newPassword}
+                            minChars={6}
+                            showChecklist={true}
+                          />
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex gap-3 pt-2">

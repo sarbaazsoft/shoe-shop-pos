@@ -20,6 +20,8 @@ import {
 import { api, setAuthSession } from '../../services/api.ts';
 import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface FreeTrialOnboardingModalProps {
   isOpen: boolean;
@@ -695,165 +697,182 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                 </div>
 
                 {/* 4. Password & Confirm Password Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                  {/* Password */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label
-                        htmlFor="trial-password"
-                        className={`block font-bold text-xs ${
-                          isDark ? 'text-slate-200' : 'text-gray-800'
-                        }`}
-                      >
-                        Owner Password <span className="text-purple-500">*</span>
-                      </label>
-                      <span
-                        className={`text-[10px] font-mono ${
-                          isDark ? 'text-slate-400' : 'text-slate-500'
-                        }`}
-                      >
-                        Min 6 chars
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="trial-password"
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        required
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (errorMessage) setErrorMessage(null);
-                        }}
-                        onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-                        placeholder="At least 6 characters"
-                        disabled={isLoading}
-                        className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
-                          isDark
-                            ? 'bg-[#151E33] text-white placeholder-slate-500'
-                            : 'bg-white text-slate-900 placeholder-slate-400'
-                        } ${
-                          touched.password && !isPasswordValid
-                            ? isDark
-                              ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
-                              : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
-                            : touched.password && isPasswordValid
-                            ? isDark
-                              ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
-                              : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
-                            : isDark
-                            ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
-                            : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className={`absolute inset-y-0 right-0 pr-3 flex items-center transition-colors cursor-pointer ${
-                          isDark
-                            ? 'text-slate-400 hover:text-white'
-                            : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {touched.password && !isPasswordValid && (
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Must be at least 6 characters.</span>
-                      </div>
-                    )}
-                  </div>
+                {(() => {
+                  const strength = evaluatePasswordStrength(password, { minChars: 6 });
+                  const isMatch = Boolean(confirmPassword && password && confirmPassword === password);
+                  const isMismatch = Boolean(confirmPassword && password && confirmPassword !== password);
 
-                  {/* Confirm Password */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label
-                        htmlFor="trial-confirm-password"
-                        className={`block font-bold text-xs ${
-                          isDark ? 'text-slate-200' : 'text-gray-800'
-                        }`}
-                      >
-                        Confirm Password <span className="text-purple-500">*</span>
-                      </label>
-                      {confirmPassword && password && (
-                        <span
-                          className={`text-[10px] font-semibold ${
-                            confirmPassword === password ? 'text-emerald-500' : 'text-rose-500'
-                          }`}
-                        >
-                          {confirmPassword === password ? '✓ Match' : 'Mismatch'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
+                  return (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {/* Password */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label
+                              htmlFor="trial-password"
+                              className={`block font-bold text-xs ${
+                                isDark ? 'text-slate-200' : 'text-gray-800'
+                              }`}
+                            >
+                              Owner Password <span className="text-purple-500">*</span>
+                            </label>
+                            <span
+                              className={`text-[10px] font-mono ${
+                                isDark ? 'text-slate-400' : 'text-slate-500'
+                              }`}
+                            >
+                              Min 6 chars
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                              <Lock className="w-4 h-4" />
+                            </div>
+                            <input
+                              id="trial-password"
+                              type={showPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              required
+                              value={password}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                if (errorMessage) setErrorMessage(null);
+                              }}
+                              onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+                              placeholder="At least 6 characters"
+                              disabled={isLoading}
+                              className={`w-full pl-10 pr-16 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                                isDark
+                                  ? 'bg-[#151E33] text-white placeholder-slate-500'
+                                  : 'bg-white text-slate-900 placeholder-slate-400'
+                              } ${
+                                password
+                                  ? strength.borderColorClass
+                                  : isDark
+                                  ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                                  : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1.5">
+                              {password && strength.isStrong && (
+                                <span title="Strong password">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                className={`flex items-center transition-colors cursor-pointer ${
+                                  isDark
+                                    ? 'text-slate-400 hover:text-white'
+                                    : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          {touched.password && !isPasswordValid && (
+                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>Must be at least 6 characters.</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label
+                              htmlFor="trial-confirm-password"
+                              className={`block font-bold text-xs ${
+                                isDark ? 'text-slate-200' : 'text-gray-800'
+                              }`}
+                            >
+                              Confirm Password <span className="text-purple-500">*</span>
+                            </label>
+                            {confirmPassword && password && (
+                              <span
+                                className={`text-[10px] font-semibold ${
+                                  isMatch ? 'text-emerald-500' : 'text-rose-500'
+                                }`}
+                              >
+                                {isMatch ? '✓ Match' : 'Mismatch'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                              <Lock className="w-4 h-4" />
+                            </div>
+                            <input
+                              id="trial-confirm-password"
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              required
+                              value={confirmPassword}
+                              onChange={(e) => {
+                                setConfirmPassword(e.target.value);
+                                if (errorMessage) setErrorMessage(null);
+                              }}
+                              onBlur={() => setTouched((prev) => ({ ...prev, confirmPassword: true }))}
+                              placeholder="Re-enter password"
+                              disabled={isLoading}
+                              className={`w-full pl-10 pr-16 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                                isDark
+                                  ? 'bg-[#151E33] text-white placeholder-slate-500'
+                                  : 'bg-white text-slate-900 placeholder-slate-400'
+                              } ${
+                                confirmPassword
+                                  ? isMatch
+                                    ? 'password-border-match'
+                                    : 'password-border-mismatch'
+                                  : isDark
+                                  ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
+                                  : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1.5">
+                              {confirmPassword && isMatch && (
+                                <span title="Passwords match">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                tabIndex={-1}
+                                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                                className={`flex items-center transition-colors cursor-pointer ${
+                                  isDark
+                                    ? 'text-slate-400 hover:text-white'
+                                    : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                              >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          {touched.confirmPassword && !isConfirmPasswordValid && (
+                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>
+                                {confirmPassword.length < 6
+                                  ? 'Must be at least 6 characters.'
+                                  : 'Passwords do not match.'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <input
-                        id="trial-confirm-password"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          if (errorMessage) setErrorMessage(null);
-                        }}
-                        onBlur={() => setTouched((prev) => ({ ...prev, confirmPassword: true }))}
-                        placeholder="Re-enter password"
-                        disabled={isLoading}
-                        className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
-                          isDark
-                            ? 'bg-[#151E33] text-white placeholder-slate-500'
-                            : 'bg-white text-slate-900 placeholder-slate-400'
-                        } ${
-                          touched.confirmPassword && !isConfirmPasswordValid
-                            ? isDark
-                              ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
-                              : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
-                            : confirmPassword && confirmPassword === password && isConfirmPasswordValid
-                            ? isDark
-                              ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
-                              : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
-                            : isDark
-                            ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
-                            : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        tabIndex={-1}
-                        aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                        className={`absolute inset-y-0 right-0 pr-3 flex items-center transition-colors cursor-pointer ${
-                          isDark
-                            ? 'text-slate-400 hover:text-white'
-                            : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+
+                      {/* Real-time Password Strength Indicator & Checklist */}
+                      <PasswordStrengthIndicator password={password} minChars={6} showChecklist={true} />
                     </div>
-                    {touched.confirmPassword && !isConfirmPasswordValid && (
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>
-                          {confirmPassword.length < 6
-                            ? 'Must be at least 6 characters.'
-                            : 'Passwords do not match.'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Trust Badges / Bullet Info repositioned inside modal body at the bottom */}

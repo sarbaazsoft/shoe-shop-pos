@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, Phone, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield, ExternalLink, Terminal, Copy } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface CreateStaffModalProps {
   isOpen: boolean;
@@ -693,78 +695,115 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Password */}
-                  <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Account Password <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-[#0F172A] border border-gray-300 dark:border-purple-500/30 rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                {(() => {
+                  const strength = evaluatePasswordStrength(formData.password, { minChars: 6 });
+                  const isMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
+                  const isMismatch = formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword;
 
-                  {/* Confirm Password */}
-                  <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Confirm Password <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        required
-                        placeholder="••••••••"
-                        value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        className="w-full pl-3 pr-10 py-2.5 bg-white dark:bg-[#0F172A] border border-gray-300 dark:border-purple-500/30 rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Password */}
+                        <div>
+                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
+                            Account Password <span className="text-red-500 dark:text-pink-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              required
+                              placeholder="••••••••"
+                              value={formData.password}
+                              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                              className={`w-full pl-3 pr-16 py-2.5 bg-white dark:bg-[#0F172A] border rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none transition shadow-2xs font-mono ${
+                                formData.password
+                                  ? strength.borderColorClass
+                                  : 'border-gray-300 dark:border-purple-500/30 focus:border-indigo-600 dark:focus:border-purple-400'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1.5">
+                              {formData.password && strength.isStrong && (
+                                <span title="Strong password">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
 
-                {/* Real-time Match status */}
-                {formData.password && formData.confirmPassword && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
-                      formData.password === formData.confirmPassword
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
-                        : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
-                    }`}
-                  >
-                    {formData.password === formData.confirmPassword ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Passwords match securely.</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>Passwords do not match yet.</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                        {/* Confirm Password */}
+                        <div>
+                          <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
+                            Confirm Password <span className="text-red-500 dark:text-pink-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              required
+                              placeholder="••••••••"
+                              value={formData.confirmPassword}
+                              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                              className={`w-full pl-3 pr-16 py-2.5 bg-white dark:bg-[#0F172A] border rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none transition shadow-2xs font-mono ${
+                                formData.confirmPassword
+                                  ? isMatch
+                                    ? 'password-border-match'
+                                    : 'password-border-mismatch'
+                                  : 'border-gray-300 dark:border-purple-500/30 focus:border-indigo-600 dark:focus:border-purple-400'
+                              }`}
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center space-x-1.5">
+                              {formData.confirmPassword && isMatch && (
+                                <span title="Passwords match">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                              >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password Strength Indicator & Checklist */}
+                      <PasswordStrengthIndicator password={formData.password} minChars={6} showChecklist={true} />
+
+                      {/* Real-time Match status */}
+                      {formData.password && formData.confirmPassword && (
+                        <div
+                          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
+                            isMatch
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60'
+                              : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60'
+                          }`}
+                        >
+                          {isMatch ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span className="font-medium">Passwords match securely.</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                              <span className="font-medium">Passwords do not match yet.</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Summary Box */}
                 <div className="p-3 bg-slate-50 dark:bg-purple-950/20 border border-slate-200 dark:border-purple-900/40 rounded-xl flex items-center justify-between">

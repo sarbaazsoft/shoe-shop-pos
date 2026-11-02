@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, CreditCard, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package } from 'lucide-react';
+import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, CreditCard, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
@@ -16,6 +16,8 @@ import { BrandLogo } from '../common/BrandLogo.tsx';
 import { CustomerPicker } from './CustomerPicker.tsx';
 import { PosToast, type PosToastNotification } from './PosToast.tsx';
 import { CartQuantityInput } from './CartQuantityInput.tsx';
+import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
+import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 export interface CartItem {
   productId: number;
@@ -149,6 +151,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const [showAdminOverrideModal, setShowAdminOverrideModal] = useState(false);
   const [overrideAdminEmail, setOverrideAdminEmail] = useState('');
   const [overrideAdminPassword, setOverrideAdminPassword] = useState('');
+  const [showOverridePassword, setShowOverridePassword] = useState(false);
   const [overridePendingItem, setOverridePendingItem] = useState<{
     name: string;
     minPrice: number;
@@ -2833,14 +2836,38 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Admin Password</label>
-                  <input
-                    type="password"
-                    value={overrideAdminPassword}
-                    onChange={(e) => setOverrideAdminPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl outline-none focus:border-blue-600 dark:focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showOverridePassword ? 'text' : 'password'}
+                      value={overrideAdminPassword}
+                      onChange={(e) => setOverrideAdminPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className={`w-full pl-3.5 pr-16 py-2 bg-slate-50 dark:bg-[#0A0E1A] border rounded-xl outline-none transition text-slate-900 dark:text-white ${
+                        overrideAdminPassword
+                          ? evaluatePasswordStrength(overrideAdminPassword, { minChars: 6 }).borderColorClass
+                          : 'border-slate-300 dark:border-slate-700 focus:border-blue-600 dark:focus:border-blue-500'
+                      }`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                      {overrideAdminPassword && evaluatePasswordStrength(overrideAdminPassword, { minChars: 6 }).isStrong && (
+                        <span title="Strong password">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowOverridePassword(!showOverridePassword)}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                        title={showOverridePassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showOverridePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  {overrideAdminPassword && (
+                    <PasswordStrengthIndicator password={overrideAdminPassword} minChars={6} showChecklist={false} />
+                  )}
                 </div>
               </div>
 
