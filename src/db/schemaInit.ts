@@ -560,7 +560,7 @@ const DATABASE_TABLE_DDL: string[] = [
     id SERIAL PRIMARY KEY,
     tenant_id INTEGER NOT NULL DEFAULT 1,
     return_number TEXT NOT NULL,
-    original_sale_id INTEGER NOT NULL REFERENCES sales(id),
+    original_sale_id INTEGER REFERENCES sales(id),
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     return_date TEXT NOT NULL,
     total_refund_amount NUMERIC(12, 2) NOT NULL,
@@ -572,7 +572,7 @@ const DATABASE_TABLE_DDL: string[] = [
     id SERIAL PRIMARY KEY,
     tenant_id INTEGER NOT NULL DEFAULT 1,
     return_id INTEGER NOT NULL REFERENCES returns(id) ON DELETE CASCADE,
-    sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
+    sale_item_id INTEGER REFERENCES sale_items(id),
     product_id INTEGER NOT NULL REFERENCES products(id),
     quantity INTEGER NOT NULL,
     unit_refund_price NUMERIC(12, 2) NOT NULL,
@@ -1418,6 +1418,11 @@ export async function ensureDatabaseSchema(): Promise<void> {
           END;
           BEGIN
             ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS pairs_per_carton INTEGER NOT NULL DEFAULT 1;
+          EXCEPTION WHEN OTHERS THEN NULL;
+          END;
+          BEGIN
+            ALTER TABLE returns ALTER COLUMN original_sale_id DROP NOT NULL;
+            ALTER TABLE return_items ALTER COLUMN sale_item_id DROP NOT NULL;
           EXCEPTION WHEN OTHERS THEN NULL;
           END;
         END $$;

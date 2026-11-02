@@ -255,7 +255,104 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
     }> = [];
 
     let origSale: any = null;
-    if (exchange && exchange.originalSaleId && Array.isArray(exchange.items) && exchange.items.length > 0) {
+    if (isWholesaleStore && exchange && Array.isArray(exchange.items) && exchange.items.length > 0) {
+      // -----------------------------------------------------------------------
+      // Wholesale Direct Return Flow (NO INVOICE NUMBER REQUIRED)
+      // Returned pairs directly restocked into inventory and credited to current invoice
+      // -----------------------------------------------------------------------
+      if (exchange.originalSaleId && Number(exchange.originalSaleId) > 0) {
+        try {
+          const origSaleRes = await pgClient.query('SELECT * FROM sales WHERE id = $1 AND COALESCE(tenant_id, 1) = $2', [exchange.originalSaleId, tenantId]);
+          if (origSaleRes.rows.length > 0) {
+            origSale = origSaleRes.rows[0];
+          }
+        } catch {}
+      }
+
+      for (const rItem of exchange.items) {
+        const retQty = parseInt(rItem.quantity, 10);
+        const refundPrice = parseFloat(rItem.unitRefundPrice);
+        const prodId = parseInt(rItem.productId, 10);
+        if (isNaN(retQty) || retQty <= 0 || !prodId) continue;
+
+        const prodRes = await pgClient.query<{ id: number; total_stock: number; article: string }>(
+          'SELECT id, total_stock, COALESCE(article, id::text) as article FROM products WHERE id = $1 AND COALESCE(tenant_id, 1) = $2 FOR UPDATE',
+          [prodId, tenantId]
+        );
+        if (prodRes.rows.length === 0) {
+          throw new Error(`Product #${prodId} not found in inventory.`);
+        }
+        const prevStock = prodRes.rows[0].total_stock;
+        const newStock = prevStock + retQty;
+        const itemCredit = Math.round(retQty * refundPrice * 100) / 100;
+        totalExchangeCredit += itemCredit;
+
+        await pgClient.query('UPDATE products SET total_stock = $1, updated_at = NOW() WHERE id = $2 AND COALESCE(tenant_id, 1) = $3', [
+          newStock,
+          prodId,
+          tenantId,
+        ]);
+
+        validatedReturnItems.push({
+          saleItemId: 0,
+          productId: prodId,
+          productName: rItem.productName || prodRes.rows[0].article || `Product #${prodId}`,
+          quantity: retQty,
+          unitRefundPrice: refundPrice,
+          subtotal: itemCredit,
+          prevStock,
+          newStock,
+        });
+      }
+
+      if (validatedReturnItems.length > 0) {
+        generatedReturnNumber = await generateReturnNumber(tenantId);
+        const returnRes = await pgClient.query<{ id: number }>(
+          `INSERT INTO returns (
+            tenant_id, return_number, original_sale_id, customer_id, return_date, 
+            total_refund_amount, reason, created_by
+          ) VALUES ($1, $2, $3, $4, NOW()::date::text, $5, $6, $7)
+          RETURNING id`,
+          [
+            tenantId,
+            generatedReturnNumber,
+            origSale ? origSale.id : null,
+            customerId ? parseInt(customerId, 10) : (origSale ? origSale.customer_id : null),
+            totalExchangeCredit,
+            (exchange.reason || 'Direct Wholesale Shoe Return').trim(),
+            user.id,
+          ]
+        );
+        const returnId = returnRes.rows[0].id;
+
+        for (const v of validatedReturnItems) {
+          await pgClient.query(
+            `INSERT INTO return_items (tenant_id, return_id, sale_item_id, product_id, quantity, unit_refund_price, subtotal)
+             VALUES ($1, $2, NULL, $3, $4, $5, $6)`,
+            [tenantId, returnId, v.productId, v.quantity, v.unitRefundPrice, v.subtotal]
+          );
+
+          await pgClient.query(
+            `INSERT INTO stock_movements (
+              tenant_id, product_id, qty_change, prev_stock, new_stock, movement_type, reference_id, user_id, notes
+            ) VALUES ($1, $2, $3, $4, $5, 'SALE_RETURN', $6, $7, $8)`,
+            [
+              tenantId,
+              v.productId,
+              v.quantity,
+              v.prevStock,
+              v.newStock,
+              generatedReturnNumber,
+              user.id,
+              `Wholesale Shoe Return (${generatedReturnNumber}): ${v.quantity} pairs returned at Rs. ${v.unitRefundPrice}/pair (${exchange.reason || 'Restocked into inventory'})`,
+            ]
+          );
+        }
+      }
+    } else if (exchange && exchange.originalSaleId && Array.isArray(exchange.items) && exchange.items.length > 0) {
+      // -----------------------------------------------------------------------
+      // Retail Direct Shoe Exchange Flow (Original retail logic preserved untouched)
+      // -----------------------------------------------------------------------
       const origSaleRes = await pgClient.query('SELECT * FROM sales WHERE id = $1 AND COALESCE(tenant_id, 1) = $2', [exchange.originalSaleId, tenantId]);
       if (origSaleRes.rows.length === 0) {
         throw new Error('Original sale record for exchange not found in this store.');
@@ -438,7 +535,11 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     let exchangeNote: string | null = null;
     if (validatedReturnItems.length > 0) {
-      exchangeNote = `Direct Shoe Exchange against ${origSale?.invoice_number || exchange.originalInvoiceNumber} (Return ${generatedReturnNumber}). Returned Credit: Rs. ${Math.round(totalExchangeCredit)}. Net Difference: Rs. ${Math.round(netDifference)}`;
+      if (isWholesaleStore) {
+        exchangeNote = `Wholesale Shoe Return (Return #${generatedReturnNumber}). Returned Credit: Rs. ${Math.round(totalExchangeCredit)} deducted directly from invoice balance.`;
+      } else {
+        exchangeNote = `Direct Shoe Exchange against ${origSale?.invoice_number || exchange.originalInvoiceNumber} (Return ${generatedReturnNumber}). Returned Credit: Rs. ${Math.round(totalExchangeCredit)}. Net Difference: Rs. ${Math.round(netDifference)}`;
+      }
     }
     const offlineNote = clientTxId ? `[Offline Tx: ${clientTxId.trim()}]` : null;
     const finalNotes = [notes?.trim(), exchangeNote, offlineNote].filter(Boolean).join(' | ') || null;
@@ -467,10 +568,20 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
     }
 
     // Invoice Calculation Logic:
-    // Total Amount Due on New Invoice = Current_Cart_Total + Customer_Previous_Balance
+    // For wholesale stores, returned pair value directly reduces the current invoice and Khata remaining balance:
+    // Net Current Invoice = (Items Subtotal - Items Discount) - Returned Credit
+    // Total Amount Due = Customer_Previous_Balance + Net_Current_Invoice
     // Remaining Balance = Total_Amount_Due - Payment_Received
-    const currentCartTotal = Math.max(0, netDifference);
-    const totalAmountDue = Math.round((currentCartTotal + customerPreviousBalance) * 100) / 100;
+    let netCurrentInvoice: number;
+    let totalAmountDue: number;
+    if (isWholesaleStore) {
+      netCurrentInvoice = Math.round(((calculatedSubtotal - calculatedTotalDiscount) - totalExchangeCredit) * 100) / 100;
+      totalAmountDue = Math.max(0, Math.round((customerPreviousBalance + netCurrentInvoice) * 100) / 100);
+    } else {
+      netCurrentInvoice = Math.max(0, netDifference);
+      totalAmountDue = Math.round((netCurrentInvoice + customerPreviousBalance) * 100) / 100;
+    }
+    const currentCartTotal = Math.max(0, netCurrentInvoice);
 
     let paymentReceived = 0;
     const rawPaid = typeof req.body.paidAmount !== 'undefined'
@@ -592,7 +703,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           balanceChange,
           remainingBalance,
           paymentMethod,
-          `Invoice #${invoiceNumber} (Items: Rs. ${currentCartTotal}, Prev Khata: Rs. ${customerPreviousBalance})`,
+          `Invoice #${invoiceNumber} (Items: Rs. ${calculatedSubtotal - calculatedTotalDiscount}${totalExchangeCredit > 0 ? `, Return: -Rs. ${totalExchangeCredit}` : ''}, Prev Khata: Rs. ${customerPreviousBalance})`,
         ]
       );
     }
@@ -634,8 +745,10 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
         const newItemsStr = validatedItems.map((i) => `${i.quantity}x ${i.productName}`).join(', ');
         notifyPosAction(tenantId, {
           type: 'EXCHANGE',
-          title: `🔁 Shoe Exchange: #${invoiceNumber}`,
-          message: `Exchange against Inv #${origSale?.invoice_number || exchange?.originalInvoiceNumber}. Old: [${oldItemsStr}] ➔ New: [${newItemsStr}]. Net: Rs. ${Math.round(netDifference)}. Handled by ${cashierDisplayName}.`,
+          title: isWholesaleStore ? `🔁 Wholesale Shoe Return: #${invoiceNumber}` : `🔁 Shoe Exchange: #${invoiceNumber}`,
+          message: isWholesaleStore
+            ? `Shoe Return against Inv #${invoiceNumber}. Returned: [${oldItemsStr}]. Credit: Rs. ${Math.round(totalExchangeCredit)}. Remaining Balance: Rs. ${Math.round(remainingBalance)}. Handled by ${cashierDisplayName}.`
+            : `Exchange against Inv #${origSale?.invoice_number || exchange?.originalInvoiceNumber}. Old: [${oldItemsStr}] ➔ New: [${newItemsStr}]. Net: Rs. ${Math.round(netDifference)}. Handled by ${cashierDisplayName}.`,
           invoiceNumber,
           orderId: saleId,
           saleId,
@@ -644,7 +757,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           customerName: customerDisplayName,
           cashierName: cashierDisplayName,
           cashierId: user.id,
-          itemsSummary: `Old: ${oldItemsStr} ➔ New: ${newItemsStr}`,
+          itemsSummary: isWholesaleStore ? `Returned: ${oldItemsStr}` : `Old: ${oldItemsStr} ➔ New: ${newItemsStr}`,
           exchangeDetails: {
             oldItems: oldItemsStr,
             newItems: newItemsStr,
@@ -681,7 +794,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     res.status(201).json({
       message: validatedReturnItems.length > 0
-        ? `Direct Shoe Exchange completed. Return ${generatedReturnNumber} generated.`
+        ? (isWholesaleStore ? `Shoe Return processed. Return #${generatedReturnNumber} generated.` : `Direct Shoe Exchange completed. Return ${generatedReturnNumber} generated.`)
         : 'Sale completed successfully.',
       invoiceNumber,
       returnNumber: generatedReturnNumber,

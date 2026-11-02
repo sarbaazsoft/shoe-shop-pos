@@ -1058,7 +1058,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
           0
         ) || 0)
       : 0;
-    const totalAmountDue = Math.round((netTotalPayable + prevBalance) * 100) / 100;
+
+    // For wholesale stores, deduct returned pair value directly against the current invoice and from the remaining balance
+    const netInvoiceDue = isWholesaleStore
+      ? (newSaleTotal - totalExchangeCredit)
+      : Math.max(0, netDifference);
+    const totalAmountDue = Math.max(0, Math.round((netInvoiceDue + prevBalance) * 100) / 100);
     const effectivePaidAmount = paymentMethod === 'KHATA'
       ? (typeof cashReceived === 'number' ? cashReceived : 0)
       : (typeof cashReceived === 'number' ? cashReceived : (cashReceived === '' ? totalAmountDue : parseFloat(String(cashReceived)) || totalAmountDue));
@@ -1364,7 +1369,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 </button>
               </div>
 
-              {/* Direct Shoe Exchange & Continuous Scan / Hardware Status */}
+              {/* Direct Shoe Exchange / Return & Continuous Scan / Hardware Status */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1375,10 +1380,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       ? 'bg-amber-400 hover:bg-amber-500 text-slate-950 border-amber-500 shadow-xs'
                       : 'bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-900 dark:text-amber-300 border-amber-300/80 dark:border-amber-500/30 shadow-2xs'
                   }`}
-                  title="Direct Shoe Return & Exchange (F4 or Ctrl+E)"
+                  title={isWholesaleStore ? "Shoe Return (F4 or Ctrl+E)" : "Direct Shoe Return & Exchange (F4 or Ctrl+E)"}
                 >
                   <Repeat className={`w-3.5 h-3.5 ${activeExchange ? 'text-slate-950 animate-spin' : 'text-amber-700 dark:text-amber-400'}`} style={{ animationDuration: '6s' }} />
-                  <span>Shoe Exchange</span>
+                  <span>{isWholesaleStore ? 'Shoe Return' : 'Shoe Exchange'}</span>
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/10 dark:bg-white/10 text-slate-900 dark:text-amber-200">F4</span>
                   {activeExchange && (
                     <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
@@ -1658,7 +1663,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
               </div>
             )}
 
-            {/* ACTIVE SHOE EXCHANGE BANNER */}
+            {/* ACTIVE SHOE RETURN / EXCHANGE BANNER */}
             {activeExchange && (
               <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-2.5">
@@ -1667,16 +1672,21 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-xs text-amber-950 dark:text-amber-200">SHOE EXCHANGE IN PROGRESS</span>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/80 text-[10px] font-mono font-bold text-amber-900 dark:text-amber-200">
-                        Orig Inv: #{activeExchange.originalInvoiceNumber}
+                      <span className="font-extrabold text-xs text-amber-950 dark:text-amber-200">
+                        {isWholesaleStore ? 'SHOE RETURN IN PROGRESS' : 'SHOE EXCHANGE IN PROGRESS'}
                       </span>
+                      {activeExchange.originalInvoiceNumber && activeExchange.originalInvoiceNumber !== 'Direct Return' && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/80 text-[10px] font-mono font-bold text-amber-900 dark:text-amber-200">
+                          Orig Inv: #{activeExchange.originalInvoiceNumber}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                      Returning {activeExchange.items.reduce((s, i) => s + i.quantity, 0)} shoe(s) • Exchange Credit:{' '}
+                      Returning {activeExchange.items.reduce((s, i) => s + i.quantity, 0)} shoe(s) • {isWholesaleStore ? 'Return Credit' : 'Exchange Credit'}:{' '}
                       <strong className="font-mono text-slate-950 dark:text-white font-black">
                         {currencySymbol} {formatStockPrice(totalExchangeCredit)}
                       </strong>
+                      {isWholesaleStore && <span className="text-emerald-700 dark:text-emerald-400 font-semibold ml-1">(Deducted directly from remaining balance)</span>}
                       {activeExchange.customerName && ` • Customer: ${activeExchange.customerName}`}
                     </p>
                   </div>
@@ -1696,9 +1706,9 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       onClearInitialExchange?.();
                     }}
                     className="px-2 py-1 bg-amber-200/60 dark:bg-amber-900/40 hover:bg-red-100 dark:hover:bg-red-950/60 text-slate-700 dark:text-slate-300 hover:text-red-700 dark:hover:text-red-300 rounded-lg text-xs font-semibold transition cursor-pointer"
-                    title="Cancel this exchange and restore regular POS sale"
+                    title={isWholesaleStore ? "Cancel this return and restore regular POS sale" : "Cancel this exchange and restore regular POS sale"}
                   >
-                    Cancel Exchange
+                    {isWholesaleStore ? 'Cancel Return' : 'Cancel Exchange'}
                   </button>
                 </div>
               </div>
@@ -1758,7 +1768,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-300 dark:bg-amber-900/80 text-slate-900 dark:text-amber-200 border border-amber-400 dark:border-amber-700">
-                            EXCHANGE RETURN
+                            {isWholesaleStore ? 'RETURN' : 'EXCHANGE RETURN'}
                           </span>
                           <span className="font-bold text-sm text-slate-900 dark:text-white line-through opacity-85">{retItem.productName}</span>
                         </div>
@@ -2264,7 +2274,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 <div className="flex justify-between text-amber-900 dark:text-amber-300 font-bold bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded-lg border border-amber-200 dark:border-amber-800/60">
                   <span className="flex items-center gap-1">
                     <RotateCcw className="w-3 h-3 text-amber-700 dark:text-amber-400" />
-                    <span>Shoe Exchange Credit:</span>
+                    <span>{isWholesaleStore ? 'Shoe Return Credit:' : 'Shoe Exchange Credit:'}</span>
                   </span>
                   <span className="font-mono text-emerald-700 dark:text-emerald-400">-{currencySymbol} {formatStockPrice(totalExchangeCredit)}</span>
                 </div>
@@ -2312,11 +2322,11 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   }`}
                 >
                   {isEvenExchange
-                    ? 'EVEN SHOE EXCHANGE'
+                    ? (isWholesaleStore ? 'EVEN RETURN SETTLEMENT' : 'EVEN SHOE EXCHANGE')
                     : isCustomerRefund
                     ? 'REFUND DUE TO CUSTOMER'
                     : activeExchange
-                    ? 'NET PAYABLE AFTER EXCHANGE'
+                    ? (isWholesaleStore ? 'NET PAYABLE AFTER RETURN' : 'NET PAYABLE AFTER EXCHANGE')
                     : 'TOTAL PAYABLE'}
                 </span>
               </div>
@@ -2496,8 +2506,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     selectedCust?.balance ??
                     0
                   ) || 0;
-                  const currentItemsTot = netTotalPayable;
-                  const netPayable = Math.round((currentItemsTot + prevBal) * 100) / 100;
+                  const currentItemsTot = isWholesaleStore
+                    ? Math.max(0, newSaleTotal - totalExchangeCredit)
+                    : netTotalPayable;
+                  const netPayable = isWholesaleStore
+                    ? Math.max(0, Math.round(((newSaleTotal - totalExchangeCredit) + prevBal) * 100) / 100)
+                    : Math.round((currentItemsTot + prevBal) * 100) / 100;
                   const paidNow = typeof cashReceived === 'number' ? cashReceived : 0;
                   const remBal = Math.max(0, Math.round((netPayable - paidNow) * 100) / 100);
 
@@ -2513,14 +2527,23 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         </span>
                       </div>
 
-                      {/* 5 Key Ledger Points */}
+                      {/* Key Ledger Points */}
                       <div className="space-y-1.5 pt-1 border-t border-indigo-200/60 dark:border-indigo-800/40 text-[11px]">
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
-                          <span>• Current Items Total:</span>
+                          <span>• Current Cart Items:</span>
                           <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                            {currencySymbol} {formatStockPrice(currentItemsTot)}
+                            {currencySymbol} {formatStockPrice(newSaleTotal)}
                           </span>
                         </div>
+
+                        {totalExchangeCredit > 0 && (
+                          <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-400 font-semibold">
+                            <span>• Returned Footwear Deduction:</span>
+                            <span className="font-mono font-bold">
+                              -{currencySymbol} {formatStockPrice(totalExchangeCredit)}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
                           <span>• Previous Khata Balance:</span>
@@ -2709,12 +2732,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 {isSubmitting
                   ? 'Recording Transaction...'
                   : isEvenExchange
-                  ? 'Complete Even Shoe Exchange (F9)'
+                  ? (isWholesaleStore ? 'Complete Even Return Settlement (F9)' : 'Complete Even Shoe Exchange (F9)')
                   : isCustomerRefund
-                  ? 'Authorize Exchange & Refund Difference (F9)'
+                  ? (isWholesaleStore ? 'Authorize Return & Refund Difference (F9)' : 'Authorize Exchange & Refund Difference (F9)')
                   : activeExchange
-                  ? 'Authorize Exchange & Print Receipt (F9)'
-                  : 'Print Receipt & Complete (F9)'}
+                  ? (isWholesaleStore ? 'Authorize Return & Print Invoice (F9)' : 'Authorize Exchange & Print Receipt (F9)')
+                  : (isWholesaleStore ? 'Print Invoice & Complete (F9)' : 'Print Receipt & Complete (F9)')}
               </span>
             </button>
 
@@ -2858,9 +2881,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
         />
       )}
 
-      {/* DIRECT SHOE EXCHANGE MODAL */}
+      {/* DIRECT SHOE EXCHANGE / RETURN MODAL */}
       {isExchangeModalOpen && (
         <ShoeExchangeModal
+          currencySymbol={currencySymbol}
           companySettings={companySettings}
           onClose={() => setIsExchangeModalOpen(false)}
           onApplyExchange={(exchange) => {

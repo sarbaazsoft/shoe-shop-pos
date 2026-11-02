@@ -49,11 +49,17 @@ function appPathForTab(tab: string): string {
   return `/${tab || 'dashboard'}`;
 }
 
-function resolveTargetTab(requestedTab: string | undefined | null, user: any): string {
+function resolveTargetTab(requestedTab: string | undefined | null, user: any, companySettings?: any): string {
   const role = (user?.role || '').toLowerCase();
   const isCashier = role === 'cashier';
   const isAdmin = role === 'admin' || role === 'superadmin';
   const clean = (requestedTab || '').toLowerCase().trim();
+  const isWholesale = String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+
+  // Wholesale stores process returns directly on POS invoice; redirect any direct /returns access to POS
+  if (isWholesale && (clean === 'returns' || clean === 'exchange')) {
+    return 'pos';
+  }
 
   // Route Guard: Settings are accessible to:
   // - Store Owners / Admins (store settings, staff/users, printer settings)
@@ -795,7 +801,7 @@ export default function App() {
   };
 
   const handleTabChange = (targetTab: string) => {
-    const valid = resolveTargetTab(targetTab, currentUser);
+    const valid = resolveTargetTab(targetTab, currentUser, companySettings);
     setCurrentTab(valid);
     window.history.replaceState({}, '', appPathForTab(valid));
   };
@@ -818,6 +824,14 @@ export default function App() {
     const role = (currentUser?.role || '').toLowerCase();
     const isCashier = role === 'cashier';
     const isAdmin = role === 'admin' || role === 'superadmin';
+    const isWholesale = String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+
+    // Wholesale stores process returns directly on POS invoice; redirect any direct /returns access to POS
+    if (isWholesale && (currentTab === 'returns' || currentTab === 'exchange')) {
+      setCurrentTab('pos');
+      window.history.replaceState({}, '', appPathForTab('pos'));
+      return;
+    }
 
     // Route Protection: Non-permitted roles are redirected away from settings
     if (currentTab === 'settings' && !isAdmin && !isCashier) {
@@ -831,7 +845,7 @@ export default function App() {
         setCurrentTab('pos');
       }
     }
-  }, [currentUser, currentTab]);
+  }, [currentUser, currentTab, companySettings]);
 
   // Deep-link event listener from Web Push notifications & Service Worker
   useEffect(() => {

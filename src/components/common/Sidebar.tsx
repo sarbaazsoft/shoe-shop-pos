@@ -135,11 +135,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const isWholesaleStore =
+    String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+
   const sections: NavSection[] = rawSections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
         if (isCashier && item.id === 'purchases') {
+          return false;
+        }
+        // Wholesale stores process returns directly on the current invoice; hide Returns/Exchange navigation link
+        if (isWholesaleStore && (item.id === 'returns' || item.id === 'exchange')) {
           return false;
         }
         return true;

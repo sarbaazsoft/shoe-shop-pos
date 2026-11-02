@@ -475,6 +475,8 @@ export function buildWhatsAppInvoiceText(sale: any, companySettings: any): strin
   const remainingBalance = parseFloat(sale.remaining_balance ?? Math.max(0, grandTotalDue - paidAmount));
   const changeGiven = parseFloat(sale.change_given || (paidAmount > grandTotalDue ? paidAmount - grandTotalDue : 0));
 
+  const isWholesale = String(sale.sale_type || sale.saleType || companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+
   let message = `🛍️ *${storeName}* - Digital Receipt\n`;
   message += `━━━━━━━━━━━━━━━━━━━━\n`;
   message += `🧾 Invoice: *${sale.invoice_number}*\n`;
@@ -487,8 +489,13 @@ export function buildWhatsAppInvoiceText(sale: any, companySettings: any): strin
   message += `━━━━━━━━━━━━━━━━━━━━\n`;
   if (discount > 0) message += `💰 Discount: -${currency} ${formatStockPrice(discount)}\n`;
   if (exchangeCredit > 0) {
-    message += `🔄 Exchange Credit: -${currency} ${formatStockPrice(exchangeCredit)}\n`;
-    if (sale.return_number) message += `📑 Exchange Return #: ${sale.return_number}\n`;
+    if (isWholesale) {
+      message += `🔄 Return Credit: -${currency} ${formatStockPrice(exchangeCredit)}\n`;
+      if (sale.return_number) message += `📑 Return #: ${sale.return_number}\n`;
+    } else {
+      message += `🔄 Exchange Credit: -${currency} ${formatStockPrice(exchangeCredit)}\n`;
+      if (sale.return_number) message += `📑 Exchange Return #: ${sale.return_number}\n`;
+    }
   }
   if (previousBalance !== 0) {
     message += `📋 Previous Khata Balance: ${currency} ${formatStockPrice(previousBalance)}\n`;
@@ -538,13 +545,20 @@ export function buildSmsInvoiceText(sale: any, companySettings: any): string {
   const grandTotalDue = Math.round((currentItemsTotal + previousBalance) * 100) / 100;
   const paidAmount = parseFloat(sale.paid_amount ?? sale.cash_received ?? grandTotalDue);
   const remainingBalance = parseFloat(sale.remaining_balance ?? Math.max(0, grandTotalDue - paidAmount));
+  const isWholesale = String(sale.sale_type || sale.saleType || companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
 
   let sms = `${storeName} Receipt\n`;
   sms += `Inv: ${sale.invoice_number} | ${sale.sale_date || ''}\n`;
   if (sale.customer_name) sms += `Cust: ${sale.customer_name}\n`;
   sms += `Items: ${itemsSummary}\n`;
   if (discount > 0) sms += `Disc: -${currency}${formatStockPrice(discount)}\n`;
-  if (exchangeCredit > 0) sms += `Exch Credit: -${currency}${formatStockPrice(exchangeCredit)}\n`;
+  if (exchangeCredit > 0) {
+    if (isWholesale) {
+      sms += `Return Credit: -${currency}${formatStockPrice(exchangeCredit)}\n`;
+    } else {
+      sms += `Exch Credit: -${currency}${formatStockPrice(exchangeCredit)}\n`;
+    }
+  }
   if (previousBalance !== 0) sms += `Prev Bal: ${currency}${formatStockPrice(previousBalance)} | Items: ${currency}${formatStockPrice(currentItemsTotal)}\n`;
   sms += `Total Due: ${currency}${formatStockPrice(grandTotalDue)} | Paid: ${currency}${formatStockPrice(paidAmount)}\n`;
   if (remainingBalance > 0) sms += `Khata Bal: ${currency}${formatStockPrice(remainingBalance)}\n`;

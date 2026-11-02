@@ -181,6 +181,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
   const subtotal = parseFloat(sale.subtotal || 0);
   const discount = parseFloat(sale.discount || 0);
+  const exchangeCredit = parseFloat(sale.exchange_credit || sale.exchangeCredit || 0);
+  const returnedItems = Array.isArray(sale.returned_items)
+    ? sale.returned_items
+    : Array.isArray(sale.returnedItems)
+    ? sale.returnedItems
+    : [];
   const itemsSubtotal = items.reduce(
     (acc: number, it: any) =>
       acc + (parseFloat(it.subtotal || it.quantity * it.unit_price) || 0),
@@ -196,7 +202,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
   const previousBalance = parseFloat(sale.previous_balance || 0);
   const grandTotalDue = parseFloat(
-    sale.total_amount || currentItemsTotal + previousBalance
+    sale.total_amount || Math.max(0, currentItemsTotal - (isWholesaleTransaction ? exchangeCredit : 0) + previousBalance)
   );
   const paidAmount = parseFloat(
     sale.paid_amount ?? sale.cash_received ?? grandTotalDue
@@ -662,6 +668,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                     <span className="font-mono">-{currencySymbol} {formatStockPrice(discount)}</span>
                   </div>
                 )}
+                {exchangeCredit > 0 && (
+                  <div className="flex justify-between text-indigo-700 font-semibold text-[9px]">
+                    <span>{isWholesaleTransaction ? 'Return Credit:' : 'Exchange Credit:'}</span>
+                    <span className="font-mono">-{currencySymbol} {formatStockPrice(exchangeCredit)}</span>
+                  </div>
+                )}
                 {isWholesaleTransaction && previousBalance !== 0 && (
                   <div className="flex justify-between font-medium text-slate-700 text-[9px]">
                     <span>Prev Khata:</span>
@@ -692,7 +704,11 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               {/* Footer */}
               <div className="pt-2 text-center space-y-1">
                 <p className="text-[8px] text-gray-600 italic px-1">{invoiceFooter}</p>
-                <p className="text-[7.5px] text-gray-500">*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***</p>
+                <p className="text-[7.5px] text-gray-500">
+                  {isWholesaleTransaction
+                    ? '*** WHOLESALE RETURN & COMMERCIAL DISPATCH ***'
+                    : '*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***'}
+                </p>
                 <p className="text-[7px] text-gray-400 pt-1 border-t border-gray-100">
                   Powered by SarbaazSoft POS
                 </p>
@@ -923,6 +939,45 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                 </div>
               </div>
 
+              {/* Wholesale Returned Footwear Table (Deducted directly from Balance) */}
+              {returnedItems.length > 0 && (
+                <div className="mt-3.5 pt-3 border-t-2 border-indigo-200">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-black text-xs uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                        {isWholesaleTransaction ? 'RETURN' : 'EXCHANGE'}
+                      </span>
+                      {isWholesaleTransaction ? 'Returned Footwear (Deducted directly from Balance)' : 'Exchanged Footwear'}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-indigo-700">
+                      Total Credit: -{currencySymbol} {formatStockPrice(exchangeCredit)}
+                    </span>
+                  </div>
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-y border-indigo-200 bg-indigo-50/60 text-indigo-900 font-bold text-[11px]">
+                        <th className="py-1.5 px-2 text-left w-8">#</th>
+                        <th className="py-1.5 px-2 text-left">Article / Product</th>
+                        <th className="py-1.5 px-2 text-center">Returned Pairs</th>
+                        <th className="py-1.5 px-2 text-right">Return Rate</th>
+                        <th className="py-1.5 px-2 text-right">Credit Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnedItems.map((r: any, rIdx: number) => (
+                        <tr key={rIdx} className="border-b border-indigo-100/60 text-slate-800">
+                          <td className="py-1.5 px-2 text-gray-500 font-mono text-[10px]">{rIdx + 1}</td>
+                          <td className="py-1.5 px-2 font-bold text-slate-900">{r.productName || r.product_name}</td>
+                          <td className="py-1.5 px-2 text-center font-mono font-bold">{r.quantity} prs</td>
+                          <td className="py-1.5 px-2 text-right font-mono">{currencySymbol} {formatStockPrice(r.unitRefundPrice || r.unit_refund_price || 0)}</td>
+                          <td className="py-1.5 px-2 text-right font-mono font-bold text-indigo-700">-{currencySymbol} {formatStockPrice(r.subtotal || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               {/* Financial Summary */}
               <div className="flex justify-end mt-4 pt-3 border-t border-gray-300">
                 <div className="w-80 space-y-1.5 text-xs">
@@ -934,6 +989,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                     <div className="flex justify-between text-emerald-700">
                       <span>Total Discount:</span>
                       <span>-{currencySymbol} {formatStockPrice(discount)}</span>
+                    </div>
+                  )}
+                  {exchangeCredit > 0 && (
+                    <div className="flex justify-between text-indigo-700 font-semibold">
+                      <span>{isWholesaleTransaction ? 'Returned Shoes Credit:' : 'Exchange Credit:'}</span>
+                      <span className="font-mono">-{currencySymbol} {formatStockPrice(exchangeCredit)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1">
@@ -1095,6 +1156,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   <span style={{ fontFamily: 'monospace' }}>-{currencySymbol} {formatStockPrice(discount)}</span>
                 </div>
               )}
+              {exchangeCredit > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontWeight: 600 }}>
+                  <span>{isWholesaleTransaction ? 'Return Credit:' : 'Exchange Credit:'}</span>
+                  <span style={{ fontFamily: 'monospace' }}>-{currencySymbol} {formatStockPrice(exchangeCredit)}</span>
+                </div>
+              )}
               {isWholesaleTransaction && previousBalance !== 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontWeight: 600 }}>
                   <span>Prev Khata:</span>
@@ -1124,7 +1191,11 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
             <div style={{ textAlign: 'center', paddingTop: '6px', color: '#000000' }}>
               <div style={{ fontSize: '8.5px', fontStyle: 'italic', color: '#333333' }}>{invoiceFooter}</div>
-              <div style={{ fontSize: '8px', color: '#555555', marginTop: '3px' }}>*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***</div>
+              <div style={{ fontSize: '8px', color: '#555555', marginTop: '3px' }}>
+                {isWholesaleTransaction
+                  ? '*** WHOLESALE RETURN & COMMERCIAL DISPATCH ***'
+                  : '*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***'}
+              </div>
               <div style={{ fontSize: '7px', color: '#777777', marginTop: '3px', borderTop: '1px dashed #ccc', paddingTop: '2px' }}>Powered by SarbaazSoft Shoe POS</div>
             </div>
           </div>
@@ -1248,6 +1319,38 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               </tbody>
             </table>
 
+            {/* Wholesale Returned Footwear Table in Print */}
+            {returnedItems.length > 0 && (
+              <div style={{ marginTop: '10px', paddingTop: '6px', borderTop: '2px solid #888' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                  <span>{isWholesaleTransaction ? 'RETURNED FOOTWEAR (Deducted directly from Balance):' : 'EXCHANGED FOOTWEAR:'}</span>
+                  <span>Credit: -{currencySymbol} {formatStockPrice(exchangeCredit)}</span>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #444', backgroundColor: '#f0f0f0' }}>
+                      <th style={{ padding: '4px', textAlign: 'left', width: '28px' }}>#</th>
+                      <th style={{ padding: '4px', textAlign: 'left' }}>Article</th>
+                      <th style={{ padding: '4px', textAlign: 'center' }}>Returned Pairs</th>
+                      <th style={{ padding: '4px', textAlign: 'right' }}>Return Rate</th>
+                      <th style={{ padding: '4px', textAlign: 'right' }}>Credit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnedItems.map((r: any, rIdx: number) => (
+                      <tr key={rIdx} style={{ borderBottom: '1px solid #ddd' }}>
+                        <td style={{ padding: '4px' }}>{rIdx + 1}</td>
+                        <td style={{ padding: '4px', fontWeight: 'bold' }}>{r.productName || r.product_name}</td>
+                        <td style={{ padding: '4px', textAlign: 'center' }}>{r.quantity} prs</td>
+                        <td style={{ padding: '4px', textAlign: 'right' }}>{currencySymbol} {formatStockPrice(r.unitRefundPrice || r.unit_refund_price || 0)}</td>
+                        <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>-{currencySymbol} {formatStockPrice(r.subtotal || 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Total Cartons and Pairs Note in Print */}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', backgroundColor: '#f5f5f5', border: '1px solid #ddd', marginTop: '8px', fontSize: '11px', fontWeight: 'bold' }}>
               <span>Total Dispatched Cartons: {displayTotalCartons} Ctns {halfCartonItemsCount > 0 ? `(with ${halfCartonItemsCount} half-carton)` : ''}</span>
@@ -1264,6 +1367,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Discount:</span>
                     <span>-{currencySymbol} {formatStockPrice(discount)}</span>
+                  </div>
+                )}
+                {exchangeCredit > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                    <span>{isWholesaleTransaction ? 'Returned Shoes Credit:' : 'Exchange Credit:'}</span>
+                    <span style={{ fontFamily: 'monospace' }}>-{currencySymbol} {formatStockPrice(exchangeCredit)}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #ccc', paddingTop: '3px', fontWeight: 'bold' }}>
