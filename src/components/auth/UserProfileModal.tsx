@@ -5,7 +5,7 @@ import { api, setAuthToken } from '../../services/api.ts';
 import { UserAvatar } from '../common/UserAvatar.tsx';
 import { InstallAppModal } from '../common/InstallAppModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, cleanEmail, isValidEmail, getEmailValidationError } from '../../utils/textFormat.ts';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -179,8 +179,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
-    if (phone.trim() && !isValidPhoneNumber(phone)) {
-      setProfileError('Phone number must contain between 10 and 15 digits without a leading 0 right after a hyphen.');
+    if (phone.trim() && !isValidEmail(phone)) {
+      setProfileError('Please provide a valid alternate or recovery email address.');
       return;
     }
 
@@ -188,7 +188,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     try {
       const res = await api.auth.updateProfile({
         name: toTitleCaseTrimmed(name),
-        phone: phone.trim(),
+        phone: cleanEmail(phone),
         avatarUrl: avatarUrl.trim(),
       });
 
@@ -542,45 +542,43 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 />
               </div>
 
-              {/* Phone Number - Editable */}
+              {/* Alternate / Recovery Email - Editable */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                     <span className="flex items-center space-x-1.5">
-                      <Phone className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>Phone Number</span>
+                      <Mail className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Alternate / Recovery Email (Optional)</span>
                     </span>
                   </label>
-                  {phone && isValidPhoneNumber(phone) && (
+                  {phone && isValidEmail(phone) && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60 animate-in fade-in duration-200">
                       <CheckCircle2 className="w-3 h-3 shrink-0" />
-                      <span>Valid phone</span>
+                      <span>Valid email</span>
                     </span>
                   )}
                 </div>
                 <div className="relative">
                   <input
                     id="profile-phone-input"
-                    type="tel"
-                    placeholder="e.g. +92 300 1234567 or 0321-7654321"
+                    type="email"
+                    placeholder="e.g. backup.account@shoestore.com"
                     value={phone}
-                    onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition ${
-                      phone && isValidPhoneNumber(phone)
+                    onChange={(e) => setPhone(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition ${
+                      phone && isValidEmail(phone)
                         ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-10'
                         : 'bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-white focus:border-blue-600 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20'
                     }`}
                   />
-                  {phone && isValidPhoneNumber(phone) && (
+                  {phone && isValidEmail(phone) && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                  {isSuperAdmin
-                    ? 'Used for platform administration, notifications, and emergency recovery contact (10 to 15 digits).'
-                    : 'Used for staff contact, shift management, and counter accountability (10 to 15 digits).'}
+                  Used for security alerts, password recovery, and staff notifications.
                 </p>
               </div>
 

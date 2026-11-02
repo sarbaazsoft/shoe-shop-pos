@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, Phone, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield, ExternalLink, Terminal, Copy } from 'lucide-react';
+import { UserPlus, X, Check, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, User, Mail, ShieldCheck, Lock, Eye, EyeOff, RefreshCw, KeyRound, Store, Shield, ExternalLink, Terminal, Copy } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, cleanEmail, isValidEmail } from '../../utils/textFormat.ts';
 
 interface CreateStaffModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
+    alternateEmail: '',
     role: 'CASHIER' as 'ADMIN' | 'CASHIER',
     status: 'APPROVED' as 'APPROVED' | 'PENDING',
     password: '',
@@ -54,8 +54,12 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
       setErrorMessage('Email address is required.');
       return false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    if (!isValidEmail(formData.email)) {
       setErrorMessage('Please provide a valid email address (e.g. cashier@shoestore.com).');
+      return false;
+    }
+    if (formData.alternateEmail.trim() && !isValidEmail(formData.alternateEmail)) {
+      setErrorMessage('Please provide a valid alternate email address.');
       return false;
     }
     return true;
@@ -88,7 +92,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
     setFormData({
       name: '',
       email: '',
-      phone: '',
+      alternateEmail: '',
       role: 'CASHIER',
       status: 'APPROVED',
       password: '',
@@ -105,7 +109,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
     setFormData({
       name: '',
       email: '',
-      phone: '',
+      alternateEmail: '',
       role: 'CASHIER',
       status: 'APPROVED',
       password: '',
@@ -134,8 +138,8 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
     try {
       const res = await api.settings.createUser({
         name: toTitleCaseTrimmed(formData.name),
-        email: toLowerTrimmed(formData.email),
-        phone: formData.phone.trim(),
+        email: cleanEmail(formData.email),
+        phone: cleanEmail(formData.alternateEmail || formData.email),
         password: formData.password,
         confirmPassword: formData.confirmPassword,
         role: formData.role,
@@ -449,11 +453,20 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
 
                   {/* Email */}
                   <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Login Email Address <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                        Login Email Address <span className="text-red-500 dark:text-pink-400">*</span>
+                      </label>
+                      {formData.email && isValidEmail(formData.email) && (
+                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200 ${
+                        formData.email && isValidEmail(formData.email) ? 'text-emerald-500' : 'text-slate-400'
+                      }`}>
                         <Mail className="w-3.5 h-3.5" />
                       </div>
                       <input
@@ -462,49 +475,58 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                         placeholder="cashier@shoestore.com"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#0F172A] border border-gray-300 dark:border-purple-500/30 rounded-xl text-xs font-medium text-gray-900 dark:text-white placeholder-slate-400 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
-                        Contact Phone (Optional)
-                      </label>
-                      {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
-                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({formData.phone.replace(/\D/g, '').length} digits)
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200 ${
-                        formData.phone && isValidPhoneNumber(formData.phone, 10, 15) ? 'text-emerald-500' : 'text-slate-400'
-                      }`}>
-                        <Phone className="w-3.5 h-3.5" />
-                      </div>
-                      <input
-                        type="tel"
-                        placeholder="e.g. 0300-1234567 or +92-300-1234567"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: formatPhoneNumber(e.target.value, formData.phone) })}
                         className={`w-full pl-9 pr-9 py-2.5 bg-white dark:bg-[#0F172A] rounded-xl text-xs font-medium placeholder-slate-400 outline-none transition-all duration-200 shadow-2xs font-mono ${
-                          formData.phone && isValidPhoneNumber(formData.phone, 10, 15)
+                          formData.email && isValidEmail(formData.email)
                             ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
                             : 'border border-gray-300 dark:border-purple-500/30 text-gray-900 dark:text-white focus:border-indigo-600 dark:focus:border-purple-400'
                         }`}
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                        {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
+                        {formData.email && isValidEmail(formData.email) && (
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                         )}
                       </div>
                     </div>
-                    {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
+                  </div>
+
+                  {/* Alternate / Recovery Email */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                        Alternate / Recovery Email (Optional)
+                      </label>
+                      {formData.alternateEmail && isValidEmail(formData.alternateEmail) && (
+                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200 ${
+                        formData.alternateEmail && isValidEmail(formData.alternateEmail) ? 'text-emerald-500' : 'text-slate-400'
+                      }`}>
+                        <Mail className="w-3.5 h-3.5" />
+                      </div>
+                      <input
+                        type="email"
+                        placeholder="alternate.staff@shoestore.com"
+                        value={formData.alternateEmail}
+                        onChange={(e) => setFormData({ ...formData, alternateEmail: e.target.value })}
+                        className={`w-full pl-9 pr-9 py-2.5 bg-white dark:bg-[#0F172A] rounded-xl text-xs font-medium placeholder-slate-400 outline-none transition-all duration-200 shadow-2xs font-mono ${
+                          formData.alternateEmail && isValidEmail(formData.alternateEmail)
+                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
+                            : 'border border-gray-300 dark:border-purple-500/30 text-gray-900 dark:text-white focus:border-indigo-600 dark:focus:border-purple-400'
+                        }`}
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                        {formData.alternateEmail && isValidEmail(formData.alternateEmail) && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        )}
+                      </div>
+                    </div>
+                    {formData.alternateEmail && isValidEmail(formData.alternateEmail) && (
                       <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Verified alternate email format.
                       </p>
                     )}
                   </div>

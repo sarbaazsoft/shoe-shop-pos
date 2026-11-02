@@ -32,27 +32,13 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
               </span>
               <span className="text-slate-300 dark:text-slate-600">&bull;</span>
               <span className="text-slate-600 dark:text-slate-300 font-medium">
-                Powered by <a
-                id="sarbaazsoft-credit-link"
-                href="https://portpolio-eight-pi.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline font-bold transition"
-              >
-                SarbaazSoft Shoe POS
-              </a>
+                Powered by <span className="font-bold text-slate-900 dark:text-white">SarbaazSoft Shoe POS</span>
               </span>
             </>
           ) : (
-            <a
-                id="sarbaazsoft-credit-link"
-                href="https://portpolio-eight-pi.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline font-bold transition"
-              >
-                SarbaazSoft Shoe POS
-              </a>
+            <span className="font-bold text-slate-900 dark:text-white">
+              SarbaazSoft Shoe POS
+            </span>
           )}
           {showSubtitle && (
             <>
@@ -63,11 +49,6 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
         </div>
 
         <div className="flex items-center gap-4 text-xs font-medium">
-          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-            System Secure
-          </span>
-          <span className="text-slate-300 dark:text-slate-600">&bull;</span>
           <span className="text-slate-500 dark:text-slate-400">
             &copy; 2026 All rights reserved.
           </span>

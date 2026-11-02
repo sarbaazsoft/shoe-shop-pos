@@ -18,7 +18,7 @@ import {
   Check,
 } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
-import { toTitleCaseLive, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber, getPhoneValidationError } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toLowerTrimmed, cleanEmail, isValidEmail, getEmailValidationError } from '../../utils/textFormat.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
 
 interface FreeTrialOnboardingModalProps {
@@ -166,13 +166,12 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
 
   // Validation calculations
   const cleanName = name.trim();
-  const cleanEmail = toLowerTrimmed(email);
-  const cleanPhone = cleanPhoneNumber(phone);
-  const phoneDigits = cleanPhone.replace(/\D/g, '');
+  const cleanEmailInput = toLowerTrimmed(email);
+  const cleanSecondaryEmail = toLowerTrimmed(phone);
 
   const isNameValid = cleanName.length >= 2 && /[a-zA-Z\u0600-\u06FF]/.test(cleanName);
-  const isEmailFormatValid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail);
-  const isPhoneValid = isValidPhoneNumber(cleanPhone, 10, 15);
+  const isEmailFormatValid = isValidEmail(cleanEmailInput);
+  const isSecondaryEmailValid = !cleanSecondaryEmail || isValidEmail(cleanSecondaryEmail);
   const isPasswordValid = password.length >= 6;
   const isConfirmPasswordValid = confirmPassword.length >= 6 && confirmPassword === password;
 
@@ -191,7 +190,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
       return;
     }
 
-    if (!cleanEmail || !isEmailFormatValid) {
+    if (!cleanEmailInput || !isEmailFormatValid) {
       setErrorMessage('Please enter a valid email address (e.g. owner@shoestore.com).');
       return;
     }
@@ -201,9 +200,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
       return;
     }
 
-    const phoneError = getPhoneValidationError(cleanPhone, { label: 'Phone / WhatsApp number', minDigits: 10, maxDigits: 15 });
-    if (phoneError) {
-      setErrorMessage(phoneError);
+    if (cleanSecondaryEmail && !isValidEmail(cleanSecondaryEmail)) {
+      setErrorMessage('Please enter a valid alternate email address (e.g. backup@shoestore.com).');
       return;
     }
 
@@ -223,8 +221,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
     try {
       const res = await api.saas.submitStoreRequest({
         name: toTitleCaseLive(cleanName),
-        email: cleanEmail,
-        phone: cleanPhone,
+        email: cleanEmailInput,
+        phone: cleanSecondaryEmail || cleanEmailInput,
         password: password.trim(),
         confirmPassword: confirmPassword.trim(),
         plan: initialPlan || 'TRIAL',
@@ -514,16 +512,24 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                     >
                       Email Address (Login Username) <span className="text-purple-500">*</span>
                     </label>
-                    <span
-                      className={`text-[11px] font-mono ${
-                        isDark ? 'text-slate-400' : 'text-slate-500'
-                      }`}
-                    >
-                      Primary store owner email
-                    </span>
+                    {email && isEmailFormatValid && emailAvailable !== false ? (
+                      <span className="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1 animate-in fade-in duration-200">
+                        <Check className="w-3 h-3 stroke-[3]" /> Valid email
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-[11px] font-mono ${
+                          isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}
+                      >
+                        Primary store owner email
+                      </span>
+                    )}
                   </div>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors duration-200 ${
+                      email && isEmailFormatValid && emailAvailable !== false ? 'text-emerald-500' : 'text-slate-400'
+                    }`}>
                       <Mail className="w-4 h-4" />
                     </div>
                     <input
@@ -539,7 +545,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                       placeholder="owner@shoestore.com"
                       disabled={isLoading}
-                      className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                      className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm font-mono outline-none transition-all duration-200 focus:ring-2 ${
                         isDark
                           ? 'bg-[#151E33] text-white placeholder-slate-500'
                           : 'bg-white text-slate-900 placeholder-slate-400'
@@ -548,19 +554,19 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                           ? isDark
                             ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
                             : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
-                          : touched.email && isEmailFormatValid && emailAvailable === true
+                          : email && isEmailFormatValid && emailAvailable !== false
                           ? isDark
-                            ? 'border-emerald-500/70 bg-emerald-950/20 focus:border-emerald-400 focus:ring-emerald-500/20'
-                            : 'border-emerald-400 bg-emerald-50/20 focus:border-emerald-500 focus:ring-emerald-500/20'
+                            ? 'border-2 border-emerald-500/90 bg-emerald-950/25 ring-2 ring-emerald-500/25 focus:border-emerald-400 focus:ring-emerald-500/30'
+                            : 'border-2 border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/25 focus:border-emerald-600 focus:ring-emerald-500/30'
                           : isDark
                           ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
                           : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
                       }`}
                     />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
                       {emailChecking && <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />}
-                      {!emailChecking && touched.email && isEmailFormatValid && emailAvailable === true && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      {!emailChecking && email && isEmailFormatValid && emailAvailable !== false && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                       )}
                       {!emailChecking && ((touched.email && !isEmailFormatValid) || emailAvailable === false) && (
                         <AlertCircle className="w-4 h-4 text-rose-500" />
@@ -579,15 +585,15 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       <span>{emailCheckMessage}</span>
                     </div>
                   )}
-                  {!emailChecking && touched.email && isEmailFormatValid && emailAvailable === true && (
+                  {!emailChecking && email && isEmailFormatValid && emailAvailable !== false && (
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Email is available for registration.</span>
+                      <span>Email format valid and available for registration.</span>
                     </div>
                   )}
                 </div>
 
-                {/* 3. Phone / WhatsApp Number */}
+                {/* 3. Alternate / Recovery Email */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label
@@ -596,23 +602,11 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                         isDark ? 'text-slate-200' : 'text-gray-800'
                       }`}
                     >
-                      Phone / WhatsApp Number <span className="text-purple-500">*</span>
+                      Alternate / Recovery Email (Optional)
                     </label>
-                    {phone ? (
-                      <span className="text-[11px] font-mono">
-                        {isPhoneValid ? (
-                          <span className="text-emerald-500 font-semibold flex items-center gap-1 animate-in fade-in duration-200">
-                            <Check className="w-3 h-3 stroke-[3]" /> Valid ({phoneDigits.length} digits)
-                          </span>
-                        ) : (
-                          <span className="text-rose-500 font-medium">
-                            {phoneDigits.length < 10
-                              ? `Need min 10 digits (${phoneDigits.length}/10)`
-                              : phoneDigits.length > 15
-                              ? 'Exceeds 15 digits'
-                              : 'Invalid format'}
-                          </span>
-                        )}
+                    {phone && isValidEmail(phone) ? (
+                      <span className="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1 animate-in fade-in duration-200">
+                        <Check className="w-3 h-3 stroke-[3]" /> Valid email
                       </span>
                     ) : (
                       <span
@@ -620,43 +614,41 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                           isDark ? 'text-slate-400' : 'text-slate-500'
                         }`}
                       >
-                        10 to 15 digits
+                        Secondary contact
                       </span>
                     )}
                   </div>
                   <div className="relative">
                     <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors duration-200 ${
-                      isPhoneValid ? 'text-emerald-500' : 'text-slate-400'
+                      phone && isValidEmail(phone) ? 'text-emerald-500' : 'text-slate-400'
                     }`}>
-                      <Phone className="w-4 h-4" />
+                      <Mail className="w-4 h-4" />
                     </div>
                     <input
                       id="trial-phone"
-                      type="tel"
-                      autoComplete="tel"
-                      required
+                      type="email"
+                      autoComplete="email"
                       value={phone}
                       onChange={(e) => {
-                        const formatted = formatPhoneNumber(e.target.value, phone);
-                        setPhone(formatted);
+                        setPhone(e.target.value);
                         if (!touched.phone) {
                           setTouched((prev) => ({ ...prev, phone: true }));
                         }
                         if (errorMessage) setErrorMessage(null);
                       }}
                       onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-                      placeholder="e.g. 0321-1234567 or +92-300-1234567"
+                      placeholder="backup@shoestore.com"
                       disabled={isLoading}
                       className={`w-full pl-10 pr-9 py-2.5 font-mono rounded-xl text-xs sm:text-sm outline-none transition-all duration-200 focus:ring-2 ${
                         isDark
                           ? 'bg-[#151E33] text-white placeholder-slate-500'
                           : 'bg-white text-slate-900 placeholder-slate-400'
                       } ${
-                        isPhoneValid
+                        phone && isValidEmail(phone)
                           ? isDark
                             ? 'border-2 border-emerald-500/90 bg-emerald-950/25 ring-2 ring-emerald-500/25 focus:border-emerald-400 focus:ring-emerald-500/30'
                             : 'border-2 border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/25 focus:border-emerald-600 focus:ring-emerald-500/30'
-                          : touched.phone && !isPhoneValid
+                          : touched.phone && phone && !isValidEmail(phone)
                           ? isDark
                             ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
                             : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
@@ -666,30 +658,24 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       }`}
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                      {isPhoneValid && (
+                      {phone && isValidEmail(phone) && (
                         <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                       )}
-                      {touched.phone && !isPhoneValid && (
+                      {touched.phone && phone && !isValidEmail(phone) && (
                         <AlertCircle className="w-4 h-4 text-rose-500" />
                       )}
                     </div>
                   </div>
-                  {touched.phone && !isPhoneValid && (
+                  {touched.phone && phone && !isValidEmail(phone) && (
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-rose-500 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {phoneDigits.length < 10
-                          ? `Please enter at least 10 digits (e.g. 0321-1234567 or +92-300-1234567). Current: ${phoneDigits.length} digits.`
-                          : phoneDigits.length > 15
-                          ? 'Phone number cannot exceed 15 digits.'
-                          : 'Invalid format: remove leading 0 immediately after the hyphen.'}
-                      </span>
+                      <span>Please enter a valid alternate email address.</span>
                     </div>
                   )}
-                  {isPhoneValid && (
+                  {phone && isValidEmail(phone) && (
                     <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-500 font-medium animate-in fade-in duration-200">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Phone format verified ({phoneDigits.length} digits). Hyphens added automatically.</span>
+                      <span>Alternate recovery email verified.</span>
                     </div>
                   )}
                 </div>

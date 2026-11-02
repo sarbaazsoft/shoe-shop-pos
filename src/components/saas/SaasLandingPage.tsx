@@ -1335,26 +1335,15 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       <footer id="global-public-footer" className="border-t border-white/10 lt:border-slate-200 bg-[#080A2A] lt:bg-[#F1F3FF] px-4 sm:px-8 py-5 text-xs text-slate-300 lt:text-slate-600">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <a
-              id="sarbaazsoft-credit-link"
-              href="https://portpolio-eight-pi.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold text-white lt:text-slate-900 hover:text-[#B9A9FF] lt:hover:text-[#5B4BFF] hover:underline transition"
-            >
+            <span className="font-bold text-white lt:text-slate-900">
               SarbaazSoft Shoe POS
-            </a>
+            </span>
             <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
             <span className="text-slate-400 lt:text-slate-500">Multi-Tenant Retail Shoe Shop POS &amp; Inventory Management SaaS</span>
           </div>
-            <div className="flex items-center gap-3 font-medium">
-              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400 lt:text-emerald-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 lt:bg-emerald-500" aria-hidden="true" />
-                System Online
-              </span>
-              <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
-              <span className="text-slate-400 lt:text-slate-500">&copy; 2026 All rights reserved.</span>
-            </div>
+          <div className="flex items-center gap-3 font-medium">
+            <span className="text-slate-400 lt:text-slate-500">&copy; 2026 All rights reserved.</span>
+          </div>
         </div>
       </footer>
       {/* STEP-BY-STEP FREE TRIAL ONBOARDING WIZARD */}

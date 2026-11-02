@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit2, Phone, Receipt, DollarSign, ShoppingBag, RefreshCw, BookOpen, PlusCircle, CheckCircle2, AlertCircle, Building, Banknote } from 'lucide-react';
+import { X, Edit2, Mail, Receipt, DollarSign, ShoppingBag, RefreshCw, BookOpen, PlusCircle, CheckCircle2, AlertCircle, Building, Banknote } from 'lucide-react';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
 import { api } from '../../services/api.ts';
 
@@ -136,8 +136,8 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-purple-200/80 mt-0.5">
                 <span className="flex items-center space-x-1">
-                  <Phone className="w-3 h-3" />
-                  <span className="font-mono">{customer.phone}</span>
+                  <Mail className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                  <span className="font-mono">{customer.email || customer.phone || 'No email registered'}</span>
                 </span>
                 {(customer.market_name || customer.marketName || customer.city) && (
                   <span className="flex items-center space-x-1">

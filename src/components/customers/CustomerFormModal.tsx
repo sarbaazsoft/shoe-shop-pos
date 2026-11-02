@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Users, Phone, User, CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
+import { X, Users, Mail, User, CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNumber } from '../../utils/textFormat.ts';
+import { toTitleCaseLive, toTitleCaseTrimmed, isValidEmail, cleanEmail } from '../../utils/textFormat.ts';
 import { customerOpeningBalanceSchema } from '../../schemas/openingBalanceSchema.ts';
 
 interface CustomerFormModalProps {
@@ -18,7 +18,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onSuccess,
 }) => {
   const [name, setName] = useState(customer?.name || '');
-  const [phone, setPhone] = useState(customer?.phone || '');
+  const [email, setEmail] = useState(customer?.email || customer?.phone || '');
   const [openingBalance, setOpeningBalance] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +43,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setError('Customer Name is required.');
       return;
     }
-    if (!phone.trim()) {
-      setError('Phone number is required.');
+    if (!email.trim()) {
+      setError('Email address is required.');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError('Please provide a valid email address (e.g. customer@example.com).');
       return;
     }
 
@@ -63,10 +67,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     try {
       const payload = {
         name: toTitleCaseTrimmed(name),
-        phone: phone.trim(),
+        email: cleanEmail(email),
+        phone: cleanEmail(email),
         customerType,
         customer_type: customerType,
-        email: '',
         address: '',
         notes: '',
         ...(showOpeningBalance ? { openingBalance: parsedOpeningBalance } : {}),
@@ -101,7 +105,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 {customer ? 'Edit Customer' : 'Add New Customer'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-purple-200/80">
-                {customer ? `Update details for ID #${customer.id}` : 'Register customer with name and phone'}
+                {customer ? `Update details for ID #${customer.id}` : 'Register customer with name and email'}
               </p>
             </div>
           </div>
@@ -172,43 +176,46 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
           </div>
 
-          {/* Phone Number */}
+          {/* Email Address */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                Phone / Mobile Number <span className="text-rose-500">*</span>
+                Customer Email Address <span className="text-rose-500">*</span>
               </label>
-              {isValidPhoneNumber(phone, 10, 15) && (
+              {isValidEmail(email) && (
                 <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Valid ({phone.replace(/\D/g, '').length} digits)
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
                 </span>
               )}
             </div>
             <div className="relative">
-              <Phone className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                isValidPhoneNumber(phone, 10, 15) ? 'text-emerald-500' : 'text-purple-600 dark:text-purple-400'
+              <Mail className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                isValidEmail(email) ? 'text-emerald-500' : 'text-purple-600 dark:text-purple-400'
               }`} />
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhoneNumber(e.target.value, phone))}
-                placeholder="e.g. 0300-1234567 or +92-300-1234567"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="e.g. customer@shoestore.com"
                 required
                 className={`w-full pl-[2.125rem] pr-9 py-2.5 bg-slate-50 dark:bg-[#0B1120] placeholder-slate-400 dark:placeholder-purple-300/40 rounded-xl outline-none font-medium text-xs font-mono transition-all duration-200 ${
-                  isValidPhoneNumber(phone, 10, 15)
+                  isValidEmail(email)
                     ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
                     : 'border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500'
                 }`}
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
-                {isValidPhoneNumber(phone, 10, 15) && (
+                {isValidEmail(email) && (
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
                 )}
               </div>
             </div>
-            {isValidPhoneNumber(phone, 10, 15) && (
+            {isValidEmail(email) && (
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Phone number verified. Hyphens applied automatically.
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Email address verified and formatted.
               </p>
             )}
           </div>

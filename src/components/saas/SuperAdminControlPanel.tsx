@@ -16,7 +16,7 @@ import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetri
 import { SuperAdminReportsView } from './SuperAdminReportsView';
 import { SettingsView } from '../settings/SettingsView';
 import { useTheme } from '../../context/ThemeContext';
-import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
+import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, isValidEmail } from '../../utils/textFormat';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -961,7 +961,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           badgeText="Control Plane Online"
           badgeVariant="online"
           subtitle="Multi-Tenant Retail POS Cloud • SuperAdmin Access"
-          dbText="System Secure • Active"
+          dbText="Cloud Synced • Active"
         />
 
         {/* Main Content Area - Centered Login Form Card */}
@@ -4914,16 +4914,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           <span>Platform SuperAdmin Control Plane</span>
           <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
           <span>
-            &copy; 2026{' '}
-            <a
-              href="https://portpolio-eight-pi.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline transition-colors"
-            >
-              SarbaazSoft
-            </a>
-            . All rights reserved.
+            &copy; 2026 <span className="font-bold text-slate-900 dark:text-white">SarbaazSoft</span>. All rights reserved.
           </span>
         </footer>
       </div>
@@ -5035,20 +5026,43 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
                   {/* Owner Email */}
                   <div>
-                    <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs mb-1.5">
-                      Owner Login Email <span className="text-red-500 dark:text-pink-400">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-bold text-gray-800 dark:text-slate-200 text-xs">
+                        Owner Login Email <span className="text-red-500 dark:text-pink-400">*</span>
+                      </label>
+                      {newOwnerEmail && isValidEmail(newOwnerEmail) && (
+                        <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Valid email
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Mail className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                        newOwnerEmail && isValidEmail(newOwnerEmail) ? 'text-emerald-500' : 'text-purple-600 dark:text-purple-400'
+                      }`} />
                       <input
                         type="email"
                         required
                         value={newOwnerEmail}
                         onChange={(e) => setNewOwnerEmail(e.target.value)}
                         placeholder="owner@apexfootwear.com"
-                        className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-purple-500/20 border border-gray-300 dark:border-purple-400/40 rounded-xl text-xs font-medium font-mono text-gray-900 dark:text-purple-100 placeholder-slate-400 dark:placeholder-purple-300/40 hover:bg-slate-50 dark:hover:bg-purple-500/30 outline-none focus:border-indigo-600 dark:focus:border-purple-400 transition shadow-2xs"
+                        className={`w-full pl-9 pr-9 py-2.5 bg-white dark:bg-purple-500/20 rounded-xl text-xs font-medium font-mono placeholder-slate-400 dark:placeholder-purple-300/40 outline-none transition-all duration-200 shadow-2xs ${
+                          newOwnerEmail && isValidEmail(newOwnerEmail)
+                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
+                            : 'border border-gray-300 dark:border-purple-400/40 text-gray-900 dark:text-purple-100 hover:bg-slate-50 dark:hover:bg-purple-500/30 focus:border-indigo-600 dark:focus:border-purple-400'
+                        }`}
                       />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
+                        {newOwnerEmail && isValidEmail(newOwnerEmail) && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        )}
+                      </div>
                     </div>
+                    {newOwnerEmail && isValidEmail(newOwnerEmail) && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Verified email address format.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
