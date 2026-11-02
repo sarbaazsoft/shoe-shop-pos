@@ -655,13 +655,9 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                           : 'bg-white text-slate-900 placeholder-slate-400'
                       } ${
                         isPhoneValid
-                          ? isDark
-                            ? 'border-2 border-emerald-500/90 bg-emerald-950/25 ring-2 ring-emerald-500/25 focus:border-emerald-400 focus:ring-emerald-500/30'
-                            : 'border-2 border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/25 focus:border-emerald-600 focus:ring-emerald-500/30'
+                          ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20'
                           : touched.phone && !isPhoneValid
-                          ? isDark
-                            ? 'border-rose-500/70 bg-rose-950/20 text-rose-100 focus:border-rose-500 focus:ring-rose-400/20'
-                            : 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-400/20'
+                          ? 'phone-border-invalid bg-rose-50/20 dark:bg-rose-950/20'
                           : isDark
                           ? 'border-purple-900/80 focus:border-purple-400 focus:ring-purple-500/25'
                           : 'border-slate-300 focus:border-purple-600 focus:ring-purple-500/20'
@@ -669,7 +665,9 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
                       {isPhoneValid && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        <span className="phone-success-icon" title="Phone number valid">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                        </span>
                       )}
                       {touched.phone && !isPhoneValid && (
                         <AlertCircle className="w-4 h-4 text-rose-500" />

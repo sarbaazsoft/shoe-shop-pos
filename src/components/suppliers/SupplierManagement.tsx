@@ -659,13 +659,13 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
                       onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
                       className={`w-full px-3 py-2 rounded-xl font-mono text-xs outline-none transition ${
                         phone && isValidPhoneNumber(phone)
-                          ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
+                          ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
                           : 'border border-slate-300 dark:border-purple-800/60 bg-white dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-purple-300/40 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-purple-500/30 focus:border-blue-500 dark:focus:border-purple-400'
                       }`}
                     />
                     {phone && isValidPhoneNumber(phone) && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                        <CheckCircle2 className="w-4 h-4" />
+                      <div className="phone-success-icon absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none animate-in fade-in zoom-in duration-200">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       </div>
                     )}
                   </div>

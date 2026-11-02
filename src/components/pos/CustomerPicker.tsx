@@ -463,12 +463,12 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
           onChange={(e) => setNewPhone(formatPhoneNumber(e.target.value, newPhone))}
           className={`app-input w-full px-3 pr-8 py-2 text-xs font-mono transition-all duration-200 ${
             isValidPhoneNumber(newPhone, 10, 15)
-              ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
+              ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
               : ''
           }`}
         />
         {isValidPhoneNumber(newPhone, 10, 15) && (
-          <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
+          <div className="phone-success-icon absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 animate-in fade-in zoom-in duration-200" />
           </div>
         )}

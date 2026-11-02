@@ -494,13 +494,15 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                         onChange={(e) => setFormData({ ...formData, phone: formatPhoneNumber(e.target.value, formData.phone) })}
                         className={`w-full pl-9 pr-9 py-2.5 bg-white dark:bg-[#0F172A] rounded-xl text-xs font-medium placeholder-slate-400 outline-none transition-all duration-200 shadow-2xs font-mono ${
                           formData.phone && isValidPhoneNumber(formData.phone, 10, 15)
-                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
+                            ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
                             : 'border border-gray-300 dark:border-purple-500/30 text-gray-900 dark:text-white focus:border-indigo-600 dark:focus:border-purple-400'
                         }`}
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
                         {formData.phone && isValidPhoneNumber(formData.phone, 10, 15) && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                          <span className="phone-success-icon" title="Valid phone number">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                          </span>
                         )}
                       </div>
                     </div>

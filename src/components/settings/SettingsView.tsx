@@ -1678,16 +1678,18 @@ setFormErrors(errors);
                     placeholder="e.g. 0321-1234567 or +92-321-1234567"
                     className={`w-full h-11 pl-10 pr-9 rounded-xl border text-xs font-mono font-medium placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all duration-200 ${
                       formErrors.company_phone
-                        ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10 text-rose-900 dark:text-rose-100'
+                        ? 'phone-border-invalid bg-rose-50/10 text-rose-900 dark:text-rose-100'
                         : isValidPhoneNumber(formData.company_phone, 10, 15)
-                        ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100 focus:border-emerald-600 focus:ring-emerald-500/30'
+                        ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100'
                         : 'border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                     }`}
                     required
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
                     {isValidPhoneNumber(formData.company_phone, 10, 15) && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                      <span className="phone-success-icon" title="Phone number valid">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                      </span>
                     )}
                   </div>
                 </div>

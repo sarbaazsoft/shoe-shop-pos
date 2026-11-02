@@ -314,13 +314,13 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                         placeholder="+92 300 1234567"
                         className={`w-full h-11 pl-10 pr-10 rounded-xl font-mono font-medium text-xs outline-none transition-all ${
                           phone && isValidPhoneNumber(phone)
-                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
+                            ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
                             : 'border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20'
                         }`}
                       />
                       {phone && isValidPhoneNumber(phone) && (
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                          <CheckCircle2 className="w-4 h-4" />
+                        <div className="phone-success-icon absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none animate-in fade-in zoom-in duration-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         </div>
                       )}
                     </div>

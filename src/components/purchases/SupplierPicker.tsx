@@ -590,13 +590,13 @@ export const SupplierPicker: React.FC<SupplierPickerProps> = ({
                 onChange={(e) => setNewSupplierPhone(formatPhoneNumber(e.target.value))}
                 className={`app-input w-full px-3 py-2 text-xs font-mono transition ${
                   newSupplierPhone && isValidPhoneNumber(newSupplierPhone)
-                    ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-8'
+                    ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-8'
                     : ''
                 }`}
               />
               {newSupplierPhone && isValidPhoneNumber(newSupplierPhone) && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                  <CheckCircle2 className="w-4 h-4" />
+                <div className="phone-success-icon absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none animate-in fade-in zoom-in duration-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 </div>
               )}
             </div>
@@ -988,13 +988,13 @@ export const SupplierPicker: React.FC<SupplierPickerProps> = ({
                         placeholder="e.g. +92 300 1234567"
                         className={`w-full px-3.5 py-2.5 rounded-xl font-mono font-medium text-xs outline-none transition ${
                           newSupplierPhone && isValidPhoneNumber(newSupplierPhone)
-                            ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
+                            ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 pr-9'
                             : 'bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-white border border-slate-200 dark:border-purple-800/60 focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500'
                         }`}
                       />
                       {newSupplierPhone && isValidPhoneNumber(newSupplierPhone) && (
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 pointer-events-none animate-in fade-in zoom-in duration-200">
-                          <CheckCircle2 className="w-4 h-4" />
+                        <div className="phone-success-icon absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none animate-in fade-in zoom-in duration-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         </div>
                       )}
                     </div>

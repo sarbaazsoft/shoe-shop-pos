@@ -196,13 +196,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 required
                 className={`w-full pl-[2.125rem] pr-9 py-2.5 bg-slate-50 dark:bg-[#0B1120] placeholder-slate-400 dark:placeholder-purple-300/40 rounded-xl outline-none font-medium text-xs font-mono transition-all duration-200 ${
                   isValidPhoneNumber(phone, 10, 15)
-                    ? 'border-2 border-emerald-500 dark:border-emerald-500/80 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 focus:border-emerald-600'
+                    ? 'phone-border-valid bg-emerald-50/20 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100'
                     : 'border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500'
                 }`}
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none transition-all duration-200">
                 {isValidPhoneNumber(phone, 10, 15) && (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                  <span className="phone-success-icon" title="Valid phone number">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-in fade-in zoom-in duration-200" />
+                  </span>
                 )}
               </div>
             </div>

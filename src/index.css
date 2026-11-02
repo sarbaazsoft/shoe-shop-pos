@@ -329,6 +329,60 @@ html.dark .app-input.password-border-mismatch:focus-visible {
   --tw-ring-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
 }
 
+/* ========================================================================= */
+/* REAL-TIME PHONE NUMBER VALIDATION DYNAMIC BORDER COLORS & FOCUS GLOWS     */
+/* ========================================================================= */
+input.phone-border-valid,
+.app-input.phone-border-valid,
+html.dark input.phone-border-valid,
+html.dark .app-input.phone-border-valid {
+  border: 1.5px solid #10b981 !important;
+  border-color: #10b981 !important;
+}
+input.phone-border-valid:focus,
+input.phone-border-valid:focus-visible,
+.app-input.phone-border-valid:focus,
+.app-input.phone-border-valid:focus-visible,
+html.dark input.phone-border-valid:focus,
+html.dark input.phone-border-valid:focus-visible,
+html.dark .app-input.phone-border-valid:focus,
+html.dark .app-input.phone-border-valid:focus-visible {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(16, 185, 129, 0.45) !important;
+}
+
+input.phone-border-invalid,
+.app-input.phone-border-invalid,
+html.dark input.phone-border-invalid,
+html.dark .app-input.phone-border-invalid {
+  border: 1.5px solid #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+input.phone-border-invalid:focus,
+input.phone-border-invalid:focus-visible,
+.app-input.phone-border-invalid:focus,
+.app-input.phone-border-invalid:focus-visible,
+html.dark input.phone-border-invalid:focus,
+html.dark input.phone-border-invalid:focus-visible,
+html.dark .app-input.phone-border-invalid:focus,
+html.dark .app-input.phone-border-invalid:focus-visible {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+  --tw-ring-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.45) !important;
+}
+
+/* Phone validation success icon override (overriding global purple icon rule) */
+.phone-success-icon,
+.phone-success-icon svg,
+svg.phone-success-icon,
+html.dark .phone-success-icon,
+html.dark .phone-success-icon svg,
+html.dark svg.phone-success-icon {
+  color: #10b981 !important;
+  stroke: #10b981 !important;
+}
+
 /* 3. Input Icons Styled to Purple (#9333ea in light mode, #c084fc in dark mode):
    All icons located inside input containers, search bars, modals, profile editors,
    and settings forms (including Lucide icons, prefixes, currency badges, and password toggles) */
