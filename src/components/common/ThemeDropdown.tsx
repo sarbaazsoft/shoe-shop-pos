@@ -6,6 +6,7 @@ import { useTheme, type ThemeMode } from '../../context/ThemeContext.tsx';
 export interface ThemeDropdownProps {
   id?: string;
   className?: string;
+  triggerClassName?: string | ((open: boolean) => string);
   dropdownAlign?: 'left' | 'right';
   showLabel?: boolean;
   isOpen?: boolean;
@@ -22,6 +23,7 @@ export interface ThemeDropdownProps {
 export const ThemeDropdown: React.FC<ThemeDropdownProps> = ({
   id = 'global-theme-dropdown-trigger',
   className = '',
+  triggerClassName,
   dropdownAlign = 'right',
   showLabel = true,
   isOpen: controlledIsOpen,
@@ -77,16 +79,22 @@ export const ThemeDropdown: React.FC<ThemeDropdownProps> = ({
   };
 
   return (
-    <div ref={dropdownRef} className={`relative inline-block ${className}`}>
+    <div ref={dropdownRef} className={`relative inline-flex items-center ${className}`}>
       <button
         id={id}
         type="button"
         onClick={() => setOpen(!open)}
-        className={`h-8 sm:h-8.5 flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs ${
-          open
-            ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 ring-2 ring-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_16px_rgba(147,51,234,0.4)]'
-            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:text-purple-200 dark:hover:text-white dark:bg-purple-500/20 dark:hover:bg-purple-500/30 dark:border-purple-400/40 dark:shadow-[0_0_14px_rgba(147,51,234,0.2)]'
-        }`}
+        className={
+          triggerClassName
+            ? typeof triggerClassName === 'function'
+              ? triggerClassName(open)
+              : `${triggerClassName} ${open ? 'ring-2 ring-indigo-400/40' : ''}`
+            : `h-8 sm:h-8.5 flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs ${
+                open
+                  ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 ring-2 ring-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_16px_rgba(147,51,234,0.4)]'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:text-purple-200 dark:hover:text-white dark:bg-purple-500/20 dark:hover:bg-purple-500/30 dark:border-purple-400/40 dark:shadow-[0_0_14px_rgba(147,51,234,0.2)]'
+              }`
+        }
         title={`Theme: ${themeMode.charAt(0).toUpperCase() + themeMode.slice(1)}`}
         aria-label="Theme selection menu"
         aria-expanded={open}
@@ -94,24 +102,26 @@ export const ThemeDropdown: React.FC<ThemeDropdownProps> = ({
       >
         <div className="shrink-0 flex items-center justify-center">
           {themeMode === 'light' ? (
-            <Sun className="w-3.5 h-3.5 stroke-[2]" />
+            <Sun className={`${triggerClassName ? 'w-4 h-4' : 'w-3.5 h-3.5'} stroke-[2]`} />
           ) : themeMode === 'dark' ? (
-            <Moon className="w-3.5 h-3.5 stroke-[2]" />
+            <Moon className={`${triggerClassName ? 'w-4 h-4' : 'w-3.5 h-3.5'} stroke-[2]`} />
           ) : (
-            <Monitor className="w-3.5 h-3.5 stroke-[2]" />
+            <Monitor className={`${triggerClassName ? 'w-4 h-4' : 'w-3.5 h-3.5'} stroke-[2]`} />
           )}
         </div>
         {showLabel && (
           <span
-            className={`hidden sm:inline-block text-xs font-semibold capitalize ${
-              open ? 'text-white' : 'text-slate-700 dark:text-purple-200'
+            className={`hidden sm:inline-block capitalize ${
+              triggerClassName
+                ? ''
+                : `text-xs font-semibold ${open ? 'text-white' : 'text-slate-700 dark:text-purple-200'}`
             }`}
           >
             {themeMode}
           </span>
         )}
         <ChevronDown
-          className={`w-3 h-3 transition-transform duration-200 ease-out opacity-75 ${
+          className={`${triggerClassName ? 'w-3.5 h-3.5' : 'w-3 h-3'} transition-transform duration-200 ease-out opacity-75 ${
             open ? 'rotate-180' : ''
           }`}
         />

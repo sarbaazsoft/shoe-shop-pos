@@ -42,7 +42,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white font-bold border border-purple-400/40 shadow-md shadow-purple-600/25 transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98] text-xs sm:text-sm px-4 py-2';
 
   const outlineBtn =
-    'inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-400/40 bg-transparent hover:bg-indigo-500/10 text-white lt:text-slate-900 font-semibold transition-colors cursor-pointer whitespace-nowrap text-xs sm:text-sm px-3.5 py-2';
+    'inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-400/40 lt:border-slate-300 bg-transparent hover:bg-indigo-500/10 lt:hover:bg-slate-100 text-white lt:text-slate-900 font-semibold transition-colors cursor-pointer whitespace-nowrap text-xs sm:text-sm px-3.5 py-2';
+
+  const themeDropdownBtn = (isOpen: boolean) =>
+    `inline-flex items-center justify-center gap-2 rounded-xl border font-semibold transition-colors cursor-pointer whitespace-nowrap text-xs sm:text-sm px-3.5 py-2 ${
+      isOpen
+        ? 'border-indigo-400/60 bg-indigo-500/20 lt:bg-slate-200 text-white lt:text-slate-900 ring-2 ring-indigo-400/30'
+        : 'border-indigo-400/40 lt:border-slate-300 bg-transparent hover:bg-indigo-500/10 lt:hover:bg-slate-100 text-white lt:text-slate-900'
+    }`;
 
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md border-b border-indigo-900/30 lt:border-slate-200 bg-[#070A24]/85 lt:bg-white/90 transition-colors">
@@ -115,6 +122,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="navbar-theme-dropdown-trigger"
               dropdownAlign="right"
               showLabel={true}
+              triggerClassName={themeDropdownBtn}
             />
 
             {/* Desktop-only action buttons */}
