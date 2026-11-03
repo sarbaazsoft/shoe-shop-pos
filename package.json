@@ -7,7 +7,6 @@
     "dev": "tsx server.ts",
     "start": "node server.ts",
     "build": "vite build",
-    "build:netlify": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
@@ -28,7 +27,6 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "resend": "^6.37.0",
-    "serverless-http": "^4.0.0",
     "vite": "^8.3.0",
     "web-push": "^3.6.7",
     "zod": "^3.24.2"

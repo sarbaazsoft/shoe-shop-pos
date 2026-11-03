@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npm run build:netlify"
   publish = "dist"
   functions = "netlify/functions"
 
@@ -13,7 +13,7 @@
 # Route all /api/* requests to the Express serverless function
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/api/api/:splat"
   status = 200
   force = true
 

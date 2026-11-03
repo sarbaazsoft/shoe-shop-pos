@@ -30,33 +30,9 @@ Ensure you have the following installed on your system:
 
 ### Installation & Local Setup
 
-1. **Install dependencies:**
+1. **Clone the repository:**
    ```bash
-   npm install
-   ```
-
-2. **Run in development mode:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Build for production:**
-   ```bash
-   npm run build
-   ```
-
----
-
-## Netlify Deployment
-
-This project is configured out-of-the-box for seamless Netlify deployment:
-
-1. **Connect Repository:** Link this Git repository to your Netlify account.
-2. **Build Configuration** (automatically detected from `netlify.toml`):
-   * **Build Command:** `npm run build`
-   * **Publish Directory:** `dist`
-   * **Functions Directory:** `netlify/functions`
-3. **Environment Variables** (set in Netlify Site Configuration -> Environment Variables):
-   * `DATABASE_URL`: PostgreSQL connection string (e.g. Neon, Supabase, or AWS RDS).
-   * `JWT_SECRET`: Secret key for signing authentication tokens.
-4. **Deploy:** Click **Deploy site**. All `/api/*` endpoints are handled serverlessly via Netlify Functions, and frontend routes are served by Netlify CDN.
+   git clone [https://github.com/sarbaazsoft/Shoe-POS-Retail-Simple.git](https://github.com/sarbaazsoft/Shoe-POS-Retail-Simple.git)
+   cd Shoe-POS-Retail-Simple
+# shoe-shop-pos-simple
+# shoe-shop-pos-simple

@@ -1,7 +1,0 @@
-# Netlify redirects file (copied to dist/_redirects on build)
-
-# Direct all API calls to the serverless Express function
-/api/*  /.netlify/functions/api/:splat  200!
-
-# SPA Client fallback for all UI routes
-/*      /index.html                     200
