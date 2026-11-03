@@ -43,7 +43,8 @@ const rootDir = path.resolve('.');
 
 export const app = express();
 const portArg = process.argv.indexOf('--port') !== -1 ? Number(process.argv[process.argv.indexOf('--port') + 1]) : undefined;
-const PORT = portArg || (process.env.PORT ? Number(process.env.PORT) : 3000);
+// AI Studio dev server runs on port 3000 (nginx reverse-proxies 8080 -> 3000)
+const PORT = portArg || 3000;
 
 // Universal API Response Transformer to map database rows (snake_case) to strict camelCase
 app.use('/api', (_req, res, next) => {
