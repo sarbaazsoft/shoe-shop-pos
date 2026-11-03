@@ -29,7 +29,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     try {
       const res = await api.notifications.grouped(5);
       if (res && Array.isArray(res.notices)) {
-        setActiveNotices(res.notices);
+        const seen = new Set<string>();
+        const unique = res.notices.filter((n: any) => {
+          const key = (n.title || '').trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setActiveNotices(unique);
       }
     } catch (err) {
       console.warn('Dashboard active notices fetch:', err);
@@ -221,6 +228,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     try {
       localStorage.setItem('pos_welcome_partner_dismissed', 'true');
       localStorage.setItem(dismissKey, 'true');
+      const welcomeNotice = activeNotices.find((n) =>
+        (n.title || '').toLowerCase().includes('welcome to sarbaazsoft') ||
+        (n.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft')
+      );
+      if (welcomeNotice?.id) {
+        api.notifications.dismiss(welcomeNotice.id, 'NOTICE').catch(() => {});
+        setActiveNotices((prev) => prev.filter((n) => n.id !== welcomeNotice.id));
+      }
     } catch {}
     setShowWelcomeBanner(false);
   };
@@ -488,10 +503,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* High-Priority Active Platform Notices Banner */}
-      {activeNotices.length > 0 && (
-        <div className="space-y-3" id="dashboard-active-notices-container">
-          {activeNotices.map((notice) => {
+      {/* High-Priority Active Platform Notices Banner (excluding welcome notices to ensure strictly ONE single welcome message is shown) */}
+      {(() => {
+        const displayNotices = activeNotices.filter((notice) => {
+          const isWelcome =
+            (notice.title || '').toLowerCase().includes('welcome to sarbaazsoft') ||
+            (notice.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft');
+          return !isWelcome;
+        });
+
+        if (displayNotices.length === 0) return null;
+
+        return (
+          <div className="space-y-3" id="dashboard-active-notices-container">
+            {displayNotices.map((notice) => {
             const isUrgent = notice.is_urgent || notice.type === 'URGENT' || notice.type === 'WARNING';
             return (
               <div
@@ -585,7 +610,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {/* Context-Aware Store Owner Welcome Greeting Banner */}
       {showWelcomeBanner && (

@@ -360,14 +360,7 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       details: { source: 'landing_free_trial' },
     });
 
-    // Simultaneously push and save the welcome message into the header notification dropdown (Notice tab)
-    const cleanFinalName = provisioned.storeName || storeName;
-    const welcomeMsg = `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
-
-    await sendWelcomeMsg(provisioned.tenantId, welcomeMsg, ownerEmail).catch((welcomeErr) => {
-      console.warn('sendWelcomeMsg notice during store-request:', welcomeErr);
-    });
-
+    // Store request logged. Welcome notification & email will be sent strictly upon initial onboarding completion.
     const ownerRes = await pgClient.query(
       "SELECT email, phone FROM users WHERE UPPER(COALESCE(role::text, '')) = 'SUPERADMIN' ORDER BY id ASC LIMIT 1"
     );

@@ -849,6 +849,16 @@ export function ensurePlatformNotificationsSchema(): Promise<void> {
             OR message ILIKE '%Free Tier store registered%'
             OR message ILIKE '%subscription renewal%'
           );
+
+        -- Purge duplicate welcome notices to ensure only one welcome notification exists per tenant
+        DELETE FROM public.platform_notifications p1
+        USING public.platform_notifications p2
+        WHERE p1.id > p2.id
+          AND COALESCE(p1.tenant_id, 0) = COALESCE(p2.tenant_id, 0)
+          AND (
+            (p1.title ILIKE 'Welcome to SarbaazSoft%' AND p2.title ILIKE 'Welcome to SarbaazSoft%')
+            OR (p1.message ILIKE '%Thank you for choosing SarbaazSoft%' AND p2.message ILIKE '%Thank you for choosing SarbaazSoft%')
+          );
       `);
     })().catch((error) => {
       platformNotificationsSchemaPromise = null;

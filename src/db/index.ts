@@ -663,7 +663,15 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       let actionUrl = '';
       let actionLabel = '';
 
-      if (hasExplicitTargetRole) {
+      if (upper.includes("VALUES ($1, 'ADMIN'")) {
+        targetTenantId = params[0] !== undefined && params[0] !== null ? Number(params[0]) : null;
+        targetRole = 'ADMIN';
+        title = String(params[1] || '');
+        message = String(params[2] || '');
+        type = 'SUCCESS';
+        actionUrl = String(params[3] || '');
+        actionLabel = 'Open POS Terminal';
+      } else if (hasExplicitTargetRole && params.length >= 7) {
         targetTenantId = params[0] !== undefined && params[0] !== null ? Number(params[0]) : null;
         targetRole = String(params[1] || 'ALL').toUpperCase();
         title = String(params[2] || '');
@@ -691,6 +699,31 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         targetTenantId = null;
       }
 
+      const isWelcomeNotif =
+        titleLower.includes('welcome to sarbaazsoft') ||
+        message.toLowerCase().includes('thank you for choosing sarbaazsoft');
+
+      if (isWelcomeNotif) {
+        // Prevent duplicate welcome notifications for the same tenant
+        const existingWelcome = mockStore.platform_notifications.find(
+          (pn: any) =>
+            Number(pn.tenant_id) === Number(targetTenantId) &&
+            ((pn.title || '').toLowerCase().includes('welcome to sarbaazsoft') ||
+              (pn.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft'))
+        );
+        if (existingWelcome) {
+          // Purge any stale duplicates and return the singular welcome notice
+          mockStore.platform_notifications = mockStore.platform_notifications.filter(
+            (pn: any) =>
+              Number(pn.id) === Number(existingWelcome.id) ||
+              Number(pn.tenant_id) !== Number(targetTenantId) ||
+              (!((pn.title || '').toLowerCase().includes('welcome to sarbaazsoft')) &&
+                !((pn.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft')))
+          );
+          return { rows: [existingWelcome as unknown as T], rowCount: 1 };
+        }
+      }
+
       const entry = {
         id: nextMockId('platform_notifications'),
         tenant_id: targetTenantId,
@@ -711,7 +744,20 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     if (upper.startsWith('SELECT')) {
       const tenantId = params.length > 0 && params[0] !== null && params[0] !== undefined ? Number(params[0]) : 1;
       const userId = params.length > 1 && params[1] !== null && params[1] !== undefined ? Number(params[1]) : 0;
-      const role = params.length > 2 && params[2] !== null && params[2] !== undefined ? String(params[2]).toUpperCase() : 'CASHIER';
+      const role = params.length > 2 && params[2] !== null && params[2] !== undefined ? String(params[2]).toUpperCase() : 'ADMIN';
+
+      if (
+        upper.includes("TITLE ILIKE 'WELCOME TO SARBAAZSOFT%'") ||
+        upper.includes("MESSAGE ILIKE '%THANK YOU FOR CHOOSING SARBAAZSOFT%'")
+      ) {
+        const welcomeRows = (mockStore.platform_notifications || []).filter((pn: any) => {
+          if (tenantId && Number(pn.tenant_id) !== tenantId) return false;
+          const t = (pn.title || '').toLowerCase();
+          const m = (pn.message || '').toLowerCase();
+          return t.includes('welcome to sarbaazsoft') || m.includes('thank you for choosing sarbaazsoft');
+        });
+        return { rows: welcomeRows as unknown as T[], rowCount: welcomeRows.length };
+      }
 
       const reads = mockStore.platform_notification_reads || [];
       const nowMs = Date.now();
@@ -779,6 +825,21 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     }
 
     if (upper.startsWith('DELETE FROM')) {
+      if (upper.includes('ID != $2') || upper.includes('ID <> $2')) {
+        const tId = Number(params[0]);
+        const keepId = Number(params[1]);
+        mockStore.platform_notifications = (mockStore.platform_notifications || []).filter((pn: any) => {
+          if (Number(pn.tenant_id) === tId && Number(pn.id) !== keepId) {
+            const t = (pn.title || '').toLowerCase();
+            const m = (pn.message || '').toLowerCase();
+            if (t.includes('welcome to sarbaazsoft') || m.includes('thank you for choosing sarbaazsoft')) {
+              return false;
+            }
+          }
+          return true;
+        });
+        return { rows: [], rowCount: 1 };
+      }
       const targetId = Number(params[0]);
       mockStore.platform_notifications = (mockStore.platform_notifications || []).filter((pn: any) => Number(pn.id) !== targetId);
       return { rows: [], rowCount: 1 };

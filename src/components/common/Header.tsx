@@ -656,7 +656,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const visibleAnnouncements = useMemo(() => {
-    return platformAnnouncements.filter((a) => {
+    const filtered = platformAnnouncements.filter((a) => {
       const aTargetRole = (a.targetRole || 'ALL').toUpperCase();
       const titleLower = (a.title || '').toLowerCase();
       const msgLower = (a.message || '').toLowerCase();
@@ -699,6 +699,14 @@ export const Header: React.FC<HeaderProps> = ({
       } else {
         if (aTargetRole !== 'ALL') return false;
       }
+      return true;
+    });
+
+    const seenTitles = new Set<string>();
+    return filtered.filter((a) => {
+      const normalizedTitle = (a.title || '').trim().toLowerCase();
+      if (seenTitles.has(normalizedTitle)) return false;
+      seenTitles.add(normalizedTitle);
       return true;
     });
   }, [platformAnnouncements, isSuperAdminUser, isCashierUser, isAdminUser]);

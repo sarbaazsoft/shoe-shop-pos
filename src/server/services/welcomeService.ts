@@ -65,8 +65,46 @@ export async function sendWelcomeMsg(
     .trim();
   const welcomeText = messageWithoutDuplicateHeading || defaultWelcomeText;
 
-  // 2. Ensure platform notifications schema and create in-app notification in platform_notifications (strictly targeted to store owner ADMIN)
+  // 2. Ensure platform notifications schema and prevent duplicate welcome notifications/emails
   await ensurePlatformNotificationsSchema();
+
+  const existingNotifRes = await pgClient.query<{ id: number; created_at: string }>(
+    `SELECT id, created_at FROM platform_notifications
+     WHERE tenant_id = $1
+       AND (
+         title ILIKE 'Welcome to SarbaazSoft%'
+         OR message ILIKE '%Thank you for choosing SarbaazSoft%'
+       )
+     ORDER BY id ASC
+     LIMIT 1`,
+    [cleanTenantId]
+  );
+
+  if (existingNotifRes.rows.length > 0) {
+    const existingId = existingNotifRes.rows[0].id;
+    // Delete any secondary duplicate rows if they exist
+    await pgClient.query(
+      `DELETE FROM platform_notifications
+       WHERE tenant_id = $1
+         AND id != $2
+         AND (
+           title ILIKE 'Welcome to SarbaazSoft%'
+           OR message ILIKE '%Thank you for choosing SarbaazSoft%'
+         )`,
+      [cleanTenantId, existingId]
+    ).catch(() => {});
+
+    return {
+      success: true,
+      tenantId: cleanTenantId,
+      message: welcomeText,
+      notificationId: existingId,
+      ownerEmail: targetEmail,
+      ownerName,
+      emailDelivered: false,
+    };
+  }
+
   const notifRes = await pgClient.query<{ id: number; created_at: string }>(
     `INSERT INTO platform_notifications (
        tenant_id, target_role, title, message, type, action_url, action_label, expires_at, created_at
