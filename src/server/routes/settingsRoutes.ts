@@ -481,8 +481,26 @@ router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requir
 // POST /api/settings/test-email - Trigger live Resend test email to verify credentials and sender domain
 router.post('/test-email', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const requestedRecipient = req.body?.recipientEmail || req.body?.to || req.user?.email || 'sarbaazsoft@gmail.com';
-    const cleanRecipient = String(requestedRecipient).trim().toLowerCase();
+    const rawRecipient = req.body?.recipientEmail || req.body?.to || req.body?.email || req.user?.email || '';
+    const cleanRecipient = String(rawRecipient).trim().toLowerCase();
+
+    if (!cleanRecipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanRecipient)) {
+      return res.status(400).json({
+        success: false,
+        delivered: false,
+        error: 'A valid recipient email address is required.',
+        message: 'Please provide a valid recipient email address to send the test email to.',
+      });
+    }
+
+    if (/@example\.(com|org|net)$/i.test(cleanRecipient)) {
+      return res.status(400).json({
+        success: false,
+        delivered: false,
+        error: 'Resend blocks RFC reserved example.com domains. Please specify an active email address or delivered@resend.dev.',
+        message: 'Resend blocks RFC reserved example.com domains. Please specify an active email address or delivered@resend.dev.',
+      });
+    }
 
     const diagnostics = await testResendConfiguration(cleanRecipient);
 
@@ -495,12 +513,13 @@ router.post('/test-email', requireAuth, requireSuperAdmin, async (req: Authentic
       });
     }
 
-    console.error(`[settingsRoutes.ts] Test email failed to deliver to ${cleanRecipient}:`, diagnostics.error);
+    console.warn(`[settingsRoutes.ts] Test email delivery notice for ${cleanRecipient}:`, diagnostics.error);
     return res.status(200).json({
       success: false,
       delivered: false,
-      message: diagnostics.info || `Test email could not be delivered: ${diagnostics.error}`,
+      message: diagnostics.info || diagnostics.error || `Test email could not be delivered to ${cleanRecipient}.`,
       details: diagnostics,
+      error: diagnostics.error,
     });
   } catch (err: any) {
     console.error('[settingsRoutes.ts] Exception in /api/settings/test-email:', err);

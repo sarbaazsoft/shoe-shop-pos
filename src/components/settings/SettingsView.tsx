@@ -653,7 +653,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const hasLoadedAppSettingsRef = useRef(false);
 
-  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [testEmailRecipient, setTestEmailRecipient] = useState(currentUser?.email || '');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{
     success: boolean;
@@ -662,11 +662,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     details?: any;
   } | null>(null);
 
+  useEffect(() => {
+    if (!testEmailRecipient && currentUser?.email) {
+      setTestEmailRecipient(currentUser.email);
+    }
+  }, [currentUser?.email]);
+
   const handleSendTestEmail = async () => {
+    const target = testEmailRecipient.trim() || currentUser?.email?.trim();
+    if (!target) {
+      setTestEmailResult({
+        success: false,
+        delivered: false,
+        message: 'Please enter a recipient email address to send the test email to.',
+      });
+      return;
+    }
+    if (/@example\.(com|org|net)$/i.test(target)) {
+      setTestEmailResult({
+        success: false,
+        delivered: false,
+        message: 'Resend blocks RFC reserved example.com domains. Please specify an active email address or delivered@resend.dev for test deliveries.',
+      });
+      return;
+    }
     setIsSendingTestEmail(true);
     setTestEmailResult(null);
     try {
-      const res = await api.settings.testEmail(testEmailRecipient.trim() || undefined);
+      const res = await api.settings.testEmail(target);
       setTestEmailResult(res);
     } catch (err: any) {
       setTestEmailResult({
@@ -2895,7 +2918,7 @@ setFormErrors(errors);
                       Verify Resend Email Delivery
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Dispatches a live transactional test email to verify your saved Resend API Key and sender settings.
+                      Dispatches a live transactional test email to verify your saved Resend API Key and sender settings. (Tip: Use your account email or <code className="font-mono text-purple-600 dark:text-purple-400">delivered@resend.dev</code> for sandbox testing).
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2903,7 +2926,7 @@ setFormErrors(errors);
                       type="email"
                       value={testEmailRecipient}
                       onChange={(e) => setTestEmailRecipient(e.target.value)}
-                      placeholder="recipient@example.com (optional)"
+                      placeholder="Enter recipient email address"
                       className="h-8 px-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 w-48 sm:w-56"
                     />
                     <button

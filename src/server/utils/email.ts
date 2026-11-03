@@ -66,7 +66,7 @@ export function parseSenderAddress(rawCandidate?: string | null): ParsedSenderAd
     ? `${displayName} <onboarding@resend.dev>`
     : `${displayName} <${email}>`;
 
-  const replyTo = email && email !== 'onboarding@resend.dev' ? email : 'sarbaazsoft@gmail.com';
+  const replyTo = email && email !== 'onboarding@resend.dev' ? email : (process.env.RESEND_REPLY_TO || 'noreply@sarbaazsoft.com');
 
   return {
     displayName,
@@ -106,6 +106,7 @@ export interface SendEmailOptions {
   from?: string;
   replyTo?: string | string[];
   tags?: { name: string; value: string }[];
+  disableFallbackReroute?: boolean;
 }
 
 export interface SendEmailResult {
@@ -211,11 +212,11 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
 
       // Automatic fallback: If custom domain fails domain verification on Resend, retry once via onboarding@resend.dev
       if (error) {
-        console.error('[Resend Error Sending Email]: Initial attempt failed:', error);
+        console.warn('[Resend API Notice]: Initial send attempt returned notice:', error?.message || (error as any)?.name || error);
         const errorMsg = String(error.message || (error as any)?.name || error || '');
-        const isDomainError = /domain.*not.*verified|domain_not_found|validation_error|cannot send from|invalid from address|verify a domain|unverified domain|not match any verified domain/i.test(errorMsg);
+        const isSenderDomainError = /domain.*not.*verified|domain_not_found|cannot send from.*domain|invalid from address|verify a domain.*resend\.com\/domains.*change the `from` address|does not match any verified domain/i.test(errorMsg);
 
-        if (isDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
+        if (isSenderDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
           const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
           console.warn(`[Resend Auto-Fallback] Sender domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
 
@@ -235,97 +236,107 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
                 messageId: retryResult.data?.id,
               };
             }
-            console.error('[Resend Auto-Fallback Error]: Fallback attempt failed:', retryResult.error);
+            console.warn('[Resend Auto-Fallback Notice]: Fallback attempt unsuccessful:', retryResult.error?.message || retryResult.error);
             error = retryResult.error;
           } catch (retryErr) {
-            console.error('[Resend Auto-Fallback Exception]:', retryErr);
+            console.warn('[Resend Auto-Fallback Exception]:', retryErr);
             error = retryErr as any;
           }
         }
 
+        // If disableFallbackReroute is set (e.g. for live test emails), never reroute or hijack recipient
+        if (opts.disableFallbackReroute) {
+          const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
+          console.warn(`[Resend Direct Delivery Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
+          return {
+            delivered: false,
+            provider: 'resend',
+            error: sanitized,
+          };
+        }
+
         // Automatic fallback for Resend Sandbox / Testing mode:
         // When using a free/testing key without a verified custom domain, Resend enforces:
-        // "You can only send testing emails to your own email address (sarbaazsoft@gmail.com)."
+        // "You can only send testing emails to your own email address (...)."
         const currentErrorMsg = String(error?.message || (error as any)?.name || error || '');
         const isTestingEmailRestriction = /only send testing emails to your own email address|testing emails to your own email/i.test(currentErrorMsg);
 
         if (isTestingEmailRestriction) {
           const testEmailMatch = currentErrorMsg.match(/own email address \(([^)]+)\)/i);
-          const authorizedTestEmail = (
-            testEmailMatch?.[1] ||
-            'sarbaazsoft@gmail.com'
-          ).trim().toLowerCase();
+          const authorizedTestEmail = testEmailMatch?.[1]?.trim().toLowerCase();
 
-          const alreadySendingToTestAddress = recipients.some(
-            (r) => r.trim().toLowerCase() === authorizedTestEmail
-          );
-
-          if (!alreadySendingToTestAddress) {
-            console.info(
-              `[Resend Sandbox Notice] Resend testing account is restricted to ${authorizedTestEmail}. Re-routing email intended for ${recipients.join(', ')} to developer testing address.`
+          if (authorizedTestEmail) {
+            const alreadySendingToTestAddress = recipients.some(
+              (r) => r.trim().toLowerCase() === authorizedTestEmail
             );
 
-            const sandboxBannerHtml = `
-              <div style="background-color:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 18px;margin:0 0 20px;color:#92400e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.6;">
-                <strong style="color:#78350f;">🧪 Resend Sandbox Delivery Notice:</strong> This message was forwarded to your authorized developer email (<strong>${authorizedTestEmail}</strong>) because your Resend API key is in testing mode (custom domain not yet verified).<br/>
-                <strong>Original Intended Recipient:</strong> <span style="font-family:monospace;color:#b45309;font-weight:bold;">${recipients.join(', ')}</span><br/>
-                <span style="font-size:11px;color:#a16207;">To deliver directly to customer addresses, verify a custom domain at <a href="https://resend.com/domains" style="color:#b45309;text-decoration:underline;">resend.com/domains</a>.</span>
-              </div>
-            `.trim();
+            if (!alreadySendingToTestAddress) {
+              console.info(
+                `[Resend Sandbox Notice] Resend testing account is restricted to ${authorizedTestEmail}. Re-routing email intended for ${recipients.join(', ')} to developer testing address.`
+              );
 
-            const sandboxBannerText = `[Resend Sandbox Delivery Notice]\nIntended Recipient: ${recipients.join(', ')}\nForwarded to authorized developer email: ${authorizedTestEmail}\n(Verify a custom domain at resend.com/domains to send directly to customers)\n--------------------------------------------------\n\n`;
+              const sandboxBannerHtml = `
+                <div style="background-color:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 18px;margin:0 0 20px;color:#92400e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.6;">
+                  <strong style="color:#78350f;">🧪 Resend Sandbox Delivery Notice:</strong> This message was forwarded to your authorized developer email (<strong>${authorizedTestEmail}</strong>) because your Resend API key is in testing mode (custom domain not yet verified).<br/>
+                  <strong>Original Intended Recipient:</strong> <span style="font-family:monospace;color:#b45309;font-weight:bold;">${recipients.join(', ')}</span><br/>
+                  <span style="font-size:11px;color:#a16207;">To deliver directly to customer addresses, verify a custom domain at <a href="https://resend.com/domains" style="color:#b45309;text-decoration:underline;">resend.com/domains</a>.</span>
+                </div>
+              `.trim();
 
-            const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
-            const sandboxPayload = {
-              ...payload,
-              from: fallbackFrom,
-              to: [authorizedTestEmail],
-              subject: `[Sandbox - For: ${recipients.join(', ')}] ${opts.subject}`,
-              html: sandboxBannerHtml + opts.html,
-              text: sandboxBannerText + (opts.text || ''),
-              replyTo: replyToAddress,
-            };
+              const sandboxBannerText = `[Resend Sandbox Delivery Notice]\nIntended Recipient: ${recipients.join(', ')}\nForwarded to authorized developer email: ${authorizedTestEmail}\n(Verify a custom domain at resend.com/domains to send directly to customers)\n--------------------------------------------------\n\n`;
 
-            try {
-              const sandboxResult = await resend.emails.send(sandboxPayload);
-              if (!sandboxResult.error) {
-                console.info(
-                  `[Resend Sandbox Delivered] ID: ${sandboxResult.data?.id} | Forwarded To: ${authorizedTestEmail} | Intended: ${recipients.join(', ')}`
-                );
-                return {
-                  delivered: true,
-                  provider: 'resend',
-                  sandbox: true,
-                  intendedRecipient: recipients.join(', '),
-                  sandboxRecipient: authorizedTestEmail,
-                  messageId: sandboxResult.data?.id,
-                };
-              } else {
-                console.error(
-                  `[Resend Sandbox Forward Error] Could not re-route to ${authorizedTestEmail}:`,
-                  sandboxResult.error
-                );
+              const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
+              const sandboxPayload = {
+                ...payload,
+                from: fallbackFrom,
+                to: [authorizedTestEmail],
+                subject: `[Sandbox - For: ${recipients.join(', ')}] ${opts.subject}`,
+                html: sandboxBannerHtml + opts.html,
+                text: sandboxBannerText + (opts.text || ''),
+                replyTo: replyToAddress,
+              };
+
+              try {
+                const sandboxResult = await resend.emails.send(sandboxPayload);
+                if (!sandboxResult.error) {
+                  console.info(
+                    `[Resend Sandbox Delivered] ID: ${sandboxResult.data?.id} | Forwarded To: ${authorizedTestEmail} | Intended: ${recipients.join(', ')}`
+                  );
+                  return {
+                    delivered: true,
+                    provider: 'resend',
+                    sandbox: true,
+                    intendedRecipient: recipients.join(', '),
+                    sandboxRecipient: authorizedTestEmail,
+                    messageId: sandboxResult.data?.id,
+                  };
+                } else {
+                  console.error(
+                    `[Resend Sandbox Forward Error] Could not re-route to ${authorizedTestEmail}:`,
+                    sandboxResult.error
+                  );
+                }
+              } catch (sandboxErr) {
+                console.error('[Resend Sandbox Forward Exception]:', sandboxErr);
               }
-            } catch (sandboxErr) {
-              console.error('[Resend Sandbox Forward Exception]:', sandboxErr);
             }
-          }
 
-          console.warn(
-            `[Resend Sandbox Handled] Delivery for ${recipients.join(', ')} handled in sandbox. Direct external delivery requires verified custom domain.`
-          );
-          return {
-            delivered: true,
-            provider: 'resend',
-            sandbox: true,
-            intendedRecipient: recipients.join(', '),
-            sandboxRecipient: authorizedTestEmail,
-            error: sanitizeError(currentErrorMsg),
-          };
+            console.warn(
+              `[Resend Sandbox Handled] Delivery for ${recipients.join(', ')} handled in sandbox. Direct external delivery requires verified custom domain.`
+            );
+            return {
+              delivered: true,
+              provider: 'resend',
+              sandbox: true,
+              intendedRecipient: recipients.join(', '),
+              sandboxRecipient: authorizedTestEmail,
+              error: sanitizeError(currentErrorMsg),
+            };
+          }
         }
 
         const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
-        console.error(`[Resend API Error] Failed to send email to ${recipients.join(', ')}:`, sanitized);
+        console.warn(`[Resend API Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
         return {
           delivered: false,
           provider: 'resend',
@@ -897,7 +908,20 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
 
   const rawFromCandidate = (resendFrom || DEFAULT_FROM_ADDRESS).trim();
   const parsedSender = parseSenderAddress(rawFromCandidate);
-  const targetRecipient = (testRecipient || parsedSender.email || 'sarbaazsoft@gmail.com').trim().toLowerCase();
+  const targetRecipient = (testRecipient || '').trim().toLowerCase();
+
+  if (!targetRecipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(targetRecipient)) {
+    return {
+      success: false,
+      delivered: false,
+      provider: 'resend',
+      from: parsedSender.resendFrom,
+      to: targetRecipient,
+      error: 'A valid recipient email address is required to dispatch the test email.',
+      info: 'Recipient email address is required.',
+      sandbox: false,
+    };
+  }
 
   const timestamp = new Date().toLocaleString();
   const subject = `Test Delivery — SarbaazSoft Shoe POS (${timestamp})`;
@@ -915,7 +939,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       <div><strong>Reply-To:</strong> ${parsedSender.replyTo}</div>
       <div><strong>Timestamp:</strong> ${timestamp}</div>
     </div>
-    <p style="color:#94a3b8;font-size:12px;">If you received this message, password reset tokens and store onboarding notifications will deliver successfully.</p>
+    <p style="color:#94a3b8;font-size:12px;">If you received this message, password reset tokens and store onboarding notifications will deliver successfully to ${targetRecipient}.</p>
   </div>
 </body>
 </html>
@@ -927,16 +951,15 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       subject,
       html,
       text: `SarbaazSoft Shoe POS Resend Test Email\n\nSent to: ${targetRecipient}\nFrom: ${parsedSender.resendFrom}\nTimestamp: ${timestamp}`,
+      disableFallbackReroute: true,
     });
 
-    const infoMsg = result.sandbox
-      ? `Email dispatched via Resend Sandbox (forwarded to verified testing address ${result.sandboxRecipient || 'sarbaazsoft@gmail.com'} for recipient ${targetRecipient}).`
-      : result.delivered
-      ? `Email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
-      : `Email delivery failed: ${result.error}`;
+    const infoMsg = result.delivered
+      ? `Test email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
+      : `Test email delivery to ${targetRecipient} failed: ${result.error || 'Unknown error'}`;
 
     if (!result.delivered) {
-      console.error(`[testResendConfiguration] Test email delivery failed for ${targetRecipient}:`, result.error);
+      console.warn(`[testResendConfiguration] Test email delivery notice for ${targetRecipient}:`, result.error);
     }
 
     return {
@@ -948,8 +971,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       to: targetRecipient,
       error: result.error,
       info: infoMsg,
-      sandbox: result.sandbox,
-      sandboxRecipient: result.sandboxRecipient,
+      sandbox: false,
     };
   } catch (err: any) {
     console.error(`[testResendConfiguration Exception] Failed to send test email to ${targetRecipient}:`, err);
