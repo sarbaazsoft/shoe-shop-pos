@@ -441,18 +441,18 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: [{ exists: true, ok: true } as unknown as T], rowCount: 1 };
   }
 
-  // APP_SETTINGS table handling in in-memory mock store
-  if (upper.includes('APP_SETTINGS')) {
+  // APP_SETTINGS and APP_SETTING table handling in in-memory mock store
+  if (upper.includes('APP_SETTINGS') || upper.includes('APP_SETTING')) {
     if (!mockStore.app_settings) mockStore.app_settings = [];
 
-    if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.APP_SETTINGS')) {
+    if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.APP_SETTINGS') || upper.includes('INSERT INTO PUBLIC.APP_SETTING') || upper.includes('INSERT INTO APP_SETTING')) {
       const key = String(params[0] || '').trim();
       const value = String(params[1] !== undefined && params[1] !== null ? params[1] : '');
       const category = String(params[2] || 'system');
       const description = String(params[3] || '');
       const isSecret = Boolean(params[4]);
 
-      const existingIdx = mockStore.app_settings.findIndex((s) => s.key === key);
+      const existingIdx = mockStore.app_settings.findIndex((s) => s.key.toUpperCase() === key.toUpperCase());
       const isDoNothing = upper.includes('DO NOTHING');
 
       if (existingIdx >= 0) {
@@ -477,16 +477,34 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
 
     if (upper.startsWith('SELECT')) {
       let list = [...mockStore.app_settings];
-      if (upper.includes('WHERE KEY = $1')) {
-        const targetKey = String(params[0] || '').trim();
-        list = list.filter((s) => s.key === targetKey);
+      if (upper.includes('WHERE KEY = $1') || upper.includes('WHERE UPPER(KEY) = $1') || upper.includes('WHERE UPPER(KEY) = UPPER($1)')) {
+        const targetKey = String(params[0] || '').trim().toUpperCase();
+        list = list.filter((s) => s.key.toUpperCase() === targetKey);
+      } else if (upper.includes("WHERE UPPER(KEY) = 'RESEND_API_KEY'") || upper.includes("WHERE KEY = 'RESEND_API_KEY'")) {
+        list = list.filter((s) => s.key.toUpperCase() === 'RESEND_API_KEY');
+      } else if (upper.includes("WHERE KEY IN") || upper.includes("WHERE UPPER(KEY) IN")) {
+        const match = upper.match(/IN\s*\(([^)]+)\)/i);
+        if (match) {
+          const keys = match[1].split(',').map((k) => k.replace(/['"\s]/g, '').toUpperCase());
+          list = list.filter((s) => keys.includes(s.key.toUpperCase()));
+        }
       }
       return { rows: list as unknown as T[], rowCount: list.length };
     }
 
     if (upper.startsWith('UPDATE')) {
-      const targetKey = String(params[params.length - 1] || '').trim();
-      const entry = mockStore.app_settings.find((s) => s.key === targetKey);
+      if (upper.includes('EMAIL_WEBHOOK_URL') && upper.includes('RESEND_WEBHOOK_URL')) {
+        for (const s of mockStore.app_settings) {
+          if (s.key === 'EMAIL_WEBHOOK_URL' || s.key === 'RESEND_WEBHOOK_URL') {
+            if (s.value && !s.value.startsWith('http://') && !s.value.startsWith('https://')) {
+              s.value = '';
+            }
+          }
+        }
+        return { rows: [], rowCount: 1 };
+      }
+      const targetKey = String(params[params.length - 1] || '').trim().toUpperCase();
+      const entry = mockStore.app_settings.find((s) => s.key.toUpperCase() === targetKey);
       if (entry && params.length >= 2) {
         entry.value = String(params[0]);
         entry.updated_at = new Date().toISOString();

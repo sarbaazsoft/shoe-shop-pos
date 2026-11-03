@@ -2841,10 +2841,10 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
     try {
       welcomeResult = await sendWelcomeMsg(tenant.id, finalWelcomeMsg, finalEmail);
       if (welcomeResult && !welcomeResult.emailDelivered) {
-        console.error(`[tenantSaasRoutes.ts] Welcome email delivery failed for tenant ${tenant.id} (${finalEmail})`);
+        console.warn(`[tenantSaasRoutes.ts] Welcome email delivery notice for tenant ${tenant.id} (${finalEmail})`);
       }
-    } catch (welcomeErr) {
-      console.error('[tenantSaasRoutes.ts] sendWelcomeMsg exception during onboarding completion:', welcomeErr);
+    } catch (welcomeErr: any) {
+      console.warn('[tenantSaasRoutes.ts] sendWelcomeMsg notice during onboarding completion:', welcomeErr?.message || welcomeErr);
       welcomeResult = null;
     }
 

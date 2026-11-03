@@ -699,6 +699,7 @@ const DATABASE_INDEX_DDL: string[] = [
   `CREATE INDEX IF NOT EXISTS platform_notification_reads_notif_idx ON platform_notification_reads(notification_id)`,
   `CREATE INDEX IF NOT EXISTS platform_notification_reads_tenant_idx ON platform_notification_reads(tenant_id)`,
   `CREATE INDEX IF NOT EXISTS app_settings_category_idx ON app_settings(category)`,
+  `CREATE OR REPLACE VIEW app_setting AS SELECT * FROM app_settings`,
   `CREATE INDEX IF NOT EXISTS trial_activations_email_idx ON trial_activations(LOWER(BTRIM(email)))`,
   `CREATE INDEX IF NOT EXISTS trial_activations_tenant_idx ON trial_activations(tenant_id)`,
   `CREATE INDEX IF NOT EXISTS trial_activations_status_idx ON trial_activations(status)`,

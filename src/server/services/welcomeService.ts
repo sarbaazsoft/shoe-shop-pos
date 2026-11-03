@@ -109,10 +109,10 @@ export async function sendWelcomeMsg(
       emailDelivered = mailRes.delivered;
       emailPreviewUrl = mailRes.previewUrl || null;
       if (!mailRes.delivered) {
-        console.error(`[welcomeService.ts] Welcome email delivery failed for ${targetEmail}:`, mailRes.error);
+        console.warn(`[welcomeService.ts] Welcome email delivery notice for ${targetEmail}: ${mailRes.error}`);
       }
-    } catch (mailErr) {
-      console.error(`[welcomeService.ts] Welcome email exception for ${targetEmail}:`, mailErr);
+    } catch (mailErr: any) {
+      console.warn(`[welcomeService.ts] Welcome email dispatch notice for ${targetEmail}:`, mailErr?.message || mailErr);
     }
   }
 
@@ -241,10 +241,10 @@ export async function sendStaffWelcomeNotification(
       emailPreviewUrl = mailRes.previewUrl || null;
       provider = mailRes.provider;
       if (!mailRes.delivered) {
-        console.error(`[welcomeService.ts] Staff welcome email delivery failed for ${targetEmail}:`, mailRes.error);
+        console.warn(`[welcomeService.ts] Staff welcome email delivery notice for ${targetEmail}: ${mailRes.error}`);
       }
     } catch (mailErr: any) {
-      console.error(`[welcomeService.ts] Staff welcome email exception for ${targetEmail}:`, mailErr?.message || mailErr);
+      console.warn(`[welcomeService.ts] Staff welcome email dispatch notice for ${targetEmail}:`, mailErr?.message || mailErr);
     }
   }
 

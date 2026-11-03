@@ -11,6 +11,18 @@ export function isValidResendApiKey(key?: string | null): boolean {
   return clean.startsWith('re_') && clean.length >= 20;
 }
 
+export function isValidHttpUrl(candidate?: string | null): boolean {
+  if (!candidate || typeof candidate !== 'string') return false;
+  const clean = candidate.trim();
+  if (!clean || clean.length < 8) return false;
+  try {
+    const parsed = new URL(clean);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function sanitizeError(err: unknown): string {
   if (!err) return 'An unknown error occurred during email transmission.';
   const str = typeof err === 'string' ? err : (err as any)?.message || String(err);
@@ -120,9 +132,34 @@ export interface SendEmailResult {
   sandboxRecipient?: string;
 }
 
+/**
+ * Dynamically retrieves the Resend API key directly from the database app_setting / app_settings table.
+ * Strictly adheres to requirement: Do NOT use .env for resend_api_key.
+ */
+export async function getDynamicResendApiKey(): Promise<string> {
+  try {
+    const res = await pgClient.query<{ key: string; value: string }>(
+      `SELECT key, value FROM public.app_settings WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
+    ).catch(async () => {
+      return await pgClient.query<{ key: string; value: string }>(
+        `SELECT key, value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
+      );
+    });
+    if (res.rows.length > 0 && res.rows[0].value) {
+      return res.rows[0].value.trim();
+    }
+  } catch (dbErr) {
+    console.error('[email.ts] Error dynamically querying app_setting table for resend_api_key:', dbErr);
+  }
+
+  // Fallback to database-synced cache only (never process.env / .env)
+  return (getCachedAppSetting('RESEND_API_KEY') || '').trim();
+}
+
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
-  // Always query app_settings dynamically directly from the database to guarantee the latest API key is used
-  let apiKey = '';
+  // Always query resend_api_key dynamically directly from the database app_setting table
+  // Strictly do NOT use .env for resend_api_key.
+  const apiKey = await getDynamicResendApiKey();
   let resendFrom = '';
   let resendFromEmail = '';
   let emailWebhookUrl = '';
@@ -131,11 +168,15 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   try {
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT key, value FROM public.app_settings 
-       WHERE key IN ('RESEND_API_KEY', 'RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
-    );
+       WHERE key IN ('RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
+    ).catch(async () => {
+      return await pgClient.query<{ key: string; value: string }>(
+        `SELECT key, value FROM public.app_setting 
+         WHERE key IN ('RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
+      );
+    });
     for (const row of res.rows) {
-      if (row.key === 'RESEND_API_KEY') apiKey = (row.value || '').trim();
-      else if (row.key === 'RESEND_FROM' && row.value?.trim()) resendFrom = row.value.trim();
+      if (row.key === 'RESEND_FROM' && row.value?.trim()) resendFrom = row.value.trim();
       else if (row.key === 'RESEND_FROM_EMAIL' && row.value?.trim()) resendFromEmail = row.value.trim();
       else if (row.key === 'EMAIL_WEBHOOK_URL') emailWebhookUrl = (row.value || '').trim();
       else if (row.key === 'RESEND_WEBHOOK_URL') resendWebhookUrl = (row.value || '').trim();
@@ -143,7 +184,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   } catch (dbErr) {
     console.error('[email.ts] Error querying app_settings table for email configuration:', dbErr);
     // In-memory cache fallback if DB query errors
-    apiKey = (getCachedAppSetting('RESEND_API_KEY') || '').trim();
     resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
     resendFromEmail = (getCachedAppSetting('RESEND_FROM_EMAIL') || '').trim();
     emailWebhookUrl = (getCachedAppSetting('EMAIL_WEBHOOK_URL') || '').trim();
@@ -153,9 +193,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   // Cross-fallback between RESEND_FROM and RESEND_FROM_EMAIL
   if (!resendFrom && resendFromEmail) {
     resendFrom = `SarbaazSoft Shoe POS Security <${resendFromEmail}>`;
-  }
-  if (!apiKey) {
-    apiKey = (process.env.RESEND_API_KEY || '').trim();
   }
   if (!resendFrom) {
     resendFrom = (process.env.RESEND_FROM || process.env.RESEND_FROM_EMAIL || '').trim();
@@ -244,99 +281,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           }
         }
 
-        // If disableFallbackReroute is set (e.g. for live test emails), never reroute or hijack recipient
-        if (opts.disableFallbackReroute) {
-          const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
-          console.warn(`[Resend Direct Delivery Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
-          return {
-            delivered: false,
-            provider: 'resend',
-            error: sanitized,
-          };
-        }
-
-        // Automatic fallback for Resend Sandbox / Testing mode:
-        // When using a free/testing key without a verified custom domain, Resend enforces:
-        // "You can only send testing emails to your own email address (...)."
-        const currentErrorMsg = String(error?.message || (error as any)?.name || error || '');
-        const isTestingEmailRestriction = /only send testing emails to your own email address|testing emails to your own email/i.test(currentErrorMsg);
-
-        if (isTestingEmailRestriction) {
-          const testEmailMatch = currentErrorMsg.match(/own email address \(([^)]+)\)/i);
-          const authorizedTestEmail = testEmailMatch?.[1]?.trim().toLowerCase();
-
-          if (authorizedTestEmail) {
-            const alreadySendingToTestAddress = recipients.some(
-              (r) => r.trim().toLowerCase() === authorizedTestEmail
-            );
-
-            if (!alreadySendingToTestAddress) {
-              console.info(
-                `[Resend Sandbox Notice] Resend testing account is restricted to ${authorizedTestEmail}. Re-routing email intended for ${recipients.join(', ')} to developer testing address.`
-              );
-
-              const sandboxBannerHtml = `
-                <div style="background-color:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 18px;margin:0 0 20px;color:#92400e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.6;">
-                  <strong style="color:#78350f;">🧪 Resend Sandbox Delivery Notice:</strong> This message was forwarded to your authorized developer email (<strong>${authorizedTestEmail}</strong>) because your Resend API key is in testing mode (custom domain not yet verified).<br/>
-                  <strong>Original Intended Recipient:</strong> <span style="font-family:monospace;color:#b45309;font-weight:bold;">${recipients.join(', ')}</span><br/>
-                  <span style="font-size:11px;color:#a16207;">To deliver directly to customer addresses, verify a custom domain at <a href="https://resend.com/domains" style="color:#b45309;text-decoration:underline;">resend.com/domains</a>.</span>
-                </div>
-              `.trim();
-
-              const sandboxBannerText = `[Resend Sandbox Delivery Notice]\nIntended Recipient: ${recipients.join(', ')}\nForwarded to authorized developer email: ${authorizedTestEmail}\n(Verify a custom domain at resend.com/domains to send directly to customers)\n--------------------------------------------------\n\n`;
-
-              const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
-              const sandboxPayload = {
-                ...payload,
-                from: fallbackFrom,
-                to: [authorizedTestEmail],
-                subject: `[Sandbox - For: ${recipients.join(', ')}] ${opts.subject}`,
-                html: sandboxBannerHtml + opts.html,
-                text: sandboxBannerText + (opts.text || ''),
-                replyTo: replyToAddress,
-              };
-
-              try {
-                const sandboxResult = await resend.emails.send(sandboxPayload);
-                if (!sandboxResult.error) {
-                  console.info(
-                    `[Resend Sandbox Delivered] ID: ${sandboxResult.data?.id} | Forwarded To: ${authorizedTestEmail} | Intended: ${recipients.join(', ')}`
-                  );
-                  return {
-                    delivered: true,
-                    provider: 'resend',
-                    sandbox: true,
-                    intendedRecipient: recipients.join(', '),
-                    sandboxRecipient: authorizedTestEmail,
-                    messageId: sandboxResult.data?.id,
-                  };
-                } else {
-                  console.error(
-                    `[Resend Sandbox Forward Error] Could not re-route to ${authorizedTestEmail}:`,
-                    sandboxResult.error
-                  );
-                }
-              } catch (sandboxErr) {
-                console.error('[Resend Sandbox Forward Exception]:', sandboxErr);
-              }
-            }
-
-            console.warn(
-              `[Resend Sandbox Handled] Delivery for ${recipients.join(', ')} handled in sandbox. Direct external delivery requires verified custom domain.`
-            );
-            return {
-              delivered: true,
-              provider: 'resend',
-              sandbox: true,
-              intendedRecipient: recipients.join(', '),
-              sandboxRecipient: authorizedTestEmail,
-              error: sanitizeError(currentErrorMsg),
-            };
-          }
-        }
-
         const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
-        console.warn(`[Resend API Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
+        console.warn(`[Resend Direct Delivery Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
         return {
           delivered: false,
           provider: 'resend',
@@ -352,7 +298,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
       };
     } catch (err: any) {
       const sanitized = sanitizeError(err);
-      console.error(`[Resend Exception in sendEmail] Error sending to ${recipients.join(', ')}:`, err);
+      console.warn(`[Resend Notice in sendEmail] Delivery notice for ${recipients.join(', ')}:`, sanitized);
       return {
         delivered: false,
         provider: 'resend',
@@ -362,11 +308,17 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   }
 
   // 2. Optional secondary webhook dispatcher if configured exclusively in app_settings
-  const webhookUrl = (
+  const candidateWebhook = (
     emailWebhookUrl ||
     resendWebhookUrl ||
     ''
   ).trim();
+
+  const webhookUrl = isValidHttpUrl(candidateWebhook) ? candidateWebhook : '';
+
+  if (candidateWebhook && !webhookUrl) {
+    console.warn(`[Webhook Email Notice] Configured webhook URL is invalid or malformed ("${candidateWebhook}"). Skipping webhook dispatch.`);
+  }
 
   if (webhookUrl) {
     try {
@@ -389,9 +341,9 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
           provider: 'webhook',
         };
       }
-      console.error(`[Webhook Dispatch Error] Server returned ${resp.status} ${resp.statusText}`);
-    } catch (whErr) {
-      console.error('[Webhook Email Dispatch Exception]:', whErr);
+      console.warn(`[Webhook Dispatch Notice] Server returned ${resp.status} ${resp.statusText}`);
+    } catch (whErr: any) {
+      console.warn('[Webhook Email Dispatch Notice]:', whErr?.message || whErr);
     }
   }
 
@@ -399,7 +351,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     ? 'Email delivery unavailable: RESEND_API_KEY is not configured in app_settings.'
     : 'Email delivery unavailable: RESEND_API_KEY format is invalid (must start with re_ and be >= 20 characters).';
 
-  console.error('[sendEmail Error]:', unconfiguredMsg);
+  console.warn('[sendEmail Notice]:', unconfiguredMsg);
   return {
     delivered: false,
     provider: 'resend',
@@ -538,7 +490,7 @@ export async function sendPasswordResetEmail(
       tags: [{ name: 'category', value: 'password_reset' }],
     });
   } catch (err: any) {
-    console.error(`[sendPasswordResetEmail Error] Failed to send reset email to ${opts.to}:`, err);
+    console.warn(`[sendPasswordResetEmail Notice] Could not send reset email to ${opts.to}:`, err?.message || err);
     return {
       delivered: false,
       provider: 'resend',
@@ -647,7 +599,7 @@ export async function sendWelcomeEmail(
       tags: [{ name: 'category', value: 'store_welcome' }],
     });
   } catch (err: any) {
-    console.error(`[sendWelcomeEmail Error] Failed to send welcome email to ${opts.to}:`, err);
+    console.warn(`[sendWelcomeEmail Notice] Could not send welcome email to ${opts.to}:`, err?.message || err);
     return {
       delivered: false,
       provider: 'resend',
@@ -759,7 +711,7 @@ export async function sendStaffWelcomeEmail(
       tags: [{ name: 'category', value: 'staff_invitation' }],
     });
   } catch (err: any) {
-    console.error(`[sendStaffWelcomeEmail Error] Failed to send staff welcome email to ${opts.to}:`, err);
+    console.warn(`[sendStaffWelcomeEmail Notice] Could not send staff welcome email to ${opts.to}:`, err?.message || err);
     return {
       delivered: false,
       provider: 'resend',
@@ -851,7 +803,7 @@ export async function sendTrialActivationEmail(
       tags: [{ name: 'category', value: 'free_trial_activation' }],
     });
   } catch (err: any) {
-    console.error(`[sendTrialActivationEmail Error] Failed to send activation email to ${opts.to}:`, err);
+    console.warn(`[sendTrialActivationEmail Notice] Could not send activation email to ${opts.to}:`, err?.message || err);
     return {
       delivered: false,
       provider: 'resend',
@@ -974,7 +926,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       sandbox: false,
     };
   } catch (err: any) {
-    console.error(`[testResendConfiguration Exception] Failed to send test email to ${targetRecipient}:`, err);
+    console.warn(`[testResendConfiguration Notice] Could not send test email to ${targetRecipient}:`, err?.message || err);
     return {
       success: false,
       delivered: false,
@@ -982,7 +934,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       from: parsedSender.resendFrom,
       to: targetRecipient,
       error: err?.message || String(err),
-      info: `Test email exception: ${err?.message || String(err)}`,
+      info: `Test email notice: ${err?.message || String(err)}`,
     };
   }
 }

@@ -158,11 +158,24 @@ export async function ensureAppSettingsSchema(): Promise<void> {
       await pgClient.query(`
         CREATE INDEX IF NOT EXISTS idx_app_settings_category ON public.app_settings (category)
       `);
+      await pgClient.query(`
+        CREATE OR REPLACE VIEW public.app_setting AS SELECT * FROM public.app_settings
+      `).catch(() => {});
+
+      // Sanitize any malformed non-HTTP URLs that may have been saved into webhook fields
+      await pgClient.query(`
+        UPDATE public.app_settings 
+        SET value = '' 
+        WHERE key IN ('EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL') 
+          AND value != '' 
+          AND value NOT ILIKE 'http://%' 
+          AND value NOT ILIKE 'https://%'
+      `).catch(() => {});
 
       // Seed all default settings if not already present
       for (const def of APP_SETTINGS_DEFAULTS) {
-        // Email settings are purely configured via SettingView in PostgreSQL app_settings
-        const isEmailCat = def.category === 'email';
+        // RESEND_API_KEY and email settings must NEVER be loaded or seeded from process.env or .env
+        const isEmailCat = def.category === 'email' || def.key === 'RESEND_API_KEY';
         const envVal = !isEmailCat ? process.env[def.key]?.trim() : undefined;
         const initialVal = envVal !== undefined && envVal !== '' ? envVal : def.defaultValue;
 
@@ -213,6 +226,28 @@ export async function loadAppSettingsCache(): Promise<void> {
  * Email settings (RESEND_API_KEY, RESEND_FROM, etc.) are strictly read from app_settings, never from .env.
  */
 export async function getAppSetting(key: string, fallback?: string): Promise<string> {
+  if (key === 'RESEND_API_KEY') {
+    // CRITICAL REQUIREMENT: Do not use .env for resend_api_key.
+    // Retrieve resend_api_key dynamically from the app_setting database table.
+    try {
+      const res = await pgClient.query<{ value: string }>(
+        `SELECT value FROM public.app_settings WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
+      ).catch(async () => {
+        return await pgClient.query<{ value: string }>(
+          `SELECT value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
+        );
+      });
+      if (res.rows.length > 0) {
+        const val = (res.rows[0].value || '').trim();
+        settingsCache.set('RESEND_API_KEY', val);
+        return val;
+      }
+    } catch (err) {
+      console.warn('Notice querying RESEND_API_KEY dynamically from app_setting table:', err);
+    }
+    return settingsCache.get('RESEND_API_KEY') || fallback || '';
+  }
+
   if (!cacheLoaded) {
     await loadAppSettingsCache();
   }
@@ -240,10 +275,12 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
     }
   }
 
-  // Environment variable fallback if not set in database
-  const envVal = process.env[key]?.trim();
-  if (envVal !== undefined && envVal !== '') {
-    return envVal;
+  // Environment variable fallback if not set in database (NEVER used for RESEND_API_KEY)
+  if (key !== 'RESEND_API_KEY') {
+    const envVal = process.env[key]?.trim();
+    if (envVal !== undefined && envVal !== '') {
+      return envVal;
+    }
   }
   if (key === 'RESEND_FROM_EMAIL') {
     const altEnv = process.env.RESEND_FROM?.trim();
@@ -266,6 +303,11 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
  * If cache is loaded, returns the cached value from PostgreSQL app_settings.
  */
 export function getCachedAppSetting(key: string, fallback?: string): string {
+  if (key === 'RESEND_API_KEY') {
+    // Strictly read from database-synced cache, never from process.env
+    return settingsCache.get('RESEND_API_KEY') || fallback || '';
+  }
+
   const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
 
   if (settingsCache.has(key)) {
@@ -291,9 +333,11 @@ export function getCachedAppSetting(key: string, fallback?: string): string {
     }
   }
 
-  const envVal = process.env[key]?.trim();
-  if (envVal !== undefined && envVal !== '') {
-    return envVal;
+  if (key !== 'RESEND_API_KEY') {
+    const envVal = process.env[key]?.trim();
+    if (envVal !== undefined && envVal !== '') {
+      return envVal;
+    }
   }
   if (key === 'RESEND_FROM_EMAIL') {
     const altEnv = process.env.RESEND_FROM?.trim();
@@ -425,6 +469,16 @@ export async function updateAppSettings(
     const emailVal = cleanUpdates.RESEND_FROM_EMAIL.trim();
     if (emailVal.includes('@')) {
       cleanUpdates.RESEND_FROM = `SarbaazSoft Shoe POS Security <${emailVal}>`;
+    }
+  }
+
+  // Sanitize webhook URLs to ensure malformed non-URL text is not stored
+  for (const hookKey of ['EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL']) {
+    if (cleanUpdates[hookKey]) {
+      const val = cleanUpdates[hookKey];
+      if (!val.startsWith('http://') && !val.startsWith('https://')) {
+        cleanUpdates[hookKey] = '';
+      }
     }
   }
 

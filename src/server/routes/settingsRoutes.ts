@@ -481,15 +481,15 @@ router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requir
 // POST /api/settings/test-email - Trigger live Resend test email to verify credentials and sender domain
 router.post('/test-email', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const rawRecipient = req.body?.recipientEmail || req.body?.to || req.body?.email || req.user?.email || '';
+    const rawRecipient = req.body?.recipientEmail || req.body?.recipient_email || req.body?.to || req.body?.email || req.query?.recipientEmail || req.query?.to || req.query?.email || '';
     const cleanRecipient = String(rawRecipient).trim().toLowerCase();
 
     if (!cleanRecipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanRecipient)) {
       return res.status(400).json({
         success: false,
         delivered: false,
-        error: 'A valid recipient email address is required.',
-        message: 'Please provide a valid recipient email address to send the test email to.',
+        error: 'A valid recipient email address is required. Please specify the target recipient email in the input field.',
+        message: 'A valid recipient email address is required. Please specify the target recipient email in the input field.',
       });
     }
 
@@ -999,7 +999,7 @@ router.post('/users', requireAuth, requireAdmin, async (req: AuthenticatedReques
         origin,
       });
     } catch (notifErr: any) {
-      console.error('[settingsRoutes.ts] Could not dispatch staff welcome notification/email:', notifErr?.message || notifErr);
+      console.warn('[settingsRoutes.ts] Could not dispatch staff welcome notification/email:', notifErr?.message || notifErr);
     }
 
     res.status(201).json({

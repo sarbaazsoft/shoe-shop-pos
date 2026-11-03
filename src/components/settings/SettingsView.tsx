@@ -653,7 +653,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const hasLoadedAppSettingsRef = useRef(false);
 
-  const [testEmailRecipient, setTestEmailRecipient] = useState(currentUser?.email || '');
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{
     success: boolean;
@@ -662,19 +662,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     details?: any;
   } | null>(null);
 
-  useEffect(() => {
-    if (!testEmailRecipient && currentUser?.email) {
-      setTestEmailRecipient(currentUser.email);
-    }
-  }, [currentUser?.email]);
-
   const handleSendTestEmail = async () => {
-    const target = testEmailRecipient.trim() || currentUser?.email?.trim();
-    if (!target) {
+    const target = testEmailRecipient.trim();
+    if (!target || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(target)) {
       setTestEmailResult({
         success: false,
         delivered: false,
-        message: 'Please enter a recipient email address to send the test email to.',
+        message: 'Please enter a valid recipient email address in the input field to send the test email to.',
       });
       return;
     }
