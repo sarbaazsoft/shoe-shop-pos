@@ -27,12 +27,40 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     isSecret: false,
   },
 
-  // 2. Email Group (Exclusively powered by Resend)
+  // 2. Email Group (Dynamic Provider Support: Resend and Gmail SMTP)
+  {
+    key: 'ACTIVE_EMAIL_PROVIDER',
+    defaultValue: 'resend',
+    category: 'email',
+    description: 'Active transactional email provider (resend or gmail)',
+    isSecret: false,
+  },
   {
     key: 'RESEND_API_KEY',
     defaultValue: '',
     category: 'email',
     description: 'Resend API Key for transactional emails (e.g. re_...)',
+    isSecret: true,
+  },
+  {
+    key: 'GMAIL_USER',
+    defaultValue: 'sarbaazsoft@gmail.com',
+    category: 'email',
+    description: 'Gmail sender address for SMTP (e.g. sarbaazsoft@gmail.com)',
+    isSecret: false,
+  },
+  {
+    key: 'GMAIL_FROM_NAME',
+    defaultValue: 'superadmin',
+    category: 'email',
+    description: 'Display sender name for Gmail SMTP emails (e.g. superadmin)',
+    isSecret: false,
+  },
+  {
+    key: 'GMAIL_APP_PASSWORD',
+    defaultValue: '',
+    category: 'email',
+    description: 'Google App Password (16 characters) for Gmail SMTP',
     isSecret: true,
   },
   {
@@ -186,6 +214,18 @@ export async function ensureAppSettingsSchema(): Promise<void> {
           [def.key, initialVal, def.category, def.description, def.isSecret]
         );
       }
+
+      // Ensure Gmail SMTP sender credentials have the requested defaults if currently empty
+      await pgClient.query(`
+        UPDATE public.app_settings
+        SET value = 'sarbaazsoft@gmail.com'
+        WHERE key = 'GMAIL_USER' AND (value IS NULL OR value = '')
+      `).catch(() => {});
+      await pgClient.query(`
+        UPDATE public.app_settings
+        SET value = 'superadmin'
+        WHERE key = 'GMAIL_FROM_NAME' AND (value IS NULL OR value = '')
+      `).catch(() => {});
     } catch (err: any) {
       console.warn('Notice while ensuring app_settings schema:', err?.message || err);
     }
@@ -415,7 +455,7 @@ export async function getAllAppSettings(
   // Ensure all known defaults appear in the response even if unseeded
   for (const def of APP_SETTINGS_DEFAULTS) {
     if (byKey[def.key] === undefined) {
-      const isEmail = def.category === 'email' || def.key.startsWith('RESEND_') || def.key.startsWith('EMAIL_');
+      const isEmail = def.category === 'email' || def.key.startsWith('RESEND_') || def.key.startsWith('EMAIL_') || def.key.startsWith('GMAIL_') || def.key === 'ACTIVE_EMAIL_PROVIDER';
       const val = settingsCache.get(def.key) ?? (!isEmail ? process.env[def.key]?.trim() : undefined) ?? def.defaultValue;
       byKey[def.key] = val;
       const item: AppSettingItem = {
@@ -428,6 +468,13 @@ export async function getAllAppSettings(
       grouped[def.category].push(item);
     }
   }
+
+  // Provide seamless lowercase aliases for email provider fields
+  if (byKey.ACTIVE_EMAIL_PROVIDER) byKey.active_email_provider = byKey.ACTIVE_EMAIL_PROVIDER;
+  if (byKey.RESEND_API_KEY) byKey.resend_api_key = byKey.RESEND_API_KEY;
+  if (byKey.GMAIL_USER) byKey.gmail_user = byKey.GMAIL_USER;
+  if (byKey.GMAIL_FROM_NAME) byKey.gmail_from_name = byKey.GMAIL_FROM_NAME;
+  if (byKey.GMAIL_APP_PASSWORD) byKey.gmail_app_password = byKey.GMAIL_APP_PASSWORD;
 
   return { byKey, grouped, items: rows };
 }
@@ -456,6 +503,27 @@ export async function updateAppSettings(
   for (const [k, v] of Object.entries(updates)) {
     if (v === undefined || v === null) continue;
     cleanUpdates[k] = String(v).trim();
+  }
+
+  // Alias lowercase email provider fields to standard configuration keys
+  if (cleanUpdates.active_email_provider && !cleanUpdates.ACTIVE_EMAIL_PROVIDER) {
+    cleanUpdates.ACTIVE_EMAIL_PROVIDER = cleanUpdates.active_email_provider;
+  }
+  if (cleanUpdates.resend_api_key !== undefined && !cleanUpdates.RESEND_API_KEY) {
+    cleanUpdates.RESEND_API_KEY = cleanUpdates.resend_api_key;
+  }
+  if (cleanUpdates.gmail_user !== undefined && !cleanUpdates.GMAIL_USER) {
+    cleanUpdates.GMAIL_USER = cleanUpdates.gmail_user;
+  }
+  if (cleanUpdates.gmail_from_name !== undefined && !cleanUpdates.GMAIL_FROM_NAME) {
+    cleanUpdates.GMAIL_FROM_NAME = cleanUpdates.gmail_from_name;
+  }
+  if (cleanUpdates.gmail_app_password !== undefined && !cleanUpdates.GMAIL_APP_PASSWORD) {
+    cleanUpdates.GMAIL_APP_PASSWORD = cleanUpdates.gmail_app_password;
+  }
+
+  if (cleanUpdates.ACTIVE_EMAIL_PROVIDER) {
+    cleanUpdates.ACTIVE_EMAIL_PROVIDER = cleanUpdates.ACTIVE_EMAIL_PROVIDER.toLowerCase() === 'gmail' ? 'gmail' : 'resend';
   }
 
   // Cross-synchronize sender address and sender email for Resend routines

@@ -1,7 +1,10 @@
-// Centralized transactional email service powered exclusively by the Resend SDK
+// Centralized transactional email service supporting multiple providers (Resend and Gmail SMTP)
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { pgClient } from '../../db/index.ts';
 import { getAllAppSettings, getCachedAppSetting } from '../services/appSettingsService.ts';
+
+export type EmailProvider = 'resend' | 'gmail';
 
 export const DEFAULT_FROM_ADDRESS = 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>';
 
@@ -28,7 +31,8 @@ export function sanitizeError(err: unknown): string {
   const str = typeof err === 'string' ? err : (err as any)?.message || String(err);
   return str
     .replace(/re_[A-Za-z0-9_]+/g, '[REDACTED_API_KEY]')
-    .replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED_TOKEN]');
+    .replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED_TOKEN]')
+    .replace(/(?:pass(?:word)?[:=]\s*)[^\s,]+/gi, 'password=[REDACTED]');
 }
 
 export interface ParsedSenderAddress {
@@ -123,13 +127,70 @@ export interface SendEmailOptions {
 
 export interface SendEmailResult {
   delivered: boolean;
-  provider: 'resend' | 'webhook';
+  provider: 'resend' | 'gmail' | 'webhook';
   messageId?: string;
   previewUrl?: string | null;
   error?: string;
   sandbox?: boolean;
   intendedRecipient?: string;
   sandboxRecipient?: string;
+}
+
+/**
+ * Dynamically queries the active email provider ('resend' | 'gmail') from database app_settings.
+ */
+export async function getActiveEmailProvider(): Promise<'resend' | 'gmail'> {
+  try {
+    const res = await pgClient.query<{ key: string; value: string }>(
+      `SELECT value FROM public.app_settings WHERE UPPER(key) IN ('ACTIVE_EMAIL_PROVIDER', 'ACTIVE_PROVIDER') LIMIT 1`
+    ).catch(async () => {
+      return await pgClient.query<{ key: string; value: string }>(
+        `SELECT value FROM public.app_setting WHERE UPPER(key) IN ('ACTIVE_EMAIL_PROVIDER', 'ACTIVE_PROVIDER') LIMIT 1`
+      );
+    });
+    if (res.rows.length > 0 && res.rows[0].value) {
+      const val = res.rows[0].value.trim().toLowerCase();
+      if (val === 'gmail') return 'gmail';
+      if (val === 'resend') return 'resend';
+    }
+  } catch (err) {
+    console.warn('[email.ts] Notice querying active email provider from database:', err);
+  }
+
+  const cached = (getCachedAppSetting('ACTIVE_EMAIL_PROVIDER') || process.env.ACTIVE_EMAIL_PROVIDER || 'resend').trim().toLowerCase();
+  return cached === 'gmail' ? 'gmail' : 'resend';
+}
+
+/**
+ * Dynamically retrieves Gmail SMTP credentials directly from the database app_setting / app_settings table.
+ */
+export async function getDynamicGmailCredentials(): Promise<{ user: string; pass: string; fromName: string }> {
+  let user = '';
+  let pass = '';
+  let fromName = '';
+  try {
+    const res = await pgClient.query<{ key: string; value: string }>(
+      `SELECT key, value FROM public.app_settings WHERE UPPER(key) IN ('GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_FROM_NAME', 'GMAIL_SENDER_NAME')`
+    ).catch(async () => {
+      return await pgClient.query<{ key: string; value: string }>(
+        `SELECT key, value FROM public.app_setting WHERE UPPER(key) IN ('GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_FROM_NAME', 'GMAIL_SENDER_NAME')`
+      );
+    });
+    for (const row of res.rows) {
+      const k = row.key.toUpperCase();
+      if (k === 'GMAIL_USER') user = (row.value || '').trim();
+      else if (k === 'GMAIL_APP_PASSWORD') pass = (row.value || '').trim();
+      else if (k === 'GMAIL_FROM_NAME' || k === 'GMAIL_SENDER_NAME') fromName = (row.value || '').trim();
+    }
+  } catch (err) {
+    console.warn('[email.ts] Notice querying Gmail credentials from database:', err);
+  }
+
+  if (!user) user = (getCachedAppSetting('GMAIL_USER') || process.env.GMAIL_USER || 'sarbaazsoft@gmail.com').trim();
+  if (!pass) pass = (getCachedAppSetting('GMAIL_APP_PASSWORD') || process.env.GMAIL_APP_PASSWORD || '').trim();
+  if (!fromName) fromName = (getCachedAppSetting('GMAIL_FROM_NAME') || process.env.GMAIL_FROM_NAME || 'superadmin').trim();
+
+  return { user, pass, fromName };
 }
 
 /**
@@ -156,10 +217,47 @@ export async function getDynamicResendApiKey(): Promise<string> {
   return (getCachedAppSetting('RESEND_API_KEY') || '').trim();
 }
 
+async function sendViaWebhookFallback(
+  webhookUrl: string,
+  fromAddress: string,
+  recipients: string[],
+  opts: SendEmailOptions,
+  replyToAddress?: string | string[]
+): Promise<SendEmailResult> {
+  try {
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: recipients,
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text,
+        replyTo: replyToAddress,
+      }),
+    });
+
+    if (resp.ok) {
+      return {
+        delivered: true,
+        provider: 'webhook',
+      };
+    }
+    console.warn(`[Webhook Dispatch Notice] Server returned ${resp.status} ${resp.statusText}`);
+  } catch (whErr: any) {
+    console.warn('[Webhook Email Dispatch Notice]:', whErr?.message || whErr);
+  }
+
+  return {
+    delivered: false,
+    provider: 'webhook',
+    error: 'Webhook dispatch attempt failed.',
+  };
+}
+
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
-  // Always query resend_api_key dynamically directly from the database app_setting table
-  // Strictly do NOT use .env for resend_api_key.
-  const apiKey = await getDynamicResendApiKey();
+  const activeProvider = await getActiveEmailProvider();
   let resendFrom = '';
   let resendFromEmail = '';
   let emailWebhookUrl = '';
@@ -183,7 +281,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     }
   } catch (dbErr) {
     console.error('[email.ts] Error querying app_settings table for email configuration:', dbErr);
-    // In-memory cache fallback if DB query errors
     resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
     resendFromEmail = (getCachedAppSetting('RESEND_FROM_EMAIL') || '').trim();
     emailWebhookUrl = (getCachedAppSetting('EMAIL_WEBHOOK_URL') || '').trim();
@@ -209,154 +306,230 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   const replyToAddress = opts.replyTo || parsedSender.replyTo;
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
 
-  // 1. Send via Resend SDK when API key is provided
-  if (isValidResendApiKey(apiKey)) {
-    try {
-      const resend = new Resend(apiKey);
+  // Optional secondary webhook URL
+  const candidateWebhook = (emailWebhookUrl || resendWebhookUrl || '').trim();
+  const webhookUrl = isValidHttpUrl(candidateWebhook) ? candidateWebhook : '';
 
-      // Verify sender domain in Resend if using a custom non-resend domain
-      const senderDomain = parsedSender.email.split('@')[1]?.toLowerCase();
-      if (senderDomain && senderDomain !== 'resend.dev' && !parsedSender.isPublicWebmail) {
-        try {
-          const domainsRes = await resend.domains.list();
-          if (domainsRes && Array.isArray(domainsRes.data)) {
-            const domainEntry = domainsRes.data.find(
-              (d: any) => d.name?.toLowerCase() === senderDomain
-            );
-            if (!domainEntry || domainEntry.status !== 'verified') {
-              console.warn(
-                `[Resend Sender Domain Warning] Sender domain "${senderDomain}" is not verified in Resend (status: ${domainEntry?.status || 'unregistered'}). Proactively falling back to onboarding@resend.dev to ensure delivery.`
-              );
-              fromAddress = `${parsedSender.displayName} <onboarding@resend.dev>`;
-            }
-          }
-        } catch (domainCheckErr) {
-          console.warn('[Resend Domain Verification Notice] Could not query domain list from Resend API:', domainCheckErr);
-        }
+  // -------------------------------------------------------------------------
+  // PROVIDER 1: GMAIL SMTP RELAY (via nodemailer)
+  // -------------------------------------------------------------------------
+  if (activeProvider === 'gmail') {
+    const { user: rawUser, pass: rawPass, fromName: rawFromName } = await getDynamicGmailCredentials();
+    const cleanUser = (rawUser || 'sarbaazsoft@gmail.com').trim();
+    const cleanPass = rawPass.replace(/\s+/g, ''); // Strip spaces from Google 16-character App Password
+
+    if (!cleanUser || !cleanPass) {
+      const missingFields = !cleanUser && !cleanPass
+        ? 'both gmail_user and gmail_app_password are not configured'
+        : !cleanUser
+        ? 'gmail_user is not configured'
+        : 'gmail_app_password is not configured';
+      const errorMsg = `Active email provider is set to Gmail, but ${missingFields}. Please configure your Gmail credentials in SuperAdmin Settings > Email Configuration > Gmail tab.`;
+      
+      console.warn(`[Gmail SMTP Warning] ${errorMsg}`);
+
+      if (webhookUrl && !opts.disableFallbackReroute) {
+        return await sendViaWebhookFallback(webhookUrl, fromAddress, recipients, opts, replyToAddress);
       }
 
-      const payload: any = {
-        from: fromAddress,
+      return {
+        delivered: false,
+        provider: 'gmail',
+        error: errorMsg,
+      };
+    }
+
+    try {
+      // Determine sender display name and email with environment variable fallbacks and hardcoded default
+      // Priority:
+      // 1. Configured GMAIL_FROM_NAME from SuperAdmin settings (e.g. 'superadmin' or customized)
+      // 2. Caller-specified opts.from display name (if explicitly passed and not default generic fallback)
+      // 3. Environment fallbacks: process.env.GMAIL_FROM_NAME || 'superadmin', process.env.GMAIL_USER || 'sarbaazsoft@gmail.com'
+      // 4. Hardcoded fallback: 'superadmin <sarbaazsoft@gmail.com>'
+      const fallbackFromName = (process.env.GMAIL_FROM_NAME || 'superadmin').trim();
+      const fallbackFromEmail = (process.env.GMAIL_USER || 'sarbaazsoft@gmail.com').trim();
+      const hardcodedFrom = 'superadmin <sarbaazsoft@gmail.com>';
+
+      const senderDisplayName = (rawFromName || '').trim() ||
+        (parsedSender.displayName && parsedSender.displayName !== 'SarbaazSoft Shoe POS Security' ? parsedSender.displayName : '') ||
+        fallbackFromName ||
+        'superadmin';
+      const senderEmail = (cleanUser || fallbackFromEmail || 'sarbaazsoft@gmail.com').trim();
+
+      const senderFrom = (senderDisplayName && senderEmail)
+        ? (senderDisplayName.includes(' ') ? `"${senderDisplayName}" <${senderEmail}>` : `${senderDisplayName} <${senderEmail}>`)
+        : hardcodedFrom;
+
+      // Construct the active sender address (dynamic settings > env vars > hardcoded fallback)
+      const mailFrom = senderFrom || 'superadmin <sarbaazsoft@gmail.com>';
+
+      // Update the transporter configuration with the dynamic sender address
+      const transporter = nodemailer.createTransport(
+        {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true, // SSL
+          auth: {
+            user: cleanUser,
+            pass: cleanPass,
+          },
+          from: mailFrom,
+        } as any,
+        {
+          from: mailFrom,
+        }
+      );
+
+      const info = await transporter.sendMail({
+        from: mailFrom,
         to: recipients,
         subject: opts.subject,
         html: opts.html,
         text: opts.text,
-        replyTo: replyToAddress,
-        tags: opts.tags,
-      };
+        replyTo: replyToAddress || mailFrom,
+      });
 
-      let { data, error } = await resend.emails.send(payload);
-
-      // Automatic fallback: If custom domain fails domain verification on Resend, retry once via onboarding@resend.dev
-      if (error) {
-        console.warn('[Resend API Notice]: Initial send attempt returned notice:', error?.message || (error as any)?.name || error);
-        const errorMsg = String(error.message || (error as any)?.name || error || '');
-        const isSenderDomainError = /domain.*not.*verified|domain_not_found|cannot send from.*domain|invalid from address|verify a domain.*resend\.com\/domains.*change the `from` address|does not match any verified domain/i.test(errorMsg);
-
-        if (isSenderDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
-          const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
-          console.warn(`[Resend Auto-Fallback] Sender domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
-
-          const retryPayload = {
-            ...payload,
-            from: fallbackFrom,
-            replyTo: replyToAddress,
-          };
-
-          try {
-            const retryResult = await resend.emails.send(retryPayload);
-            if (!retryResult.error) {
-              console.log(`[Resend Email Sent via Fallback] ID: ${retryResult.data?.id} | To: ${recipients.join(', ')} | From: ${fallbackFrom}`);
-              return {
-                delivered: true,
-                provider: 'resend',
-                messageId: retryResult.data?.id,
-              };
-            }
-            console.warn('[Resend Auto-Fallback Notice]: Fallback attempt unsuccessful:', retryResult.error?.message || retryResult.error);
-            error = retryResult.error;
-          } catch (retryErr) {
-            console.warn('[Resend Auto-Fallback Exception]:', retryErr);
-            error = retryErr as any;
-          }
-        }
-
-        const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
-        console.warn(`[Resend Direct Delivery Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
-        return {
-          delivered: false,
-          provider: 'resend',
-          error: sanitized,
-        };
-      }
-
-      console.log(`[Resend Email Sent] ID: ${data?.id} | To: ${recipients.join(', ')} | From: ${fromAddress}`);
+      console.log(`[Gmail SMTP Email Sent] ID: ${info.messageId} | To: ${recipients.join(', ')} | From: ${mailFrom}`);
       return {
         delivered: true,
-        provider: 'resend',
-        messageId: data?.id,
+        provider: 'gmail',
+        messageId: info.messageId,
       };
     } catch (err: any) {
       const sanitized = sanitizeError(err);
-      console.warn(`[Resend Notice in sendEmail] Delivery notice for ${recipients.join(', ')}:`, sanitized);
+      console.warn(`[Gmail SMTP Transmission Error] Failed sending to ${recipients.join(', ')}:`, sanitized);
+
+      if (webhookUrl && !opts.disableFallbackReroute) {
+        console.warn('[Gmail SMTP] Retrying transmission via backup webhook...');
+        const whResult = await sendViaWebhookFallback(webhookUrl, fromAddress, recipients, opts, replyToAddress);
+        if (whResult.delivered) return whResult;
+      }
+
+      return {
+        delivered: false,
+        provider: 'gmail',
+        error: `Gmail SMTP transmission error: ${sanitized}`,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // PROVIDER 2: RESEND SDK (HTTPS API)
+  // -------------------------------------------------------------------------
+  const apiKey = await getDynamicResendApiKey();
+
+  if (!isValidResendApiKey(apiKey)) {
+    const unconfiguredMsg = !apiKey
+      ? 'Active email provider is set to Resend, but RESEND_API_KEY is not configured in SuperAdmin Settings.'
+      : 'Active email provider is set to Resend, but RESEND_API_KEY format is invalid (must start with re_ and be >= 20 characters).';
+
+    console.warn(`[Resend Warning] ${unconfiguredMsg}`);
+
+    if (webhookUrl && !opts.disableFallbackReroute) {
+      return await sendViaWebhookFallback(webhookUrl, fromAddress, recipients, opts, replyToAddress);
+    }
+
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: `${unconfiguredMsg} Please navigate to SuperAdmin Settings > Email Configuration > Resend tab to configure your credentials.`,
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+
+    // Verify sender domain in Resend if using a custom non-resend domain
+    const senderDomain = parsedSender.email.split('@')[1]?.toLowerCase();
+    if (senderDomain && senderDomain !== 'resend.dev' && !parsedSender.isPublicWebmail) {
+      try {
+        const domainsRes = await resend.domains.list();
+        if (domainsRes && Array.isArray(domainsRes.data)) {
+          const domainEntry = domainsRes.data.find(
+            (d: any) => d.name?.toLowerCase() === senderDomain
+          );
+          if (!domainEntry || domainEntry.status !== 'verified') {
+            console.warn(
+              `[Resend Sender Domain Warning] Sender domain "${senderDomain}" is not verified in Resend (status: ${domainEntry?.status || 'unregistered'}). Proactively falling back to onboarding@resend.dev to ensure delivery.`
+            );
+            fromAddress = `${parsedSender.displayName} <onboarding@resend.dev>`;
+          }
+        }
+      } catch (domainCheckErr) {
+        console.warn('[Resend Domain Verification Notice] Could not query domain list from Resend API:', domainCheckErr);
+      }
+    }
+
+    const payload: any = {
+      from: fromAddress,
+      to: recipients,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      replyTo: replyToAddress,
+      tags: opts.tags,
+    };
+
+    let { data, error } = await resend.emails.send(payload);
+
+    // Automatic fallback: If custom domain fails domain verification on Resend, retry once via onboarding@resend.dev
+    if (error) {
+      console.warn('[Resend API Notice]: Initial send attempt returned notice:', error?.message || (error as any)?.name || error);
+      const errorMsg = String(error.message || (error as any)?.name || error || '');
+      const isSenderDomainError = /domain.*not.*verified|domain_not_found|cannot send from.*domain|invalid from address|verify a domain.*resend\.com\/domains.*change the `from` address|does not match any verified domain/i.test(errorMsg);
+
+      if (isSenderDomainError && fromAddress !== `${parsedSender.displayName} <onboarding@resend.dev>`) {
+        const fallbackFrom = `${parsedSender.displayName} <onboarding@resend.dev>`;
+        console.warn(`[Resend Auto-Fallback] Sender domain failed verification (${errorMsg}). Retrying via ${fallbackFrom}...`);
+
+        const retryPayload = {
+          ...payload,
+          from: fallbackFrom,
+          replyTo: replyToAddress,
+        };
+
+        try {
+          const retryResult = await resend.emails.send(retryPayload);
+          if (!retryResult.error) {
+            console.log(`[Resend Email Sent via Fallback] ID: ${retryResult.data?.id} | To: ${recipients.join(', ')} | From: ${fallbackFrom}`);
+            return {
+              delivered: true,
+              provider: 'resend',
+              messageId: retryResult.data?.id,
+            };
+          }
+          console.warn('[Resend Auto-Fallback Notice]: Fallback attempt unsuccessful:', retryResult.error?.message || retryResult.error);
+          error = retryResult.error;
+        } catch (retryErr) {
+          console.warn('[Resend Auto-Fallback Exception]:', retryErr);
+          error = retryErr as any;
+        }
+      }
+
+      const sanitized = sanitizeError(error?.message || error || 'Unknown email error');
+      console.warn(`[Resend Direct Delivery Notice] Resend delivery notice for ${recipients.join(', ')}:`, sanitized);
       return {
         delivered: false,
         provider: 'resend',
         error: sanitized,
       };
     }
+
+    console.log(`[Resend Email Sent] ID: ${data?.id} | To: ${recipients.join(', ')} | From: ${fromAddress}`);
+    return {
+      delivered: true,
+      provider: 'resend',
+      messageId: data?.id,
+    };
+  } catch (err: any) {
+    const sanitized = sanitizeError(err);
+    console.warn(`[Resend Notice in sendEmail] Delivery notice for ${recipients.join(', ')}:`, sanitized);
+    return {
+      delivered: false,
+      provider: 'resend',
+      error: sanitized,
+    };
   }
-
-  // 2. Optional secondary webhook dispatcher if configured exclusively in app_settings
-  const candidateWebhook = (
-    emailWebhookUrl ||
-    resendWebhookUrl ||
-    ''
-  ).trim();
-
-  const webhookUrl = isValidHttpUrl(candidateWebhook) ? candidateWebhook : '';
-
-  if (candidateWebhook && !webhookUrl) {
-    console.warn(`[Webhook Email Notice] Configured webhook URL is invalid or malformed ("${candidateWebhook}"). Skipping webhook dispatch.`);
-  }
-
-  if (webhookUrl) {
-    try {
-      const resp = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: recipients,
-          subject: opts.subject,
-          html: opts.html,
-          text: opts.text,
-          replyTo: replyToAddress,
-        }),
-      });
-
-      if (resp.ok) {
-        return {
-          delivered: true,
-          provider: 'webhook',
-        };
-      }
-      console.warn(`[Webhook Dispatch Notice] Server returned ${resp.status} ${resp.statusText}`);
-    } catch (whErr: any) {
-      console.warn('[Webhook Email Dispatch Notice]:', whErr?.message || whErr);
-    }
-  }
-
-  const unconfiguredMsg = !apiKey
-    ? 'Email delivery unavailable: RESEND_API_KEY is not configured in app_settings.'
-    : 'Email delivery unavailable: RESEND_API_KEY format is invalid (must start with re_ and be >= 20 characters).';
-
-  console.warn('[sendEmail Notice]:', unconfiguredMsg);
-  return {
-    delivered: false,
-    provider: 'resend',
-    error: unconfiguredMsg,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +547,7 @@ export interface SendResetEmailOptions {
 
 export interface SendResetEmailResult {
   delivered: boolean;
-  provider: 'resend' | 'webhook';
+  provider: 'resend' | 'gmail' | 'webhook';
   messageId?: string;
   previewUrl?: string | null;
   error?: string;
@@ -513,7 +686,7 @@ export interface SendWelcomeEmailOptions {
 
 export interface SendWelcomeEmailResult {
   delivered: boolean;
-  provider: 'resend' | 'webhook';
+  provider: 'resend' | 'gmail' | 'webhook';
   messageId?: string;
   previewUrl?: string | null;
   error?: string;
@@ -625,7 +798,7 @@ export interface SendStaffWelcomeEmailOptions {
 
 export interface SendStaffWelcomeEmailResult {
   delivered: boolean;
-  provider: 'resend' | 'webhook';
+  provider: 'resend' | 'gmail' | 'webhook';
   messageId?: string;
   previewUrl?: string | null;
   error?: string;
@@ -819,7 +992,7 @@ export async function sendTrialActivationEmail(
 export interface TestEmailDiagnostics {
   success: boolean;
   delivered: boolean;
-  provider: 'resend' | 'webhook';
+  provider: 'resend' | 'gmail' | 'webhook';
   messageId?: string;
   from: string;
   to: string;
@@ -829,7 +1002,8 @@ export interface TestEmailDiagnostics {
   sandboxRecipient?: string;
 }
 
-export async function testResendConfiguration(testRecipient?: string): Promise<TestEmailDiagnostics> {
+export async function testEmailConfiguration(testRecipient?: string): Promise<TestEmailDiagnostics> {
+  const activeProvider = await getActiveEmailProvider();
   let resendFrom = '';
   let resendFromEmail = '';
 
@@ -845,7 +1019,7 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       }
     }
   } catch (dbErr) {
-    console.error('[testResendConfiguration] Error querying app_settings table for sender email:', dbErr);
+    console.error('[testEmailConfiguration] Error querying app_settings table for sender email:', dbErr);
     resendFrom = (getCachedAppSetting('RESEND_FROM') || '').trim();
     resendFromEmail = (getCachedAppSetting('RESEND_FROM_EMAIL') || '').trim();
   }
@@ -862,12 +1036,21 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
   const parsedSender = parseSenderAddress(rawFromCandidate);
   const targetRecipient = (testRecipient || '').trim().toLowerCase();
 
+  const providerLabel = activeProvider === 'gmail' ? 'Gmail SMTP' : 'Resend';
+  const gmailCreds = activeProvider === 'gmail' ? await getDynamicGmailCredentials() : null;
+  const activeFromDisplay = activeProvider === 'gmail'
+    ? `"${gmailCreds?.fromName || 'superadmin'}" <${gmailCreds?.user || 'sarbaazsoft@gmail.com'}>`
+    : parsedSender.resendFrom;
+  const activeReplyTo = activeProvider === 'gmail'
+    ? `"${gmailCreds?.fromName || 'superadmin'}" <${gmailCreds?.user || 'sarbaazsoft@gmail.com'}>`
+    : parsedSender.replyTo;
+
   if (!targetRecipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(targetRecipient)) {
     return {
       success: false,
       delivered: false,
-      provider: 'resend',
-      from: parsedSender.resendFrom,
+      provider: activeProvider,
+      from: activeFromDisplay,
       to: targetRecipient,
       error: 'A valid recipient email address is required to dispatch the test email.',
       info: 'Recipient email address is required.',
@@ -876,19 +1059,20 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
   }
 
   const timestamp = new Date().toLocaleString();
-  const subject = `Test Delivery — SarbaazSoft Shoe POS (${timestamp})`;
+  const subject = `Test Delivery via ${providerLabel} — SarbaazSoft Shoe POS (${timestamp})`;
   const html = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"/><title>Resend Test Email</title></head>
+<head><meta charset="utf-8"/><title>${providerLabel} Test Email</title></head>
 <body style="font-family:sans-serif;background-color:#0f172a;color:#f8fafc;padding:32px 16px;">
   <div style="max-width:520px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;">
-    <h2 style="color:#38bdf8;margin-top:0;">SarbaazSoft Shoe POS Resend Test</h2>
-    <p>This is a live test email confirming that your Resend transactional email integration is operational.</p>
+    <h2 style="color:#38bdf8;margin-top:0;">SarbaazSoft Shoe POS ${providerLabel} Test</h2>
+    <p>This is a live test email confirming that your <strong>${providerLabel}</strong> transactional email integration is operational.</p>
     <div style="background:#0f172a;padding:12px;border-radius:8px;font-family:monospace;font-size:13px;line-height:1.6;margin:16px 0;">
-      <div><strong>Sender (From):</strong> ${parsedSender.resendFrom}</div>
+      <div><strong>Active Provider:</strong> ${providerLabel}</div>
+      <div><strong>Sender (From):</strong> ${activeFromDisplay}</div>
       <div><strong>Recipient (To):</strong> ${targetRecipient}</div>
-      <div><strong>Reply-To:</strong> ${parsedSender.replyTo}</div>
+      <div><strong>Reply-To:</strong> ${activeReplyTo}</div>
       <div><strong>Timestamp:</strong> ${timestamp}</div>
     </div>
     <p style="color:#94a3b8;font-size:12px;">If you received this message, password reset tokens and store onboarding notifications will deliver successfully to ${targetRecipient}.</p>
@@ -902,16 +1086,16 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       to: targetRecipient,
       subject,
       html,
-      text: `SarbaazSoft Shoe POS Resend Test Email\n\nSent to: ${targetRecipient}\nFrom: ${parsedSender.resendFrom}\nTimestamp: ${timestamp}`,
+      text: `SarbaazSoft Shoe POS ${providerLabel} Test Email\n\nSent to: ${targetRecipient}\nProvider: ${providerLabel}\nFrom: ${activeFromDisplay}\nTimestamp: ${timestamp}`,
       disableFallbackReroute: true,
     });
 
     const infoMsg = result.delivered
-      ? `Test email delivered successfully to ${targetRecipient} via ${result.provider} (ID: ${result.messageId || 'ok'}).`
+      ? `Test email delivered successfully to ${targetRecipient} via ${result.provider.toUpperCase()} (ID: ${result.messageId || 'ok'}).`
       : `Test email delivery to ${targetRecipient} failed: ${result.error || 'Unknown error'}`;
 
     if (!result.delivered) {
-      console.warn(`[testResendConfiguration] Test email delivery notice for ${targetRecipient}:`, result.error);
+      console.warn(`[testEmailConfiguration] Test email delivery notice for ${targetRecipient}:`, result.error);
     }
 
     return {
@@ -926,11 +1110,11 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
       sandbox: false,
     };
   } catch (err: any) {
-    console.warn(`[testResendConfiguration Notice] Could not send test email to ${targetRecipient}:`, err?.message || err);
+    console.warn(`[testEmailConfiguration Notice] Could not send test email to ${targetRecipient}:`, err?.message || err);
     return {
       success: false,
       delivered: false,
-      provider: 'resend',
+      provider: activeProvider,
       from: parsedSender.resendFrom,
       to: targetRecipient,
       error: err?.message || String(err),
@@ -938,3 +1122,6 @@ export async function testResendConfiguration(testRecipient?: string): Promise<T
     };
   }
 }
+
+// Backward-compatible export alias for testResendConfiguration
+export const testResendConfiguration = testEmailConfiguration;

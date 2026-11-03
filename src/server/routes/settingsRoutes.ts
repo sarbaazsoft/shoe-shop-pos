@@ -10,7 +10,7 @@ import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAllAppSettings, updateAppSettings, APP_SETTINGS_DEFAULTS } from '../services/appSettingsService.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
-import { testResendConfiguration } from '../utils/email.ts';
+import { testEmailConfiguration, testResendConfiguration } from '../utils/email.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -502,7 +502,7 @@ router.post('/test-email', requireAuth, requireSuperAdmin, async (req: Authentic
       });
     }
 
-    const diagnostics = await testResendConfiguration(cleanRecipient);
+    const diagnostics = await testEmailConfiguration(cleanRecipient);
 
     if (diagnostics.delivered) {
       return res.json({

@@ -364,8 +364,11 @@ const mockStore: Record<string, any[]> = {
   trial_activations: [],
   app_settings: [
     { key: 'INVOICE_PREFIX', value: 'INV-', category: 'billing', description: 'Default prefix for customer sales receipts and invoices', is_secret: false, updated_at: new Date().toISOString() },
-    { key: 'PURCHASE_PREFIX', value: 'PUR-', category: 'billing', description: 'Default prefix for supplier purchase orders and stock receipts', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'ACTIVE_EMAIL_PROVIDER', value: 'resend', category: 'email', description: 'Active email provider (resend or gmail)', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_API_KEY', value: '', category: 'email', description: 'Resend API Key for transactional emails', is_secret: true, updated_at: new Date().toISOString() },
+    { key: 'GMAIL_USER', value: 'sarbaazsoft@gmail.com', category: 'email', description: 'Gmail sender address for SMTP', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'GMAIL_FROM_NAME', value: 'superadmin', category: 'email', description: 'Display sender name for Gmail SMTP emails', is_secret: false, updated_at: new Date().toISOString() },
+    { key: 'GMAIL_APP_PASSWORD', value: '', category: 'email', description: 'Google App Password for Gmail SMTP', is_secret: true, updated_at: new Date().toISOString() },
     { key: 'RESEND_FROM', value: 'SarbaazSoft Shoe POS Security <onboarding@resend.dev>', category: 'email', description: 'Verified default sender address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_FROM_EMAIL', value: 'onboarding@resend.dev', category: 'email', description: 'Sender email address for Resend emails', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'EMAIL_WEBHOOK_URL', value: '', category: 'email', description: 'Custom webhook URL to receive outgoing email payloads', is_secret: false, updated_at: new Date().toISOString() },
