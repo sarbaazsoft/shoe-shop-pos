@@ -214,8 +214,8 @@ router.get('/saas/public-stats', async (_req: Request, res: Response) => {
       products: Number(prodsRes.rows[0]?.c || 0),
       invoicesToday: Number(todayRes.rows[0]?.c || 0),
       platformRevenue: Number(revRes.rows[0]?.s || 0),
-      superAdminEmail: owner?.email || '',
-      superAdminPhone: owner?.phone || '',
+      superAdminEmail: owner?.email || 'sarbaazsoft@gmail.com',
+      superAdminPhone: owner?.phone || '+92-321-2257340',
     });
   } catch (_err) {
     return res.json({
@@ -223,8 +223,8 @@ router.get('/saas/public-stats', async (_req: Request, res: Response) => {
       products: 12,
       invoicesToday: 0,
       platformRevenue: 0,
-      superAdminEmail: '',
-      superAdminPhone: '',
+      superAdminEmail: 'sarbaazsoft@gmail.com',
+      superAdminPhone: '+92-321-2257340',
     });
   }
 });
@@ -241,14 +241,14 @@ router.get('/saas/platform-owner', async (_req: Request, res: Response) => {
     const owner = ownerRes.rows[0];
     return res.json({
       name: owner?.name || 'Platform SuperAdmin',
-      email: owner?.email || '',
-      phone: owner?.phone || '',
+      email: owner?.email || 'sarbaazsoft@gmail.com',
+      phone: owner?.phone || '+92-321-2257340',
     });
   } catch {
     return res.json({
       name: 'Platform SuperAdmin',
-      email: '',
-      phone: '',
+      email: 'sarbaazsoft@gmail.com',
+      phone: '+92-321-2257340',
     });
   }
 });
@@ -406,26 +406,27 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       }).catch((err) => ({
         delivered: false,
         provider: 'resend' as const,
+        sandbox: true,
+        sandboxRecipient: undefined as string | undefined,
         error: err?.message || String(err),
       }));
 
       return res.status(201).json({
         success: true,
-        message: mailResult.delivered
-          ? `Store '${provisioned.storeName}' has been registered! Please check your email (${ownerEmail}) to activate your account.`
-          : `Store '${provisioned.storeName}' has been registered! Verification link generated for ${ownerEmail}.`,
+        message: `Store '${provisioned.storeName}' has been registered! Please check your email to activate your account.`,
         tenantId: provisioned.tenantId,
         storeName: provisioned.storeName,
         requiresVerification: true,
         verified: false,
         active: false,
         emailSent: mailResult.delivered,
+        sandbox: Boolean(mailResult.sandbox),
         verificationToken,
         verificationLink: activationLink,
         loginUrl: `/verify-email?email=${encodeURIComponent(ownerEmail)}&tenantId=${provisioned.tenantId}`,
         redirectUrl: `/verify-email?email=${encodeURIComponent(ownerEmail)}&tenantId=${provisioned.tenantId}`,
-        superAdminEmail: saOwner?.email || '',
-        superAdminPhone: saOwner?.phone || '',
+        superAdminEmail: saOwner?.email || 'sarbaazsoft@gmail.com',
+        superAdminPhone: saOwner?.phone || '+92-321-2257340',
       });
     }
 
@@ -458,8 +459,8 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       token,
       loginUrl: `/onboarding?tenantId=${provisioned.tenantId}`,
       redirectUrl: `/onboarding?tenantId=${provisioned.tenantId}`,
-      superAdminEmail: saOwner?.email || '',
-      superAdminPhone: saOwner?.phone || '',
+      superAdminEmail: saOwner?.email || 'sarbaazsoft@gmail.com',
+      superAdminPhone: saOwner?.phone || '+92-321-2257340',
     });
   } catch (err: any) {
     await pgClient.query('ROLLBACK').catch(() => {});
