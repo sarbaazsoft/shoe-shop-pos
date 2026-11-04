@@ -1,7 +1,5 @@
 import 'dotenv/config';
 
-import fs from 'fs';
-import path from 'path';
 import pg from 'pg';
 import type { Pool as PgPool, PoolClient } from 'pg';
 import { AsyncLocalStorage } from 'async_hooks';
@@ -388,47 +386,6 @@ const mockStore: Record<string, any[]> = {
   email_verification_tokens: [],
 };
 
-const APP_SETTINGS_STORAGE_FILE = path.resolve(process.cwd(), '.app_settings.json');
-
-function syncPersistedAppSettingsToMock(): void {
-  try {
-    if (fs.existsSync(APP_SETTINGS_STORAGE_FILE)) {
-      const raw = fs.readFileSync(APP_SETTINGS_STORAGE_FILE, 'utf-8');
-      const data = JSON.parse(raw);
-      if (typeof data === 'object' && data !== null) {
-        for (const [key, value] of Object.entries(data)) {
-          const idx = mockStore.app_settings.findIndex((s) => s.key.toUpperCase() === key.toUpperCase());
-          if (idx >= 0) {
-            mockStore.app_settings[idx].value = String(value ?? '');
-          } else {
-            mockStore.app_settings.push({
-              key,
-              value: String(value ?? ''),
-              category: 'system',
-              description: '',
-              is_secret: false,
-              updated_at: new Date().toISOString(),
-            });
-          }
-        }
-      }
-    }
-  } catch {}
-}
-
-function persistMockAppSettingsToFile(): void {
-  try {
-    const out: Record<string, string> = {};
-    for (const item of mockStore.app_settings) {
-      if (item.key) out[item.key] = item.value ?? '';
-    }
-    fs.writeFileSync(APP_SETTINGS_STORAGE_FILE, JSON.stringify(out, null, 2), 'utf-8');
-  } catch {}
-}
-
-// Initial hydration from local file store if present
-syncPersistedAppSettingsToMock();
-
 let mockIdCounters: Record<string, number> = {
   tenants: 2,
   users: 3,
@@ -505,7 +462,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         if (!isDoNothing) {
           mockStore.app_settings[existingIdx].value = value;
           mockStore.app_settings[existingIdx].updated_at = new Date().toISOString();
-          persistMockAppSettingsToFile();
         }
         return { rows: [mockStore.app_settings[existingIdx] as unknown as T], rowCount: 1 };
       } else {
@@ -518,7 +474,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
           updated_at: new Date().toISOString(),
         };
         mockStore.app_settings.push(entry);
-        persistMockAppSettingsToFile();
         return { rows: [entry as unknown as T], rowCount: 1 };
       }
     }
@@ -556,7 +511,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       if (entry && params.length >= 2) {
         entry.value = String(params[0]);
         entry.updated_at = new Date().toISOString();
-        persistMockAppSettingsToFile();
       }
       return { rows: entry ? ([entry] as unknown as T[]) : [], rowCount: entry ? 1 : 0 };
     }

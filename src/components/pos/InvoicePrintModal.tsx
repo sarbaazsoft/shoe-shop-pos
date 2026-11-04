@@ -157,11 +157,41 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const [copiedType, setCopiedType] = useState<'whatsapp' | 'sms' | null>(null);
 
   const currencySymbol = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
-  const storeName =
+
+  // Sanitize store name: remove literal placeholders like "{Store Name}" and platform branding
+  const sanitizeStoreName = (name?: string): string => {
+    if (!name) return '';
+    const trimmed = name.trim();
+    if (
+      trimmed === '{Store Name}' ||
+      trimmed === '{store_name}' ||
+      trimmed === '{storeName}' ||
+      trimmed === 'Store Name' ||
+      trimmed === '[Store Name]' ||
+      trimmed === 'SarbaazSoft Shoe POS' ||
+      trimmed === 'SarbaazSoft POS' ||
+      trimmed.toLowerCase() === '{store name}' ||
+      trimmed.toLowerCase() === '{store_name}'
+    ) {
+      return '';
+    }
+    return trimmed
+      .replace(/\{Store Name\}/gi, '')
+      .replace(/SarbaazSoft Shoe POS/gi, '')
+      .replace(/SarbaazSoft POS/gi, '')
+      .replace(/\|\s*$/g, '')
+      .trim();
+  };
+
+  const rawCandidate =
     companySettings?.name ||
     companySettings?.company_name ||
     companySettings?.companyName ||
-    (isWholesaleTransaction ? 'Footwear Wholesale Traders' : 'Retail Store');
+    '';
+
+  const storeName =
+    sanitizeStoreName(rawCandidate) ||
+    (isWholesaleTransaction ? 'Footwear Wholesale' : 'Shoe Store');
   const storeAddress = companySettings?.address || '';
   const storePhone = companySettings?.phone || '';
   const storeEmail = companySettings?.email || '';
@@ -240,7 +270,20 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   }, [recipientPhone, smsText]);
 
   const handlePrintStandard = () => {
+    const originalTitle = document.title;
+    // Suppress "{Store Name} | SarbaazSoft Shoe POS" or unwanted credit headers from browser print margins
+    document.title = sale.invoice_number ? `Invoice_${sale.invoice_number}` : 'Invoice';
+
+    const restoreTitle = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', restoreTitle);
+    };
+    window.addEventListener('afterprint', restoreTitle);
+
     window.print();
+
+    // Fallback restoration for webviews where afterprint might not trigger
+    setTimeout(restoreTitle, 1500);
   };
 
   const handleCopyReceipt = (type: 'whatsapp' | 'sms') => {
@@ -621,14 +664,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span>Type:</span>
-                  <span className="font-bold text-emerald-800">
-                    {isExplicitWholesaler ? 'Wholesaler' : 'Retailer'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
                   <span>Payment:</span>
-                  <span className="font-semibold">{sale.payment_method}</span>
+                  <span className="font-semibold">{sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</span>
                 </div>
               </div>
 
@@ -703,15 +740,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
               {/* Footer */}
               <div className="pt-2 text-center space-y-1">
-                <p className="text-[8px] text-gray-600 italic px-1">{invoiceFooter}</p>
-                <p className="text-[7.5px] text-gray-500">
-                  {isWholesaleTransaction
-                    ? '*** WHOLESALE RETURN & COMMERCIAL DISPATCH ***'
-                    : '*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***'}
-                </p>
-                <p className="text-[7px] text-gray-400 pt-1 border-t border-gray-100">
-                  Powered by SarbaazSoft POS
-                </p>
+                {invoiceFooter && <p className="text-[8px] text-gray-600 italic px-1">{invoiceFooter}</p>}
               </div>
             </div>
           ) : (
@@ -745,16 +774,13 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="inline-block px-3 py-1 font-black text-xs tracking-wider uppercase rounded border border-indigo-700 bg-indigo-50 text-indigo-900 shadow-2xs">
-                    WHOLESALE COMMERCIAL TAX INVOICE &amp; DISPATCH
+                  <div className="text-sm sm:text-base font-black tracking-wider uppercase text-gray-900 border-b border-gray-900 pb-0.5 inline-block">
+                    TAX INVOICE
                   </div>
-                  <p className="text-gray-950 font-mono font-black mt-2 text-sm">
+                  <p className="text-gray-950 font-mono font-bold mt-1 text-sm">
                     {sale.invoice_number}
                   </p>
                   <p className="text-gray-500 text-xs mt-0.5">Date: {sale.sale_date}</p>
-                  <p className="text-[11px] font-bold text-indigo-700 mt-1">
-                    Customer: Wholesale Dealer
-                  </p>
                 </div>
               </div>
 
@@ -789,7 +815,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   <p className="text-gray-800">
                     <span className="font-medium">Payment Mode:</span>{' '}
                     <strong className="text-gray-950 font-bold">
-                      {sale.payment_method === 'KHATA' ? 'Khata (Credit Ledger)' : sale.payment_method}
+                      {sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}
                     </strong>
                   </p>
                   <p className="text-gray-800 mt-0.5">
@@ -1041,8 +1067,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               {/* Dual Signatures & Acceptance Footer */}
               <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-4 items-end">
                 <div>
-                  <p className="text-[10px] text-gray-500 max-w-xs">{invoiceFooter}</p>
-                  <p className="text-[9px] text-gray-400 mt-2">Powered by SarbaazSoft Shoe POS</p>
+                  {invoiceFooter && <p className="text-[10px] text-gray-500 max-w-xs">{invoiceFooter}</p>}
                 </div>
                 <div className="flex justify-end gap-8">
                   <div className="text-center">
@@ -1113,7 +1138,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Payment:</span>
-                <strong>{sale.payment_method}</strong>
+                <strong>{sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</strong>
               </div>
             </div>
 
@@ -1190,13 +1215,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             </div>
 
             <div style={{ textAlign: 'center', paddingTop: '6px', color: '#000000' }}>
-              <div style={{ fontSize: '8.5px', fontStyle: 'italic', color: '#333333' }}>{invoiceFooter}</div>
-              <div style={{ fontSize: '8px', color: '#555555', marginTop: '3px' }}>
-                {isWholesaleTransaction
-                  ? '*** WHOLESALE RETURN & COMMERCIAL DISPATCH ***'
-                  : '*** 7-DAY SHOE EXCHANGE WITH RECEIPT ***'}
-              </div>
-              <div style={{ fontSize: '7px', color: '#777777', marginTop: '3px', borderTop: '1px dashed #ccc', paddingTop: '2px' }}>Powered by SarbaazSoft Shoe POS</div>
+              {invoiceFooter && <div style={{ fontSize: '8.5px', fontStyle: 'italic', color: '#333333' }}>{invoiceFooter}</div>}
             </div>
           </div>
         ) : (
@@ -1219,12 +1238,11 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: '#000000', textTransform: 'uppercase' }}>
-                  WHOLESALE COMMERCIAL TAX INVOICE &amp; DISPATCH
+                <h2 style={{ fontSize: '15px', fontWeight: 'bold', margin: 0, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TAX INVOICE
                 </h2>
                 <p style={{ margin: '4px 0', fontWeight: 'bold', color: '#000000', fontSize: '13px' }}>{sale.invoice_number}</p>
                 <p style={{ margin: '2px 0', color: '#444444' }}>Date: {sale.sale_date}</p>
-                <p style={{ margin: '2px 0', fontWeight: 'bold', color: '#333333' }}>Customer: Wholesale Dealer</p>
               </div>
             </div>
 
@@ -1244,7 +1262,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                 {dealerNtn && <div>NTN: {dealerNtn}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div><strong>Payment:</strong> {sale.payment_method === 'KHATA' ? 'Khata (Credit Ledger)' : sale.payment_method}</div>
+                <div><strong>Payment:</strong> {sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</div>
                 <div><strong>Cashier / Dispatch:</strong> {sale.cashier_name || 'Counter Operator'}</div>
               </div>
             </div>
@@ -1418,8 +1436,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
             <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', color: '#000000' }}>
               <div>
-                <div style={{ fontSize: '10px' }}>{invoiceFooter}</div>
-                <div style={{ fontSize: '8.5px', color: '#666666', marginTop: '4px' }}>Powered by SarbaazSoft Shoe POS</div>
+                {invoiceFooter && <div style={{ fontSize: '10px' }}>{invoiceFooter}</div>}
               </div>
               <div style={{ display: 'flex', gap: '40px' }}>
                 <div style={{ textAlign: 'center' }}>
