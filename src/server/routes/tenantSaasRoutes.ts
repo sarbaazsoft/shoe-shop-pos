@@ -2485,12 +2485,39 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
 
     const tenant = tenantRes.rows[0];
 
-    // Lock Initial Store Setup & POS Defaults once store owner has completed setup
-    if (tenant.onboarding_completed) {
-      return res.status(403).json({
-        error:
-          'Initial Store Setup & POS Defaults is locked because this store has already been configured by the Store Owner.',
-        isLocked: true,
+    // If onboarding is already completed, allow relaxed re-configuration or return existing setup state gracefully
+    if (tenant.onboarding_completed && !req.body?.force && !req.body?.reconfigure) {
+      const existingSettingsRes = await pgClient.query('SELECT * FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenant.id]);
+      const ownerRes = await pgClient.query('SELECT id, name, email, quick_password FROM users WHERE tenant_id = $1 AND role = $2 LIMIT 1', [tenant.id, 'ADMIN']);
+      const adminUser = ownerRes.rows[0];
+      const token = adminUser ? generateToken({
+        id: adminUser.id,
+        tenantId: tenant.id,
+        name: adminUser.name,
+        email: adminUser.email,
+        role: 'ADMIN',
+        status: 'APPROVED',
+      }) : null;
+
+      return res.json({
+        success: true,
+        alreadyCompleted: true,
+        message: `Store setup has already been completed for ${tenant.name}.`,
+        token,
+        user: adminUser ? {
+          id: adminUser.id,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          name: adminUser.name,
+          email: adminUser.email,
+          role: 'ADMIN',
+          originalRole: 'ADMIN',
+          status: 'APPROVED',
+          onboardingCompleted: true,
+        } : null,
+        settings: existingSettingsRes.rows[0] || null,
+        manifestUrl: `/api/tenants/manifest?tenantId=${tenant.id}`,
+        redirectUrl: `/?tenantId=${tenant.id}`,
       });
     }
 
@@ -3075,5 +3102,31 @@ router.delete('/superadmin/notifications/:id', requireAuth, requireSuperAdmin, a
   }
 });
 
+// POST /api/welcome and /api/saas/welcome - Relaxed endpoint to trigger or re-send the single canonical welcome message service
+router.post(['/welcome', '/saas/welcome'], async (req: Request, res: Response) => {
+  try {
+    const rawTenantId =
+      req.body?.tenantId ||
+      req.body?.tenant_id ||
+      req.query?.tenantId ||
+      req.headers['x-tenant-id'] ||
+      1;
+    const tenantId = Number(rawTenantId) || 1;
+    const msg = req.body?.msg || req.body?.message || req.body?.welcomeMsg || '';
+    const email = req.body?.email || req.body?.ownerEmail || req.body?.targetEmail || undefined;
+
+    const result = await sendWelcomeMsg(tenantId, msg, email);
+    return res.json({
+      success: true,
+      result,
+      message: 'Welcome message processed via single canonical welcome service.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process welcome message: ' + (err?.message || err),
+    });
+  }
+});
 
 export default router;

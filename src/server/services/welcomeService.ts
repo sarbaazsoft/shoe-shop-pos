@@ -72,8 +72,9 @@ export async function sendWelcomeMsg(
     `SELECT id, created_at FROM platform_notifications
      WHERE tenant_id = $1
        AND (
-         title ILIKE 'Welcome to SarbaazSoft%'
-         OR message ILIKE '%Thank you for choosing SarbaazSoft%'
+         title ILIKE '%Welcome%'
+         OR message ILIKE '%Welcome%'
+         OR message ILIKE '%Thank you for choosing%'
        )
      ORDER BY id ASC
      LIMIT 1`,
@@ -88,8 +89,9 @@ export async function sendWelcomeMsg(
        WHERE tenant_id = $1
          AND id != $2
          AND (
-           title ILIKE 'Welcome to SarbaazSoft%'
-           OR message ILIKE '%Thank you for choosing SarbaazSoft%'
+           title ILIKE '%Welcome%'
+           OR message ILIKE '%Welcome%'
+           OR message ILIKE '%Thank you for choosing%'
          )`,
       [cleanTenantId, existingId]
     ).catch(() => {});

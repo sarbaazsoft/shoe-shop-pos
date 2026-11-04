@@ -111,12 +111,16 @@ router.get('/grouped', async (req: Request, res: Response) => {
            CASE
              WHEN $3 = 'SUPERADMIN' THEN (
                COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%'
+               AND pn.message NOT ILIKE '%welcome%'
              )
              WHEN $3 = 'ADMIN' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND pn.title NOT ILIKE '%welcome%'
+               AND pn.message NOT ILIKE '%welcome%'
+               AND pn.message NOT ILIKE '%thank you for choosing%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
@@ -125,7 +129,9 @@ router.get('/grouped', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%'
+               AND pn.message NOT ILIKE '%welcome%'
+               AND pn.message NOT ILIKE '%thank you for choosing%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
@@ -347,7 +353,7 @@ router.get('/all', async (req: Request, res: Response) => {
            CASE
              WHEN $3 = 'SUPERADMIN' THEN (
                COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
              )
              WHEN $3 = 'ADMIN' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
@@ -361,7 +367,7 @@ router.get('/all', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
@@ -799,7 +805,7 @@ router.get('/', async (req: Request, res: Response) => {
            CASE
              WHEN $3 = 'SUPERADMIN' THEN (
                COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
              )
              WHEN $3 = 'ADMIN' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
@@ -813,7 +819,7 @@ router.get('/', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
@@ -912,7 +918,7 @@ router.get('/platform', async (req: Request, res: Response) => {
            CASE
              WHEN $3 = 'SUPERADMIN' THEN (
                COALESCE(pn.target_role, 'ALL') IN ('ALL', 'SUPERADMIN')
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
              )
              WHEN $3 = 'ADMIN' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
@@ -926,7 +932,7 @@ router.get('/platform', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
-               AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
+               AND pn.title NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%welcome%' AND pn.message NOT ILIKE '%thank you for choosing%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'

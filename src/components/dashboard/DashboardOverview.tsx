@@ -192,14 +192,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // 2. Returning Free Tier Store Owner:
   //    Greeting: "Welcome back! Enjoying your Free Tier trial?"
   //    Subtext: "If you are satisfied with our service, upgrade to our Premium 6-Month or Yearly Plan."
-  // 3. Returning Paid Tier Store Owner:
-  //    Greeting: "Welcome back! Thank you for being a valued Premium subscriber."
+  const storeName =
+    companySettings?.name ||
+    companySettings?.company_name ||
+    companySettings?.companyName ||
+    'Your Store';
+
+  const isCashier = currentUser?.role === 'CASHIER';
   let bannerGreeting = '';
   let bannerSubtext = '';
   let showRenewUpgradeButton = false;
   let bannerBadge = '';
 
-  if (isFree) {
+  if (isCashier) {
+    bannerGreeting = `Welcome to ${storeName}, ${currentUser?.name || 'Cashier'}!`;
+    bannerSubtext = 'Your cashier terminal is ready. Click "Open POS" or press F9 anytime to begin processing customer sales and counter checkouts.';
+    bannerBadge = 'Cashier Station';
+    showRenewUpgradeButton = false;
+  } else if (isFree) {
     if (isFirstTime) {
       bannerGreeting = 'Welcome to your new store! You are currently on the 30-day Free Tier.';
       bannerSubtext = 'Explore all features, and when you are ready, upgrade to our Premium 6-Month or Yearly Plan to keep your store active.';
@@ -228,14 +238,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     try {
       localStorage.setItem('pos_welcome_partner_dismissed', 'true');
       localStorage.setItem(dismissKey, 'true');
-      const welcomeNotice = activeNotices.find((n) =>
-        (n.title || '').toLowerCase().includes('welcome to sarbaazsoft') ||
-        (n.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft')
-      );
-      if (welcomeNotice?.id) {
-        api.notifications.dismiss(welcomeNotice.id, 'NOTICE').catch(() => {});
-        setActiveNotices((prev) => prev.filter((n) => n.id !== welcomeNotice.id));
+      const welcomeNotices = activeNotices.filter((n) => {
+        const titleLower = (n.title || '').toLowerCase();
+        const msgLower = (n.message || '').toLowerCase();
+        return (
+          titleLower.includes('welcome') ||
+          msgLower.includes('welcome') ||
+          msgLower.includes('thank you for choosing')
+        );
+      });
+      for (const wn of welcomeNotices) {
+        if (wn?.id) {
+          api.notifications.dismiss(wn.id, 'NOTICE').catch(() => {});
+        }
       }
+      setActiveNotices((prev) =>
+        prev.filter((n) => {
+          const titleLower = (n.title || '').toLowerCase();
+          const msgLower = (n.message || '').toLowerCase();
+          return (
+            !titleLower.includes('welcome') &&
+            !msgLower.includes('welcome') &&
+            !msgLower.includes('thank you for choosing')
+          );
+        })
+      );
     } catch {}
     setShowWelcomeBanner(false);
   };
@@ -262,12 +289,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       setIsSubmittingUpgrade(false);
     }
   };
-
-  const storeName =
-    companySettings?.name ||
-    companySettings?.company_name ||
-    companySettings?.companyName ||
-    'Your Store';
 
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'7days' | 'month' | 'year'>('7days');
@@ -503,12 +524,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* High-Priority Active Platform Notices Banner (excluding welcome notices to ensure strictly ONE single welcome message is shown) */}
+      {/* High-Priority Active Platform Notices Banner (strictly excluding welcome notices so only ONE single welcome message is rendered) */}
       {(() => {
         const displayNotices = activeNotices.filter((notice) => {
+          const titleLower = (notice.title || '').toLowerCase();
+          const msgLower = (notice.message || '').toLowerCase();
           const isWelcome =
-            (notice.title || '').toLowerCase().includes('welcome to sarbaazsoft') ||
-            (notice.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft');
+            titleLower.includes('welcome') ||
+            msgLower.includes('welcome') ||
+            msgLower.includes('thank you for choosing') ||
+            msgLower.includes('sarbaazsoft') ||
+            notice.type === 'WELCOME';
           return !isWelcome;
         });
 
@@ -613,29 +639,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         );
       })()}
 
-      {/* Context-Aware Store Owner Welcome Greeting Banner */}
+      {/* Single Unified Context-Aware Store Owner / Cashier Welcome Greeting Banner (Restyled with Light BG, Border, and Shadow) */}
       {showWelcomeBanner && (
         <div
           id="dashboard-welcome-banner"
-          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-900/95 via-indigo-900/90 to-slate-900 border border-purple-400/40 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+          className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-blue-50/40 dark:from-[#131B2E] dark:via-purple-950/30 dark:to-[#0f172a] border border-purple-200/90 dark:border-purple-800/60 shadow-sm text-slate-900 dark:text-white relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all"
         >
           <div className="flex items-start gap-3.5 min-w-0 z-10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center shrink-0 shadow-md border border-purple-300/30">
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs border border-purple-400/40">
               <Store className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/30 border border-purple-400/40 text-purple-200">
-                  <Sparkles className="w-3 h-3 text-purple-300" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 border border-purple-300 dark:border-purple-700/60 text-purple-800 dark:text-purple-300">
+                  <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
                   {bannerBadge}
                 </span>
-                <span className="text-xs font-mono text-purple-300/80">• {storeName}</span>
+                <span className="text-xs font-mono text-purple-700 dark:text-purple-300/80">• {storeName}</span>
               </div>
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white leading-snug">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-snug">
                 {bannerGreeting}
               </h2>
               {bannerSubtext && (
-                <p className="text-xs sm:text-sm text-purple-100/90 mt-1 leading-relaxed max-w-3xl">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-3xl">
                   {bannerSubtext}
                 </p>
               )}
@@ -648,7 +674,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 id="dashboard-renew-upgrade-subscription-btn"
                 type="button"
                 onClick={handleOpenUpgradeModal}
-                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-bold transition shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95 border border-amber-300/40"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 border border-amber-300/40"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Renew / Upgrade Subscription</span>
@@ -658,7 +684,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('pos')}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <ShoppingCart className="w-3.5 h-3.5" />
               <span>Open POS</span>
@@ -667,7 +693,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={handleDismissWelcomeBanner}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+              className="p-2 rounded-xl bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 transition cursor-pointer shadow-2xs"
               title="Dismiss announcement"
               aria-label="Dismiss welcome banner"
             >

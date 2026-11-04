@@ -110,6 +110,7 @@ export function clearAllSessionState(): void {
         const key = localStorage.key(i);
         if (key && (
           key.startsWith('pos_welcome_partner_dismissed_') ||
+          key.startsWith('pos_welcome_banner_dismissed_') ||
           key.startsWith('pos_dashboard_visited_') ||
           key.startsWith('cached_company_settings') ||
           key.startsWith('cached_store_name') ||
