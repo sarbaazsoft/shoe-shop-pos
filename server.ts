@@ -39,6 +39,7 @@ import chatRoutes from './src/server/routes/chatRoutes.ts';
 import tenantSaasRoutes from './src/server/routes/tenantSaasRoutes.ts';
 import { transformKeysToCamelCase } from './src/utils/caseTransformer.ts';
 import { getCachedAppSetting } from './src/server/services/appSettingsService.ts';
+import { recordApplicationBaseUrl } from './src/server/services/welcomeService.ts';
 
 const rootDir = path.resolve('.');
 
@@ -88,6 +89,7 @@ self.addEventListener('activate', (event) => {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (typeof origin === 'string' && origin.trim() && origin !== 'null') {
+    recordApplicationBaseUrl(origin);
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader(
@@ -100,6 +102,12 @@ app.use((req, res, next) => {
       'X-SaaS-Mode, X-Tenant-Id, X-Tenant-Status, X-Subscription-Status, X-Subscription-Plan'
     );
     res.setHeader('Vary', 'Origin, Host, X-Tenant-Id');
+  } else {
+    const host = req.get('x-forwarded-host') || req.get('host');
+    if (host) {
+      const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+      recordApplicationBaseUrl(`${proto}://${host}`);
+    }
   }
   if (req.method === 'OPTIONS') {
     return res.status(204).end();

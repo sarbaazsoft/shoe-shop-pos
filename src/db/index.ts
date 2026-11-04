@@ -712,6 +712,10 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
               (pn.message || '').toLowerCase().includes('thank you for choosing sarbaazsoft'))
         );
         if (existingWelcome) {
+          existingWelcome.message = message;
+          if (actionUrl) existingWelcome.action_url = actionUrl;
+          if (actionLabel) existingWelcome.action_label = actionLabel;
+          if (title) existingWelcome.title = title;
           // Purge any stale duplicates and return the singular welcome notice
           mockStore.platform_notifications = mockStore.platform_notifications.filter(
             (pn: any) =>
@@ -862,6 +866,23 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
             ) {
               pn.expires_at = nowIso;
             }
+          }
+        }
+        return { rows: [], rowCount: 1 };
+      }
+
+      if (upper.includes('SET') && (upper.includes('MESSAGE') || upper.includes('TITLE') || upper.includes('ACTION_URL'))) {
+        const targetId = Number(params[params.length - 1]);
+        const entry = (mockStore.platform_notifications || []).find((pn: any) => Number(pn.id) === targetId);
+        if (entry) {
+          if (params.length >= 4) {
+            entry.title = params[0];
+            entry.message = params[1];
+            entry.action_url = params[2];
+            entry.action_label = params[3] || 'Open Store Portal';
+          } else if (params.length >= 2) {
+            entry.message = params[0];
+            entry.action_url = params[1];
           }
         }
         return { rows: [], rowCount: 1 };

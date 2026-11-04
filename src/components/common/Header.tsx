@@ -4,6 +4,7 @@ import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut,
 import { UserAvatar } from './UserAvatar.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
+import { ClickableMessage } from './ClickableMessage.tsx';
 import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
@@ -1627,8 +1628,14 @@ export const Header: React.FC<HeaderProps> = ({
                               {a.title}
                             </div>
 
-                            <div className="text-[11px] text-slate-600 dark:text-purple-200/90 mt-1 whitespace-pre-line leading-relaxed line-clamp-2">
-                              {String(a.message || '').replace(new RegExp('^' + String(a.title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '').trim() || a.message}
+                            <div className="text-[11px] text-slate-600 dark:text-purple-200/90 mt-1 whitespace-pre-line leading-relaxed">
+                              <ClickableMessage
+                                text={
+                                  String(a.message || '')
+                                    .replace(new RegExp('^' + String(a.title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '')
+                                    .trim() || a.message
+                                }
+                              />
                             </div>
 
                             <div className="mt-2 pt-1.5 border-t border-slate-200/60 dark:border-purple-800/40 flex items-center justify-between gap-2">

@@ -17,6 +17,24 @@ const router = Router();
 const DEFAULT_PWA_THEME_COLOR = '#2563EB';
 const DEFAULT_PWA_BACKGROUND_COLOR = '#ffffff';
 
+export function extractRequestOrigin(req: Request): string {
+  const origin = req.get('origin');
+  if (origin && origin !== 'null') return origin.replace(/\/+$/, '');
+  const referer = req.get('referer');
+  if (referer) {
+    try {
+      const u = new URL(referer);
+      return `${u.protocol}//${u.host}`;
+    } catch {}
+  }
+  const host = req.get('x-forwarded-host') || req.get('host');
+  if (host) {
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+    return `${proto}://${host}`;
+  }
+  return '';
+}
+
 /**
  * 1. DYNAMIC STORE PWA MANIFEST (`/api/tenants/manifest?tenantId=...`)
  * Generates a separate PWA manifest for each store.
@@ -2859,7 +2877,8 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
 
     let welcomeResult: any = null;
     try {
-      welcomeResult = await sendWelcomeMsg(tenant.id, finalWelcomeMsg, finalEmail);
+      const requestOrigin = extractRequestOrigin(req);
+      welcomeResult = await sendWelcomeMsg(tenant.id, finalWelcomeMsg, finalEmail, { origin: requestOrigin });
       if (welcomeResult && !welcomeResult.emailDelivered) {
         console.warn(`[tenantSaasRoutes.ts] Welcome email delivery notice for tenant ${tenant.id} (${finalEmail})`);
       }
@@ -3131,8 +3150,13 @@ router.post(['/welcome', '/saas/welcome'], async (req: Request, res: Response) =
     const tenantId = Number(rawTenantId) || 1;
     const msg = req.body?.msg || req.body?.message || req.body?.welcomeMsg || '';
     const email = req.body?.email || req.body?.ownerEmail || req.body?.targetEmail || undefined;
+    const requestOrigin = extractRequestOrigin(req);
+    const resendEmail = Boolean(req.body?.resendEmail || req.body?.sendEmail || email);
 
-    const result = await sendWelcomeMsg(tenantId, msg, email);
+    const result = await sendWelcomeMsg(tenantId, msg, email, {
+      origin: requestOrigin,
+      resendEmail,
+    });
     return res.json({
       success: true,
       result,

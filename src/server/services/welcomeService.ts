@@ -3,6 +3,77 @@ import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeEmail, sendStaffWelcomeEmail } from '../utils/email.ts';
 
+let latestKnownBaseUrl: string | null = null;
+
+/**
+ * Records the latest known origin or base URL detected from active HTTP requests.
+ */
+export function recordApplicationBaseUrl(candidate?: string | null): void {
+  if (!candidate || typeof candidate !== 'string') return;
+  const clean = candidate.trim().replace(/\/+$/, '');
+  if (!clean || clean === 'null' || clean === 'undefined') return;
+  try {
+    const parsed = new URL(clean);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      latestKnownBaseUrl = clean;
+    }
+  } catch {
+    // Ignore invalid URL
+  }
+}
+
+/**
+ * Resolves the application base URL using configured environment variables,
+ * active HTTP request headers/origin, or local dev port fallback.
+ */
+export function getApplicationBaseUrl(fallbackCandidate?: string | null): string {
+  if (fallbackCandidate && typeof fallbackCandidate === 'string') {
+    const clean = fallbackCandidate.trim().replace(/\/+$/, '');
+    if (clean && clean !== 'null' && clean !== 'undefined') {
+      try {
+        const parsed = new URL(clean);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          recordApplicationBaseUrl(clean);
+          return clean;
+        }
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  if (latestKnownBaseUrl) {
+    return latestKnownBaseUrl;
+  }
+
+  const envUrl = (
+    process.env.APP_BASE_URL ||
+    process.env.VITE_APP_URL ||
+    process.env.PUBLIC_URL ||
+    process.env.BASE_URL ||
+    ''
+  ).trim().replace(/\/+$/, '');
+  if (envUrl) {
+    try {
+      const parsed = new URL(envUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return envUrl;
+      }
+    } catch {
+      // Fall through
+    }
+  }
+
+  const port = process.env.PORT || 3000;
+  return `http://localhost:${port}`;
+}
+
+export interface SendWelcomeMsgOptions {
+  origin?: string;
+  baseUrl?: string;
+  resendEmail?: boolean;
+}
+
 export interface SendWelcomeMsgResult {
   success: boolean;
   tenantId: number;
@@ -12,18 +83,21 @@ export interface SendWelcomeMsgResult {
   ownerName?: string;
   emailDelivered: boolean;
   emailPreviewUrl?: string | null;
+  storeUrl?: string;
+  portalUrl?: string;
 }
 
 /**
  * Triggers sending the welcome notification to the tenant and emailing the exact
  * same welcome message to the store owner's email address.
  *
- * CRITICAL: Does NOT add any new database columns, including to track whether the user has been welcomed.
+ * CRITICAL: Does NOT add any new database columns, reusing existing columns.
  */
 export async function sendWelcomeMsg(
   tenantId: number,
   msg: string,
-  explicitOwnerEmail?: string
+  explicitOwnerEmail?: string,
+  options?: SendWelcomeMsgOptions
 ): Promise<SendWelcomeMsgResult> {
   const cleanTenantId = Number(tenantId) || 1;
 
@@ -55,17 +129,30 @@ export async function sendWelcomeMsg(
   const ownerName = tenant?.owner_name || 'Store Owner';
   const targetEmail = (explicitOwnerEmail || tenant?.owner_email || '').trim().toLowerCase();
 
-  const defaultWelcomeText = `Thank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${storeName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
-  const welcomeTitle = `Welcome to SarbaazSoft Shoe POS, ${storeName}!`;
-  // Keep the prominent notification title as the only welcome heading. Older callers
-  // may include the same heading in the message body, so strip it before saving/sending.
-  const suppliedMessage = String(msg || '').trim();
-  const messageWithoutDuplicateHeading = suppliedMessage
-    .replace(/^Welcome\s+to\s+SarbaazSoft\s+Shoe\s+POS,?\s+[^!\n]+!\s*/i, '')
-    .trim();
-  const welcomeText = messageWithoutDuplicateHeading || defaultWelcomeText;
+  // 2. Resolve complete dynamic URLs for Store Link and Direct Portal Link
+  const baseUrl = getApplicationBaseUrl(options?.origin || options?.baseUrl);
+  const storeLink = `${baseUrl}/dashboard?tenantId=${cleanTenantId}`;
+  const directPortalLink = `${baseUrl}/?tenantId=${cleanTenantId}`;
 
-  // 2. Ensure platform notifications schema and prevent duplicate welcome notifications/emails
+  const defaultWelcomeBody = `Thank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${storeName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
+  const welcomeTitle = `Welcome to SarbaazSoft Shoe POS, ${storeName}!`;
+
+  // Keep the prominent notification title as the only welcome heading. Strip redundant headings or old links.
+  const suppliedMessage = String(msg || '').trim();
+  let baseMessage = suppliedMessage
+    .replace(/^Welcome\s+to\s+SarbaazSoft\s+Shoe\s+POS,?\s+[^!\n]+!\s*/i, '')
+    .replace(/•?\s*Store\s+Link:\s*[^\n]+/gi, '')
+    .replace(/•?\s*Direct\s+Portal\s+Link:\s*[^\n]+/gi, '')
+    .trim();
+
+  if (!baseMessage) {
+    baseMessage = defaultWelcomeBody;
+  }
+
+  // Include dynamic Store Link and Direct Portal Link (with ?tenantId=<storeId>) in the message
+  const welcomeText = `${baseMessage}\n\n• Store Link: ${storeLink}\n• Direct Portal Link: ${directPortalLink}`;
+
+  // 3. Ensure platform notifications schema and prevent duplicate welcome notifications/emails
   await ensurePlatformNotificationsSchema();
 
   const existingNotifRes = await pgClient.query<{ id: number; created_at: string }>(
@@ -96,6 +183,37 @@ export async function sendWelcomeMsg(
       [cleanTenantId, existingId]
     ).catch(() => {});
 
+    // Update the existing notice with the corrected message and complete direct portal link
+    await pgClient.query(
+      `UPDATE platform_notifications
+       SET title = $1,
+           message = $2,
+           action_url = $3,
+           action_label = 'Open Store Portal'
+       WHERE id = $4`,
+      [welcomeTitle, welcomeText, directPortalLink, existingId]
+    ).catch(() => {});
+
+    let emailDelivered = false;
+    let emailPreviewUrl: string | null = null;
+    if (options?.resendEmail && targetEmail && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(targetEmail)) {
+      try {
+        const mailRes = await sendWelcomeEmail({
+          to: targetEmail,
+          ownerName,
+          storeName,
+          welcomeMessage: welcomeText,
+          loginUrl: directPortalLink,
+          storeUrl: storeLink,
+          portalUrl: directPortalLink,
+        });
+        emailDelivered = mailRes.delivered;
+        emailPreviewUrl = mailRes.previewUrl || null;
+      } catch (mailErr: any) {
+        console.warn(`[welcomeService.ts] Welcome email re-dispatch notice for ${targetEmail}:`, mailErr?.message || mailErr);
+      }
+    }
+
     return {
       success: true,
       tenantId: cleanTenantId,
@@ -103,25 +221,28 @@ export async function sendWelcomeMsg(
       notificationId: existingId,
       ownerEmail: targetEmail,
       ownerName,
-      emailDelivered: false,
+      emailDelivered,
+      emailPreviewUrl,
+      storeUrl: storeLink,
+      portalUrl: directPortalLink,
     };
   }
 
   const notifRes = await pgClient.query<{ id: number; created_at: string }>(
     `INSERT INTO platform_notifications (
        tenant_id, target_role, title, message, type, action_url, action_label, expires_at, created_at
-     ) VALUES ($1, 'ADMIN', $2, $3, 'SUCCESS', $4, 'Open POS Terminal', NOW() + INTERVAL '14 days', NOW())
+     ) VALUES ($1, 'ADMIN', $2, $3, 'SUCCESS', $4, 'Open Store Portal', NOW() + INTERVAL '14 days', NOW())
      RETURNING id, created_at`,
     [
       cleanTenantId,
       welcomeTitle,
       welcomeText,
-      `/?tenantId=${cleanTenantId}`,
+      directPortalLink,
     ]
   );
   const notificationId = notifRes.rows[0]?.id;
 
-  // 3. Broadcast real-time SSE event & Web Push strictly to store owner (ADMIN)
+  // 4. Broadcast real-time SSE event & Web Push strictly to store owner (ADMIN)
   await notifyPlatformAnnouncement({
     id: notificationId,
     tenantId: cleanTenantId,
@@ -129,12 +250,12 @@ export async function sendWelcomeMsg(
     title: welcomeTitle,
     message: welcomeText,
     type: 'SUCCESS',
-    actionUrl: `/?tenantId=${cleanTenantId}`,
-    actionLabel: 'Open POS Terminal',
+    actionUrl: directPortalLink,
+    actionLabel: 'Open Store Portal',
     timestamp: notifRes.rows[0]?.created_at,
   }).catch((err) => console.warn('Could not dispatch welcome push/SSE announcement:', err));
 
-  // 4. Email the same welcome message to the owner's email address
+  // 5. Email the same welcome message to the owner's email address
   let emailDelivered = false;
   let emailPreviewUrl: string | null = null;
   if (targetEmail && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(targetEmail)) {
@@ -144,7 +265,9 @@ export async function sendWelcomeMsg(
         ownerName,
         storeName,
         welcomeMessage: welcomeText,
-        loginUrl: `/?tenantId=${cleanTenantId}`,
+        loginUrl: directPortalLink,
+        storeUrl: storeLink,
+        portalUrl: directPortalLink,
       });
       emailDelivered = mailRes.delivered;
       emailPreviewUrl = mailRes.previewUrl || null;
@@ -165,6 +288,8 @@ export async function sendWelcomeMsg(
     ownerName,
     emailDelivered,
     emailPreviewUrl,
+    storeUrl: storeLink,
+    portalUrl: directPortalLink,
   };
 }
 
@@ -215,11 +340,11 @@ export async function sendStaffWelcomeNotification(
   }
 
   // 2. Prepare terminal and login URLs
-  const baseUrl = (params.origin || '').replace(/\/+$/, '');
+  const baseUrl = getApplicationBaseUrl(params.origin);
   const terminalPath = `/pos?tenantId=${cleanTenantId}`;
   const loginPath = `/?tenantId=${cleanTenantId}&mode=login`;
-  const terminalUrl = baseUrl ? `${baseUrl}${terminalPath}` : terminalPath;
-  const loginUrl = baseUrl ? `${baseUrl}${loginPath}` : loginPath;
+  const terminalUrl = `${baseUrl}${terminalPath}`;
+  const loginUrl = `${baseUrl}${loginPath}`;
 
   const notifTitle = `Welcome to ${storeName}, ${params.staffName}!`;
   const notifMessage = `Your ${roleDisplay} account has been activated. Press F9 anytime to launch the POS Terminal counter and begin ringing up footwear sales.`;

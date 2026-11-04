@@ -30,6 +30,7 @@ import {
 import { api } from '../../services/api.ts';
 import { HistoricalNotificationItem, PlatformNotificationType } from '../../types.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
+import { ClickableMessage } from '../common/ClickableMessage.tsx';
 
 interface NotificationsViewProps {
   currentUser: any;
@@ -610,9 +611,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       {item.title}
                     </h4>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                      {item.message}
-                    </p>
+                    <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                      <ClickableMessage text={item.message} />
+                    </div>
 
                     {/* Metadata line: Timestamp & Expiry */}
                     <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-400 dark:text-slate-500 flex-wrap">

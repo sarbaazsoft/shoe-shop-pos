@@ -682,6 +682,8 @@ export interface SendWelcomeEmailOptions {
   storeName: string;
   welcomeMessage: string;
   loginUrl: string;
+  storeUrl?: string;
+  portalUrl?: string;
 }
 
 export interface SendWelcomeEmailResult {
@@ -697,6 +699,14 @@ export interface SendWelcomeEmailResult {
 
 function buildWelcomeEmailHtml(opts: SendWelcomeEmailOptions): string {
   const displayName = opts.ownerName || opts.to;
+  const storeUrl = opts.storeUrl || opts.loginUrl;
+  const portalUrl = opts.portalUrl || opts.loginUrl;
+
+  // Convert raw URLs into clickable styled links and replace newlines with line breaks
+  const formattedMessage = opts.welcomeMessage
+    .replace(/(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#60a5fa;text-decoration:underline;font-weight:600;">$1</a>')
+    .replace(/\n/g, '<br/>');
+
   return `
 <!DOCTYPE html>
 <html>
@@ -723,22 +733,23 @@ function buildWelcomeEmailHtml(opts: SendWelcomeEmailOptions): string {
           <tr>
             <td style="padding:32px;color:#e2e8f0;font-size:14px;line-height:1.6;">
               <p style="margin:0 0 16px;">Hello <strong style="color:#ffffff;">${displayName}</strong>,</p>
-              <p style="margin:0 0 20px;color:#cbd5e1;">
-                ${opts.welcomeMessage}
-              </p>
+              <div style="margin:0 0 20px;color:#cbd5e1;line-height:1.7;">
+                ${formattedMessage}
+              </div>
 
               <div style="text-align:center;margin:28px 0;">
-                <a href="${opts.loginUrl}" style="display:inline-block;padding:13px 28px;background:linear-gradient(135deg,#2563eb 0%,#7c3aed 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;border-radius:10px;">
+                <a href="${storeUrl || portalUrl}" style="display:inline-block;padding:13px 28px;background:linear-gradient(135deg,#2563eb 0%,#7c3aed 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;border-radius:10px;">
                   Open Store Workspace
                 </a>
               </div>
 
               <div style="background-color:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;margin:24px 0;">
                 <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:8px;">Workspace Details:</div>
-                <div style="font-size:13px;color:#cbd5e1;line-height:1.6;">
+                <div style="font-size:13px;color:#cbd5e1;line-height:1.8;">
                   • <strong>Store:</strong> ${opts.storeName}<br/>
                   • <strong>Account Email:</strong> ${opts.to}<br/>
-                  • <strong>Direct Portal:</strong> <a href="${opts.loginUrl}" style="color:#60a5fa;text-decoration:underline;">${opts.loginUrl}</a>
+                  • <strong>Store Link:</strong> <a href="${storeUrl}" target="_blank" rel="noopener noreferrer" style="color:#60a5fa;text-decoration:underline;word-break:break-all;">${storeUrl}</a><br/>
+                  • <strong>Direct Portal Link:</strong> <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" style="color:#60a5fa;text-decoration:underline;word-break:break-all;">${portalUrl}</a>
                 </div>
               </div>
 
@@ -760,9 +771,11 @@ export async function sendWelcomeEmail(
   opts: SendWelcomeEmailOptions
 ): Promise<SendWelcomeEmailResult> {
   try {
+    const storeUrl = opts.storeUrl || opts.loginUrl;
+    const portalUrl = opts.portalUrl || opts.loginUrl;
     const subject = `Welcome to ${opts.storeName} — Your Store Workspace is Ready`;
     const html = buildWelcomeEmailHtml(opts);
-    const text = `Welcome to ${opts.storeName}!\n\nHello ${opts.ownerName || opts.to},\n\n${opts.welcomeMessage}\n\nAccess your workspace at: ${opts.loginUrl}`;
+    const text = `Welcome to ${opts.storeName}!\n\nHello ${opts.ownerName || opts.to},\n\n${opts.welcomeMessage}\n\n• Store Link: ${storeUrl}\n• Direct Portal Link: ${portalUrl}\n\nAccess your workspace at: ${portalUrl}`;
 
     return await sendEmail({
       to: opts.to,
