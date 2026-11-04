@@ -196,10 +196,36 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const storePhone = companySettings?.phone || '';
   const storeEmail = companySettings?.email || '';
   const taxNumber = companySettings?.tax_number || companySettings?.taxNumber || '';
-  const invoiceFooter =
+  const rawInvoiceFooter =
     companySettings?.invoice_footer ||
     companySettings?.invoiceFooter ||
     'Thank you for your business!';
+
+  // Sanitize invoice footer: completely remove any application branding, platform watermarks, or footer credits
+  const sanitizeInvoiceFooter = (footer?: string): string => {
+    if (!footer) return '';
+    const trimmed = footer.trim();
+    if (
+      trimmed === 'Powered by SarbaazSoft Shoe POS • © 2026 All rights reserved.' ||
+      trimmed === 'Powered by SarbaazSoft Shoe POS' ||
+      trimmed === 'SarbaazSoft Shoe POS' ||
+      trimmed.toLowerCase().includes('sarbaazsoft')
+    ) {
+      const sanitized = trimmed
+        .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+        .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
+        .replace(/SarbaazSoft Shoe POS/gi, '')
+        .replace(/SarbaazSoft POS/gi, '')
+        .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+        .replace(/Powered by[\s\S]*$/gi, '')
+        .trim();
+      return sanitized;
+    }
+    return trimmed;
+  };
+
+  const cleanInvoiceFooter = sanitizeInvoiceFooter(rawInvoiceFooter);
+  const invoiceFooter = cleanInvoiceFooter;
   const showReceiptLogo = Boolean(
     companySettings?.show_receipt_logo ?? companySettings?.showReceiptLogo ?? false
   );
@@ -332,7 +358,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       setDirectFeedback(
         err.message || 'Direct print error, fallback to system dialog.'
       );
-      window.print();
+      handlePrintStandard();
     } finally {
       setIsPrintingDirect(false);
     }
@@ -348,6 +374,14 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       handlePrintStandard();
     }
   };
+
+  // Mark body while invoice modal is active to isolate print output via CSS
+  useEffect(() => {
+    document.body.classList.add('invoice-modal-open');
+    return () => {
+      document.body.classList.remove('invoice-modal-open');
+    };
+  }, []);
 
   // Listen for F9 (Print Receipt) and F8/Escape (Dismiss)
   useEffect(() => {
@@ -377,7 +411,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   }, [printerSettings, sale, companySettings, recipientPhone, whatsAppUrl, smsUrl, selectedFormat]);
 
   return (
-    <div className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto print:static print:bg-white print:p-0 print:overflow-visible print:block">
+    <div className="invoice-modal-root form-modal-theme fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto print:static print:bg-white print:p-0 print:overflow-visible print:block">
       {/* Screen Container */}
       <div className="relative w-full max-w-4xl app-modal-container overflow-hidden flex flex-col max-h-[94vh] no-print shadow-2xl rounded-2xl border border-slate-200 dark:border-purple-800/80">
         {/* Modal Header */}

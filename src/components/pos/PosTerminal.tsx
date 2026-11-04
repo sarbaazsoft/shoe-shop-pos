@@ -2769,7 +2769,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     </div>
 
     {/* Dedicated Footer Branding */}
-    <div className="text-center py-2 text-[11px] text-slate-400 dark:text-slate-500 select-none">
+    <div className="text-center py-2 text-[11px] text-slate-400 dark:text-slate-500 select-none no-print">
       Powered by <span className="text-slate-700 dark:text-slate-200 font-semibold">SarbaazSoft Shoe POS</span> &bull; &copy; 2026 All rights reserved.
     </div>
 

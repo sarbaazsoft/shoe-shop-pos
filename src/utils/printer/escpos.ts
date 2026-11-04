@@ -139,7 +139,15 @@ export function generateSaleEscPos(
   const storeAddress = companySettings?.address || '';
   const storePhone = companySettings?.phone || '';
   const taxNumber = companySettings?.tax_number || companySettings?.taxNumber || '';
-  const footerNote = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const rawFooter = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const footerNote = rawFooter
+    .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft POS/gi, '')
+    .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by[\s\S]*$/gi, '')
+    .trim() || 'Thank you for shopping with us!';
 
   // Kick cash drawer first if enabled
   if (options.openCashDrawer) {

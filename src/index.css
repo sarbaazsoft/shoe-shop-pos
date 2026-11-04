@@ -2398,6 +2398,42 @@ aside {
       color: #000000 !important;
     }
 
+    /* Hide all application headers, navigation bars, sidebars, and application footers during printing */
+    header,
+    nav,
+    aside,
+    footer,
+    .app-footer,
+    [role="contentinfo"],
+    [role="navigation"] {
+      display: none !important;
+    }
+
+    /* Isolate invoice printing: hide all application page contents outside the invoice modal */
+    body.invoice-modal-open #root > *:not(:has(.invoice-modal-root)),
+    body.invoice-modal-open main > *:not(:has(.invoice-modal-root)) {
+      display: none !important;
+    }
+
+    body.invoice-modal-open .invoice-modal-root {
+      display: block !important;
+      position: static !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+    }
+
+    body.invoice-modal-open .invoice-modal-root .no-print {
+      display: none !important;
+    }
+
+    body.invoice-modal-open .invoice-modal-root .print-only {
+      display: block !important;
+    }
+
     /* Standard A4 invoice printing */
     .print-a4-invoice {
       width: 100% !important;

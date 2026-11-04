@@ -451,7 +451,15 @@ export function buildWhatsAppInvoiceText(sale: any, companySettings: any): strin
     'Retail Store';
   const phone = companySettings?.phone || '';
   const currency = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
-  const footerNote = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const rawFooter = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const footerNote = rawFooter
+    .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft POS/gi, '')
+    .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by[\s\S]*$/gi, '')
+    .trim() || 'Thank you for shopping with us!';
 
   const items = sale.items || [];
   const itemsText = items
@@ -524,7 +532,15 @@ export function buildSmsInvoiceText(sale: any, companySettings: any): string {
     'Retail Store';
   const phone = companySettings?.phone || '';
   const currency = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
-  const footerNote = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const rawFooter = companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Thank you for shopping with us!';
+  const footerNote = rawFooter
+    .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft Shoe POS/gi, '')
+    .replace(/SarbaazSoft POS/gi, '')
+    .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+    .replace(/Powered by[\s\S]*$/gi, '')
+    .trim() || 'Thank you for shopping with us!';
 
   const items = sale.items || [];
   const itemsSummary = items
