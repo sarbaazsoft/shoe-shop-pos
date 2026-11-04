@@ -1,0 +1,14 @@
+Fix the **Enable Web Push Notifications** button in the notification container.
+
+Currently, clicking the button incorrectly triggers the disable/unsubscribe notification flow.
+
+Expected behavior:
+- Clicking **Enable Web Push Notifications** should request the browser's notification permission.
+- If permission is granted, register the device/browser for push notifications and save the subscription.
+- Support compatible browsers on desktop, Android, and iPhone (iOS).
+- If permission is already granted but no subscription exists, create a new push subscription.
+- Update the button state to **Disable Notifications** only after successful subscription.
+- Handle denied permissions, unsupported browsers, and subscription errors gracefully.
+- Ensure disabling notifications remains a separate action.
+
+**Important:** Audit the existing service worker, Push API, notification permissions, subscription logic, and UI state. Fix the incorrect enable/disable flow without duplicating subscriptions or breaking existing push notifications.

@@ -12,13 +12,18 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-function subscriptionMatchesKey(sub: PushSubscription, key: Uint8Array): boolean {
-  const current = sub.options?.applicationServerKey;
-  if (!current) return false;
-  const a = new Uint8Array(current as ArrayBuffer);
-  if (a.length !== key.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== key[i]) return false;
-  return true;
+export function isIOSDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+}
+
+export function isStandalonePWA(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    (window.navigator as any).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches
+  );
 }
 
 export function isWebPushSupported(): boolean {
@@ -40,6 +45,10 @@ export function getNotificationPermissionState(): NotificationPermission {
 export async function isDeviceSubscribedToPush(): Promise<boolean> {
   if (!isWebPushSupported()) return false;
   try {
+    if (Notification.permission !== 'granted') return false;
+    // If explicitly disabled by user on this client, respect that setting
+    if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return false;
+
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
@@ -49,20 +58,50 @@ export async function isDeviceSubscribedToPush(): Promise<boolean> {
   }
 }
 
-export async function subscribeDeviceToWebPush(): Promise<{ success: boolean; error?: string }> {
+export async function subscribeDeviceToWebPush(): Promise<{
+  success: boolean;
+  error?: string;
+  permission?: NotificationPermission;
+}> {
+  if (typeof window === 'undefined') {
+    return { success: false, error: 'Web Push is not available in non-browser environments.' };
+  }
+
+  // iOS Safari requires adding to Home Screen first for Web Push
+  if (isIOSDevice() && !isStandalonePWA() && !('Notification' in window)) {
+    return {
+      success: false,
+      error: 'On iPhone or iPad, push notifications require adding this app to your Home Screen first (tap Share > Add to Home Screen), then launching it from your Home Screen.',
+    };
+  }
+
   if (!isWebPushSupported()) {
-    return { success: false, error: 'Web Push notifications are not supported on this browser or platform.' };
+    return {
+      success: false,
+      error: 'Web Push notifications are not supported on this browser or platform.',
+    };
   }
 
   try {
-    // 1. Request explicit permission
-    const permission = await Notification.requestPermission();
+    // 1. Check or request browser notification permission
+    let permission = Notification.permission;
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission === 'denied') {
+      return {
+        success: false,
+        permission: 'denied',
+        error: 'Notification permission was denied. Please allow notifications in your browser or device settings.',
+      };
+    }
+
     if (permission !== 'granted') {
       return {
         success: false,
-        error: permission === 'denied'
-          ? 'Notification permission was denied. Please allow notifications in your browser or device settings.'
-          : 'Notification permission request was dismissed.',
+        permission: 'default',
+        error: 'Notification permission request was dismissed.',
       };
     }
 
@@ -76,36 +115,57 @@ export async function subscribeDeviceToWebPush(): Promise<{ success: boolean; er
     // 3. Ensure Service Worker registration is active
     let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
-      reg = await navigator.serviceWorker.register('/sw-background-sync.js');
+      reg = await navigator.serviceWorker.register('/sw-background-sync.js', { scope: '/' });
     }
     await navigator.serviceWorker.ready;
 
-    // 4. Subscribe with PushManager
+    // 4. Ensure push subscription with PushManager
     const applicationServerKey = urlBase64ToUint8Array(publicKey);
     let sub = await reg.pushManager.getSubscription();
-    // A subscription made with a different server key can never receive pushes: drop it and re-create it.
-    if (sub && !subscriptionMatchesKey(sub, applicationServerKey)) {
-      const staleEndpoint = sub.endpoint;
-      await sub.unsubscribe().catch(() => {});
-      await api.notifications.unsubscribe(staleEndpoint).catch(() => {});
-      sub = null;
-    }
+
+    // If permission is already granted but no subscription exists, create a new push subscription
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey as any,
-      });
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as any,
+        });
+      } catch (subErr: any) {
+        console.warn('[pushNotificationClient] Initial subscribe attempt error:', subErr);
+        // If an existing subscription had mismatched keys, reset and retry once
+        const existing = await reg.pushManager.getSubscription().catch(() => null);
+        if (existing) {
+          await existing.unsubscribe().catch(() => {});
+        }
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as any,
+        });
+      }
+    }
+
+    if (!sub) {
+      return {
+        success: false,
+        error: 'Could not create a push subscription on this device.',
+      };
     }
 
     // 5. Send subscription to server
     const rawSub = sub.toJSON();
-    await api.notifications.subscribe(rawSub);
+    const saveRes = await api.notifications.subscribe(rawSub);
+    if (saveRes && saveRes.success === false) {
+      return {
+        success: false,
+        error: saveRes.error || 'Server rejected push notification subscription.',
+      };
+    }
 
     try {
       localStorage.setItem('pos_push_notifications_enabled', 'true');
     } catch {}
 
-    return { success: true };
+    return { success: true, permission: 'granted' };
   } catch (err: any) {
     console.error('Failed to subscribe device to Web Push:', err);
     return {
@@ -129,8 +189,16 @@ export async function resyncPushSubscriptionIfEnabled(): Promise<void> {
   await subscribeDeviceToWebPush();
 }
 
+/**
+ * Disables Web Push notifications for this device and unregisters from the server.
+ */
 export async function unsubscribeDeviceFromWebPush(): Promise<boolean> {
+  try {
+    localStorage.setItem('pos_push_notifications_enabled', 'false');
+  } catch {}
+
   if (!isWebPushSupported()) return true;
+
   try {
     const reg = await navigator.serviceWorker.getRegistration();
     if (reg) {
@@ -141,9 +209,6 @@ export async function unsubscribeDeviceFromWebPush(): Promise<boolean> {
         await api.notifications.unsubscribe(endpoint).catch(() => {});
       }
     }
-    try {
-      localStorage.setItem('pos_push_notifications_enabled', 'false');
-    } catch {}
     return true;
   } catch (err) {
     console.warn('Error during push unsubscription:', err);
