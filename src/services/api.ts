@@ -557,6 +557,10 @@ export const api = {
       apiFetch<{ success: boolean; message: string }>(`/superadmin/notifications/${id}`, {
         method: 'DELETE',
       }),
+    revokeNotification: (id: number) =>
+      apiFetch<{ success: boolean; message: string }>(`/superadmin/notifications/${id}`, {
+        method: 'DELETE',
+      }),
   },
 
   install: {

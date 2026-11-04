@@ -248,6 +248,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [sendingNotif, setSendingNotif] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
   const [deletingNotifId, setDeletingNotifId] = useState<number | null>(null);
+  const [notifToRevoke, setNotifToRevoke] = useState<PlatformNotification | null>(null);
+  const [revokingNotif, setRevokingNotif] = useState(false);
   const [notifFilterTarget, setNotifFilterTarget] = useState<'ALL' | 'GLOBAL' | 'TARGETED'>('ALL');
   const [notifFilterType, setNotifFilterType] = useState<string>('ALL');
 
@@ -316,18 +318,48 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
     }
   };
 
-  const handleDeleteNotification = async (id: number) => {
-    if (!window.confirm('Are you sure you want to revoke and delete this notification? Store terminals will no longer see it.')) {
-      return;
-    }
+  const handleOpenRevokeModal = (notif: PlatformNotification) => {
+    setError(null);
+    setNotifToRevoke(notif);
+  };
+
+  const handleDeleteNotification = (id: number) => {
+    const target = notificationsList.find((n) => n.id === id) || {
+      id,
+      title: `Notification #${id}`,
+      message: 'Platform announcement broadcast',
+      type: 'INFO' as PlatformNotificationType,
+      storeName: 'Platform Store',
+      createdAt: new Date().toISOString(),
+    };
+    handleOpenRevokeModal(target);
+  };
+
+  const handleConfirmRevokeNotification = async () => {
+    if (!notifToRevoke) return;
+    const id = notifToRevoke.id;
+    setRevokingNotif(true);
     setDeletingNotifId(id);
+    setError(null);
+    setSuccessMessage(null);
     try {
-      await api.superAdmin.deleteNotification(id);
+      const res = await api.superAdmin.deleteNotification(id);
       setNotificationsList((prev) => prev.filter((n) => n.id !== id));
-      setSuccessMessage('Notification revoked successfully.');
+      const notifKey = `pn-${id}`;
+      setSuperAdminReadNotifs((prev) => {
+        const next = prev.filter((k) => k !== notifKey);
+        try {
+          localStorage.setItem('pos_superadmin_read_notifs', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setSuccessMessage(res?.message || 'Notification revoked successfully.');
+      setNotifToRevoke(null);
+      await loadNotifications();
     } catch (err: any) {
-      setError(err.message || 'Failed to revoke notification.');
+      setError(err?.message || 'Failed to revoke notification.');
     } finally {
+      setRevokingNotif(false);
       setDeletingNotifId(null);
     }
   };
@@ -492,7 +524,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         actionLabel,
         onAction,
         onDelete: () => {
-          handleDeleteNotification(notif.id);
+          handleOpenRevokeModal(notif);
         },
       });
     });
@@ -2178,18 +2210,34 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                                     <span className="shrink-0">{new Date(item.createdAt).toLocaleDateString()}</span>
                                   </div>
 
-                                  {item.onAction && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        item.onAction?.();
-                                      }}
-                                      className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-2xs shrink-0"
-                                    >
-                                      {item.actionLabel || 'Manage'}
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {item.onDelete && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowNotifDropdown(false);
+                                          item.onDelete?.();
+                                        }}
+                                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 transition cursor-pointer shadow-2xs"
+                                        title="Revoke notification"
+                                      >
+                                        Revoke
+                                      </button>
+                                    )}
+                                    {item.onAction && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          item.onAction?.();
+                                        }}
+                                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-2xs shrink-0"
+                                      >
+                                        {item.actionLabel || 'Manage'}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -4881,7 +4929,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteNotification(notif.id)}
+                                    onClick={() => handleOpenRevokeModal(notif)}
                                     disabled={deletingNotifId === notif.id}
                                     title="Revoke and delete this announcement"
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-bold transition cursor-pointer disabled:opacity-50"
@@ -6272,6 +6320,112 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                         ? 'Broadcast to All Stores'
                         : `Send to ${stores.find((s) => String(s.id) === notifTargetTenantId)?.name || 'Store'}`}
                     </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Revoke Notification Modal */}
+      {notifToRevoke && (
+        <div
+          className="form-modal-theme fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto"
+          onClick={() => !revokingNotif && setNotifToRevoke(null)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white dark:bg-[#131B2E] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-rose-200 dark:border-rose-500/40 animate-in fade-in zoom-in-95 duration-150 text-slate-900 dark:text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-rose-50/80 dark:bg-rose-950/30 border-b border-rose-100 dark:border-rose-900/40 px-5 py-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-2xs">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white tracking-tight">
+                    Confirm Revoke Notification
+                  </h3>
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    ID #{notifToRevoke.id} &bull; {notifToRevoke.tenantId ? `Store #${notifToRevoke.tenantId}` : 'All Stores (Global Broadcast)'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={revokingNotif}
+                onClick={() => setNotifToRevoke(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white rounded-lg hover:bg-rose-100/60 dark:hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3.5 text-xs">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                Are you sure you want to revoke and delete this notification? Store terminals and users will immediately stop seeing this announcement.
+              </p>
+
+              {/* Notification Details Card */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#070B14] border border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                    {notifToRevoke.title}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
+                    {notifToRevoke.type || 'INFO'}
+                  </span>
+                </div>
+
+                {notifToRevoke.message && (
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-3 whitespace-pre-wrap leading-relaxed">
+                    {notifToRevoke.message}
+                  </p>
+                )}
+
+                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                  <span>Scope: {notifToRevoke.storeName || (notifToRevoke.tenantId ? `Store #${notifToRevoke.tenantId}` : 'All Stores Broadcast')}</span>
+                  <span>{notifToRevoke.createdAt ? new Date(notifToRevoke.createdAt).toLocaleDateString() : 'Active'}</span>
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/40 text-rose-700 dark:text-rose-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 dark:bg-[#0E1628] border-t border-slate-200/80 dark:border-slate-800 px-5 py-3.5 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={revokingNotif}
+                onClick={() => setNotifToRevoke(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={revokingNotif}
+                onClick={handleConfirmRevokeNotification}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition cursor-pointer active:scale-95"
+              >
+                {revokingNotif ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                    <span>Revoking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Revoke Notification</span>
                   </>
                 )}
               </button>

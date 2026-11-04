@@ -894,6 +894,13 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       });
       return { rows: [], rowCount: 1 };
     }
+    if (upper.startsWith('DELETE FROM')) {
+      const notifId = Number(params[0] || 0);
+      mockStore.platform_notification_reads = mockStore.platform_notification_reads.filter(
+        (r) => Number(r.notification_id) !== notifId
+      );
+      return { rows: [], rowCount: 1 };
+    }
     return { rows: [], rowCount: 0 };
   }
 

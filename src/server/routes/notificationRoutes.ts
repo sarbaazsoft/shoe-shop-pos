@@ -1117,4 +1117,39 @@ router.get('/stream', (req: Request, res: Response) => {
   });
 });
 
+/**
+ * 12. REVOKE NOTIFICATION MUTATION (DELETE /api/notifications/:id & POST /api/notifications/:id/revoke)
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    await ensurePlatformNotificationsSchema();
+    const rawId = String(req.params.id || '').replace(/^notice-/, '').trim();
+    const id = parseInt(rawId, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid notification ID' });
+    }
+    await pgClient.query('DELETE FROM platform_notification_reads WHERE notification_id = $1', [id]).catch(() => {});
+    await pgClient.query('DELETE FROM platform_notifications WHERE id = $1', [id]);
+    return res.json({ success: true, message: 'Notification revoked successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to revoke notification: ' + err.message });
+  }
+});
+
+router.post('/:id/revoke', async (req: Request, res: Response) => {
+  try {
+    await ensurePlatformNotificationsSchema();
+    const rawId = String(req.params.id || '').replace(/^notice-/, '').trim();
+    const id = parseInt(rawId, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid notification ID' });
+    }
+    await pgClient.query('DELETE FROM platform_notification_reads WHERE notification_id = $1', [id]).catch(() => {});
+    await pgClient.query('DELETE FROM platform_notifications WHERE id = $1', [id]);
+    return res.json({ success: true, message: 'Notification revoked successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to revoke notification: ' + err.message });
+  }
+});
+
 export default router;

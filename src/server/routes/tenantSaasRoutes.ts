@@ -3095,10 +3095,27 @@ router.delete('/superadmin/notifications/:id', requireAuth, requireSuperAdmin, a
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: 'Invalid notification ID' });
     }
+    await pgClient.query('DELETE FROM platform_notification_reads WHERE notification_id = $1', [id]).catch(() => {});
     await pgClient.query('DELETE FROM platform_notifications WHERE id = $1', [id]);
     return res.json({ success: true, message: 'Notification revoked successfully.' });
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to delete notification: ' + err.message });
+    return res.status(500).json({ error: 'Failed to revoke notification: ' + err.message });
+  }
+});
+
+// POST /api/superadmin/notifications/:id/revoke (and /delete) - POST alias for notification revocation
+router.post(['/superadmin/notifications/:id/revoke', '/superadmin/notifications/:id/delete'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await ensurePlatformNotificationsSchema();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid notification ID' });
+    }
+    await pgClient.query('DELETE FROM platform_notification_reads WHERE notification_id = $1', [id]).catch(() => {});
+    await pgClient.query('DELETE FROM platform_notifications WHERE id = $1', [id]);
+    return res.json({ success: true, message: 'Notification revoked successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to revoke notification: ' + err.message });
   }
 });
 
