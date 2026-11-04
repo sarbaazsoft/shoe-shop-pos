@@ -1454,6 +1454,7 @@ export default function App() {
                             companySettings={companySettings}
                             initialExchange={activeExchangeForPos}
                             onClearInitialExchange={() => setActiveExchangeForPos(null)}
+                            onNavigateTab={(tab) => handleTabChange(tab)}
                           />
                         ) : (
                           <DashboardOverview
@@ -1469,6 +1470,7 @@ export default function App() {
                           companySettings={companySettings}
                           initialExchange={activeExchangeForPos}
                           onClearInitialExchange={() => setActiveExchangeForPos(null)}
+                          onNavigateTab={(tab) => handleTabChange(tab)}
                         />
                       )}
 
@@ -1488,6 +1490,7 @@ export default function App() {
                             companySettings={companySettings}
                             initialExchange={activeExchangeForPos}
                             onClearInitialExchange={() => setActiveExchangeForPos(null)}
+                            onNavigateTab={(tab) => handleTabChange(tab)}
                           />
                         ) : (
                           <PurchaseManagement

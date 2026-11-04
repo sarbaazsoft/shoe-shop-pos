@@ -19,6 +19,7 @@ import { CartQuantityInput } from './CartQuantityInput.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
+import { PosNotificationBanner } from './PosNotificationBanner.tsx';
 
 export interface CartItem {
   productId: number;
@@ -50,6 +51,7 @@ interface PosTerminalProps {
   companySettings: any;
   initialExchange?: ActiveExchange | null;
   onClearInitialExchange?: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const PosTerminal: React.FC<PosTerminalProps> = ({
@@ -57,6 +59,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   companySettings,
   initialExchange,
   onClearInitialExchange,
+  onNavigateTab,
 }) => {
   // Input Mode: 'SCANNER' (Physical Hardware Scanner listening for Enter) vs 'MANUAL' (Catalog Text Search)
   const [inputMode, setInputMode] = useState<'SCANNER' | 'MANUAL'>('SCANNER');
@@ -1315,6 +1318,13 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
   return (
     <div className="flex flex-col min-h-0 bg-[#F8FAFC] dark:bg-[#0B0F17] gap-4 p-4 print:p-0 print:bg-white transition-colors">
+      {/* Persistent Top Banner for Cashier Notifications & SuperAdmin Notices */}
+      <PosNotificationBanner
+        currentUser={currentUser}
+        companySettings={companySettings}
+        onNavigateTab={onNavigateTab}
+      />
+
       <div className="flex flex-col xl:flex-row min-h-0 gap-4 flex-1 no-print">
         {/* LEFT COLUMN: Physical Scanner & Cart Table */}
         <motion.div

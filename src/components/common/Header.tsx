@@ -1380,8 +1380,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* RIGHT: Notifications, Theme Dropdown, and User Profile */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto pl-1">
 
-        {/* Real-time Notifications Menu */}
-        <div ref={notifRef} className="relative">
+        {/* Real-time Notifications Menu (Rendered for Admins & SuperAdmins; Cashiers use persistent POS Terminal Banner) */}
+        {!isCashierUser && (
+          <div ref={notifRef} className="relative">
           <button
             id="header-notifications-trigger"
             type="button"
@@ -1764,6 +1765,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </AnimatePresence>
         </div>
+        )}
           {/* Three-Way Theme Dropdown Sub-Component */}
           <ThemeDropdown
             id="header-theme-dropdown-trigger"

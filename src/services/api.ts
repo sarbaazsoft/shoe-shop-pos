@@ -1197,9 +1197,9 @@ export const api = {
       }),
     getVapidPublicKey: () => apiFetch<{ publicKey: string }>('/notifications/vapid-public-key'),
     subscribe: (subscription: any) =>
-      apiFetch<{ success: boolean }>('/notifications/subscribe', { method: 'POST', body: { subscription } }),
+      apiFetch<{ success: boolean; error?: string }>('/notifications/subscribe', { method: 'POST', body: { subscription } }),
     unsubscribe: (endpoint: string) =>
-      apiFetch<{ success: boolean }>('/notifications/unsubscribe', { method: 'POST', body: { endpoint } }),
+      apiFetch<{ success: boolean; error?: string }>('/notifications/unsubscribe', { method: 'POST', body: { endpoint } }),
     testPush: () =>
       apiFetch<{ success: boolean; message: string }>('/notifications/test-push', { method: 'POST' }),
     getPlatformAnnouncements: () =>
