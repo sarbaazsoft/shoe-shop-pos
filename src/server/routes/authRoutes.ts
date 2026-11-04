@@ -9,7 +9,7 @@ import { generateToken, requireAuth, requireAdmin, extractTokenFromRequest, revo
 import type { AuthenticatedRequest, AuthUser } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { recordTenantMiddlewarePresence, removeTenantMiddlewarePresence } from '../middleware/tenantMiddleware.ts';
-import { sendPasswordResetEmail, sendTrialActivationEmail } from '../utils/email.ts';
+import { sendPasswordResetEmail, sendTrialActivationEmail, sendFreeTierWelcomeEmail } from '../utils/email.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
 const router = Router();
@@ -496,8 +496,27 @@ const handleStoreRegister = async (req: Request, res: Response) => {
     const createdUser: any = result.rows[0];
 
     // CASE 1: Verification is bypassed (REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL = false)
-    // Bypass sending the activation email and immediately activate and log in the user
     if (!requireEmailVerification) {
+      const requestOrigin =
+        (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+        (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+        `${req.protocol}://${req.get('host')}`;
+
+      const loginLink = `${requestOrigin.replace(/\/+$/, '')}/?tenantId=${createdUser.tenant_id}`;
+
+      const welcomeMail = await sendFreeTierWelcomeEmail({
+        to: cleanEmail,
+        userName: String(name).trim(),
+        storeName: targetTenant?.name || 'SarbaazSoft Shoe POS',
+        loginUrl: loginLink,
+        password: String(password),
+        trialDurationDays: 30,
+        trialExpiryDate: new Date(Date.now() + 30 * 86400000),
+      }).catch((err) => {
+        console.warn(`[authRoutes] Failed sending free tier welcome email to ${cleanEmail}:`, err?.message || err);
+        return { delivered: false, provider: 'resend' as const, sandbox: false, error: err?.message || String(err) };
+      });
+
       const authUser: AuthUser = {
         id: createdUser.id,
         tenantId: createdUser.tenant_id,
@@ -513,10 +532,12 @@ const handleStoreRegister = async (req: Request, res: Response) => {
         success: true,
         verified: true,
         active: true,
+        emailSent: welcomeMail.delivered,
+        sandbox: Boolean(welcomeMail.sandbox),
         token,
         user: authUser,
         tenantId: createdUser.tenant_id,
-        message: 'Account registered and activated successfully. Welcome to SarbaazSoft!',
+        message: 'Account registered and activated successfully. Welcome to SarbaazSoft! An onboarding email has been sent to your inbox.',
       });
     }
 

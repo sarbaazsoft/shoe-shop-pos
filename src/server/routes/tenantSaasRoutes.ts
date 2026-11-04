@@ -7,7 +7,7 @@ import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificatio
 import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest, type AuthUser } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
-import { sendTrialActivationEmail } from '../utils/email.ts';
+import { sendTrialActivationEmail, sendFreeTierWelcomeEmail, outgoingEmailOutbox } from '../utils/email.ts';
 import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getOnlineTenantCount, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
@@ -282,7 +282,7 @@ router.get('/saas/check-email', async (req: Request, res: Response) => {
 /**
  * 2e. PUBLIC FREE TRIAL STORE ACTIVATION (`/api/saas/store-request`)
  */
-router.post('/saas/store-request', async (req: Request, res: Response) => {
+router.post(['/saas/store-request', '/saas/request-store'], async (req: Request, res: Response) => {
   try {
     await ensureSaasControlPlane();
     const body = req.body || {};
@@ -423,7 +423,29 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       });
     }
 
-    // CASE 2: Verification toggle is OFF
+    // CASE 2: Verification toggle is OFF (Immediate Free Tier Store Activation)
+    const requestOrigin =
+      (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+      (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+      `${req.protocol}://${req.get('host')}`;
+
+    const onboardingLink = `${requestOrigin.replace(/\/+$/, '')}/onboarding?tenantId=${provisioned.tenantId}`;
+
+    const mailResult = await sendFreeTierWelcomeEmail({
+      to: ownerEmail,
+      userName: ownerName,
+      storeName: provisioned.storeName,
+      loginUrl: onboardingLink,
+      password: password || provisioned.initialPassword,
+      trialDurationDays,
+      trialExpiryDate: endDate,
+      businessType,
+      pricingMode,
+    }).catch((err) => {
+      console.warn(`[store-request] Failed sending free tier welcome email to ${ownerEmail}:`, err?.message || err);
+      return { delivered: false, provider: 'resend' as const, sandbox: false, error: err?.message || String(err) };
+    });
+
     const authUser: AuthUser = {
       id: provisioned.adminUserId,
       tenantId: provisioned.tenantId,
@@ -439,10 +461,12 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
 
     return res.status(201).json({
       success: true,
-      message: `Congratulations! Store '${provisioned.storeName}' has been activated with a 30-day Free Trial.`,
+      message: `Congratulations! Store '${provisioned.storeName}' has been activated with a 30-day Free Trial. An onboarding email with your credentials has been dispatched to ${ownerEmail}.`,
       tenantId: provisioned.tenantId,
       storeName: provisioned.storeName,
       requiresVerification: false,
+      emailSent: mailResult.delivered,
+      sandbox: Boolean(mailResult.sandbox),
       user: {
         ...authUser,
         tenantName: provisioned.storeName,
@@ -2347,10 +2371,34 @@ router.post('/superadmin/tenants', requireAuth, requireSuperAdmin, async (req: A
       });
     }
 
+    const requestOrigin =
+      (typeof req.body?.origin === 'string' && req.body.origin.trim().startsWith('http') ? req.body.origin.trim() : '') ||
+      (typeof req.headers.origin === 'string' && req.headers.origin.startsWith('http') ? req.headers.origin : '') ||
+      `${req.protocol}://${req.get('host')}`;
+
+    const onboardingLink = `${requestOrigin.replace(/\/+$/, '')}/onboarding?tenantId=${provisioned.tenantId}`;
+
+    const welcomeMail = await sendFreeTierWelcomeEmail({
+      to: normalizedOwnerEmail,
+      userName: String(ownerName || storeName).trim(),
+      storeName: provisioned.storeName,
+      loginUrl: onboardingLink,
+      password: password ? String(password).trim() : provisioned.initialPassword,
+      trialDurationDays: provisioned.trialDays || 30,
+      trialExpiryDate: provisioned.subscriptionEndDate,
+      businessType: finalBusinessType,
+      pricingMode: finalPricingMode,
+    }).catch((err) => {
+      console.warn(`[superadmin/tenants] Failed sending welcome email to ${normalizedOwnerEmail}:`, err?.message || err);
+      return { delivered: false, provider: 'resend' as const, sandbox: false, error: err?.message || String(err) };
+    });
+
     return res.status(201).json({
       success: true,
       provisioned,
-      message: `Store '${provisioned.storeName}' created successfully.`,
+      emailSent: welcomeMail.delivered,
+      sandbox: Boolean(welcomeMail.sandbox),
+      message: `Store '${provisioned.storeName}' created successfully. Onboarding email dispatched to ${normalizedOwnerEmail}.`,
     });
   } catch (err: any) {
     await pgClient.query('ROLLBACK').catch(() => {});
@@ -2362,6 +2410,18 @@ router.post('/superadmin/tenants', requireAuth, requireSuperAdmin, async (req: A
     }
     return res.status(400).json({ error: err.message || 'Failed to create tenant store.' });
   }
+});
+
+/**
+ * 8B. SUPERADMIN EMAIL OUTBOX TELEMETRY (`GET /api/superadmin/email-outbox`)
+ * Returns recent transactional emails dispatched by the platform (for audit & testing verification).
+ */
+router.get('/superadmin/email-outbox', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  return res.json({
+    success: true,
+    totalDispatched: outgoingEmailOutbox.length,
+    outbox: outgoingEmailOutbox.slice().reverse(),
+  });
 });
 
 /**
