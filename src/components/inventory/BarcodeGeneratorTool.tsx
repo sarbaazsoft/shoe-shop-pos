@@ -812,7 +812,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
                     </select>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Code-128 supports full alphanumeric characters (letters, numbers, hyphens). EAN-13 conforms to international 13-digit retail scan standards.
+                    Code-128 supports full alphanumeric characters (letters, numbers, hyphens). EAN-13 conforms to international 13-digit retail & wholesale scan standards.
                   </p>
                 </div>
 

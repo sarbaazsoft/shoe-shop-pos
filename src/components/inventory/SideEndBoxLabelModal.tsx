@@ -150,7 +150,7 @@ export const SideEndBoxLabelModal: React.FC<SideEndBoxLabelModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-purple-200/80 mt-0.5">
-                High-visibility label for warehouse &amp; retail shoe rack box ends
+                High-visibility label for warehouse, wholesale &amp; retail shoe rack box ends
               </p>
             </div>
           </div>

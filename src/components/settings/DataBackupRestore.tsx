@@ -325,7 +325,7 @@ export const DataBackupRestore: React.FC<DataBackupRestoreProps> = ({
           <div>
             <h3 className="font-bold text-slate-900 dark:text-white text-base">Store Backup &amp; Safety Restore (بیک اپ اور بحالی)</h3>
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-              Safeguard your retail shoe store by creating snapshot backups and restoring store records anytime.
+              Safeguard your wholesale & retail shoe store by creating snapshot backups and restoring store records anytime.
             </p>
           </div>
         </div>

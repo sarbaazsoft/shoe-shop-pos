@@ -76,7 +76,7 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
       id: `/?tenantId=${tenant.id}`,
       name: tenant.name || 'Shoe POS',
       short_name: shortName,
-      description: `Dedicated Retail POS & Inventory Terminal for ${tenant.name}`,
+      description: `Dedicated Dual-Engine Wholesale & Retail POS Terminal for ${tenant.name}`,
       start_url: `/?tenantId=${tenant.id}`,
       scope: '/',
       display: 'standalone',
@@ -2846,7 +2846,7 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
     const finalWelcomeMsg =
       req.body?.msg ||
       req.body?.welcomeMsg ||
-      `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your retail operations seamlessly.`;
+      `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your wholesale & retail operations seamlessly.`;
 
     let welcomeResult: any = null;
     try {

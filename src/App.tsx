@@ -1096,7 +1096,7 @@ export default function App() {
               storeName="SarbaazSoft Shoe POS"
               badgeText="Connecting..."
               badgeVariant="connecting"
-              subtitle="Multi-tenant retail shoe shop POS"
+              subtitle="Dual-engine wholesale & retail shoe shop POS"
               dbText="Secure platform sign-in"
             >
               <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">

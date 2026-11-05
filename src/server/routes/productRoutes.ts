@@ -545,7 +545,7 @@ async function handleAiProductSuggestion(req: AuthenticatedRequest, res: Respons
 
     const { base64Data, mimeType } = resolved.data;
     const aiClient = getGeminiClient();
-    const prompt = `You are an expert footwear cataloger and AI vision inspector for a retail shoe store POS system.
+    const prompt = `You are an expert footwear cataloger and AI vision inspector for a dual-engine wholesale & retail shoe store POS system.
 Examine this product image carefully.
 
 First, strictly determine if this image shows footwear (shoes, sneakers, boots, sandals, heels, slides, slippers, loafers, clogs, flats, etc.).

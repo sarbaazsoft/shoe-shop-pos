@@ -647,7 +647,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700">
                 <Zap className="w-3.5 h-3.5 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" />
-                The Complete POS Solution for Shoe Stores
+                Dual-Engine Wholesale & Retail POS Solution for Shoe Stores
               </div>
               <h1 className="mt-5 text-[40px] sm:text-5xl lg:text-[54px] font-extrabold tracking-tight leading-[1.05] text-white lt:text-slate-900">
                 Grow your shoe<br />
@@ -699,7 +699,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               Everything you need to run your shoe store
             </h2>
             <p className="mt-4 max-w-md text-base leading-relaxed text-slate-300 lt:text-slate-600">
-              From sales to inventory, suppliers to reports — SarbaazSoft POS helps you manage your complete retail business in one powerful platform.
+              From sales to inventory, suppliers to reports — SarbaazSoft POS helps you manage your complete wholesale & retail business in one powerful platform.
             </p>
 
             {/* keep-dark:start */}
@@ -824,13 +824,13 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
           <div className="mb-7 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3 py-1 text-xs text-violet-200 lt:text-indigo-700 font-semibold mb-2">
-                <Store className="w-3.5 h-3.5" aria-hidden="true" /> Live Retail Network
+                <Store className="w-3.5 h-3.5" aria-hidden="true" /> Live Wholesale & Retail Network
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white lt:text-slate-900">
                 Shops using SarbaazSoft POS
               </h2>
               <p className="mt-1 text-sm text-slate-300 lt:text-slate-600">
-                Browse the retail stores currently registered and running on SarbaazSoft POS.
+                Browse the wholesale & retail stores currently registered and running on SarbaazSoft POS.
               </p>
             </div>
 

@@ -1573,7 +1573,7 @@ setFormErrors(errors);
                       </span>
                     </h4>
                     <p className="text-[11px] text-indigo-700 dark:text-indigo-300/90 mt-0.5">
-                      Your store has full access to all retail shoe POS, inventory, barcode, and reporting features during your free trial. You can request a 6-month or yearly plan extension at any time.
+                      Your store has full access to all wholesale & retail shoe POS, inventory, barcode, and reporting features during your free trial. You can request a 6-month or yearly plan extension at any time.
                     </p>
                   </div>
                 </div>
@@ -3529,7 +3529,7 @@ setFormErrors(errors);
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">Server Commissioning &amp; Route Lockout Security</h3>
                 <p className="text-slate-500 dark:text-purple-200/70 text-xs mt-0.5">
-                  Manage first-time setup installer state, route lockdown guard, and retail recommissioning.
+                  Manage first-time setup installer state, route lockdown guard, and store recommissioning.
                 </p>
               </div>
             </div>

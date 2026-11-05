@@ -3,7 +3,7 @@
  *
  * Rule:
  * Remove decimal price rule totally. Never show prices with decimals (e.g. convert 1250.00 or 1250.50 to 1250).
- * All retail shoe prices, subtotals, tender amounts, and inventory costs are displayed as whole integers.
+ * All wholesale & retail shoe prices, subtotals, tender amounts, and inventory costs are displayed as whole integers.
  */
 
 /**

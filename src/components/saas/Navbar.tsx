@@ -140,7 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {/* Subtitle: Hidden on small mobile screens to keep center alignment clean */}
                 <span className="hidden sm:flex text-[11px] text-slate-300/80 lt:text-slate-500 dark:text-indigo-200/70 font-medium items-center gap-1 truncate mt-0.5">
                   <span className="text-purple-400 lt:text-purple-600 dark:text-purple-400">👟</span>
-                  <span>Multi-tenant shoe shop POS</span>
+                  <span>Dual-engine wholesale & retail POS</span>
                 </span>
               </div>
             </button>

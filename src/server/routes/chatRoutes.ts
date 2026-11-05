@@ -489,7 +489,7 @@ ${codebaseContextText}
 ═══════════════════════════════════════════════════════════════
 ABSOLUTE CORE RULES & GUARDRAILS (ZERO HALLUCINATION DIRECTIVES):
 ═══════════════════════════════════════════════════════════════
-DO NOT assume global, generic retail software behaviors (Shopify, Lightspeed, Square, etc.). Answer strictly according to the real architecture, workflows, UI components, shortcuts, and business rules of "${storeName}" POS.
+DO NOT assume global, generic retail or wholesale software behaviors (Shopify, Lightspeed, Square, etc.). Answer strictly according to the real architecture, workflows, UI components, shortcuts, and business rules of "${storeName}" POS.
 
 0. HOW TO IMPORT CSV FILE (BULK PRODUCT IMPORT WORKFLOW — \`CsvImportModal.tsx\` & \`src/utils/csvImport.ts\`):
    • WHERE TO FIND IT:

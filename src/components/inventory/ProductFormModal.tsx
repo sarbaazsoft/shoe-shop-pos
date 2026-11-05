@@ -2578,7 +2578,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <div className="pt-2 border-t border-gray-200 dark:border-slate-800 w-full flex flex-wrap items-center justify-center gap-2">
                       <button
                         type="button"
-                        title="Print retail barcode sticker (50x30mm)"
+                        title="Print footwear barcode sticker (50x30mm)"
                         onClick={() => setIsBarcodeStickerOpen(true)}
                         className="px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-gradient-to-r hover:from-purple-600 hover:to-indigo-600 hover:text-white dark:hover:from-purple-600 dark:hover:to-indigo-600 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 text-xs font-bold active:scale-95"
                       >

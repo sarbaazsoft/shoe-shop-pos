@@ -493,7 +493,7 @@ export const PrinterHardwareSettings: React.FC = () => {
                 </div>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Standard retail shoe label size is <strong>50mm × 30mm</strong> with TSPL / ESC standard barcodes.
+                Standard footwear shoe label size is <strong>50mm × 30mm</strong> with TSPL / ESC standard barcodes.
               </p>
             </div>
           </div>

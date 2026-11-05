@@ -2,7 +2,7 @@
   "id": "/admin/",
   "name": "POS Admin",
   "short_name": "POSAdmin",
-  "description": "Dedicated SuperAdmin Control Plane for Multi-Tenant POS Provisioning, Store Suspension & SaaS Analytics",
+  "description": "Dedicated SuperAdmin Control Plane for Multi-Tenant Dual-Engine Wholesale & Retail POS Provisioning, Store Suspension & SaaS Analytics",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",

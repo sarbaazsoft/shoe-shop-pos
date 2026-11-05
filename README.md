@@ -1,6 +1,6 @@
 # SarbaazSoft Shoe POS
 
-> **Enterprise Multi-Tenant Retail Footwear POS & Inventory Management SaaS**  
+> **Enterprise Multi-Tenant Dual-Engine Wholesale & Retail Footwear POS & Inventory Management SaaS**  
 > Engineered for counter speed, offline resilience, direct thermal printing, multi-store isolation, and dynamic SaaS subscription activations.
 
 ---
@@ -201,4 +201,4 @@ Both commands must pass with **0 errors and 0 warnings**.
 ## 📄 License & Attribution
 
 Copyright &copy; 2026 SarbaazSoft. All rights reserved.  
-Built for high-performance footwear retail and wholesale management.
+Built for high-performance footwear dual-engine wholesale & retail management.

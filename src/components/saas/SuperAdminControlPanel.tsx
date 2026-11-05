@@ -2753,7 +2753,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                         ? Math.min(100, Math.max(18, Math.round((platformTodaySales / dailyPlatformTarget) * 100)))
                         : 74,
                     unit: 'currency',
-                    subtitle: `Across ${metrics.activeStores} active retail shoe stores today`,
+                    subtitle: `Across ${metrics.activeStores} active wholesale & retail shoe stores today`,
                     status: 'Live Sync',
                   },
                   {
