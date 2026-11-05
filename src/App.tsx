@@ -17,6 +17,7 @@ import { AuthModal } from './components/auth/AuthModal.tsx';
 import { UserProfileModal } from './components/auth/UserProfileModal.tsx';
 import { OfflineToastNotification } from './components/common/OfflineToastNotification.tsx';
 import { PublicLayout } from './components/common/PublicLayout.tsx';
+import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
 import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
 import { UnknownStore404View } from './components/saas/UnknownStore404View.tsx';
 import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
@@ -1084,21 +1085,36 @@ export default function App() {
       {/* 1. ROOT DOMAIN SAAS LANDING PAGE */}
       {saasMode === 'LANDING' && (
         shouldShowTenantLoading ? (
-          <PublicLayout
-            // Never display a cached store name while a requested tenant is unresolved.
-            storeName={tenantIdParam && isRequestedTenantVerified ? storeLoginTarget?.name || 'SarbaazSoft Shoe POS' : 'SarbaazSoft Shoe POS'}
-            badgeText="Connecting..."
-            badgeVariant="connecting"
-            subtitle={tenantIdParam ? 'Preparing your store workspace' : 'Multi-tenant retail shoe shop POS'}
-            dbText="Secure tenant sign-in"
-          >
-            <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">
-              <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-4">
-                {tenantIdParam ? 'Loading your store...' : 'Loading SarbaazSoft Shoe POS...'}
-              </p>
-            </div>
-          </PublicLayout>
+          Boolean(tenantIdParam) ? (
+            <TenantWorkspaceSkeleton
+              storeName={
+                isRequestedTenantVerified
+                  ? storeLoginTarget?.name || effectiveStoreName
+                  : (tenantIdParam ? `Store #${tenantIdParam}` : 'Store Workspace')
+              }
+              activeTab={currentTab}
+              statusMessage={
+                isRequestedTenantVerified
+                  ? `Loading ${storeLoginTarget?.name || 'Store'}...`
+                  : `Connecting to store #${tenantIdParam}...`
+              }
+            />
+          ) : (
+            <PublicLayout
+              storeName="SarbaazSoft Shoe POS"
+              badgeText="Connecting..."
+              badgeVariant="connecting"
+              subtitle="Multi-tenant retail shoe shop POS"
+              dbText="Secure platform sign-in"
+            >
+              <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">
+                <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-4">
+                  Loading SarbaazSoft Shoe POS...
+                </p>
+              </div>
+            </PublicLayout>
+          )
         ) : (isLoginModalOpen || Boolean(tenantIdParam)) ? (
           <>
             {tenantIdNotice && (
@@ -1367,29 +1383,12 @@ export default function App() {
       {/* 6. ACTIVE TENANT POS & INVENTORY SUITE (shared root with tenantId) */}
       {saasMode === 'TENANT_ACTIVE' && (
         <>
-          {isInitializing ? (
-            <PublicLayout
-              storeName={effectiveStoreName || 'Store Workspace'}
-              badgeText="Connecting..."
-              badgeVariant="connecting"
-              subtitle="Powered by SarbaazSoft Shoe POS"
-              dbText="Cloud Synchronized"
-            >
-              <div
-                id="app-initial-loading-card"
-                className="bg-white/95 dark:bg-[#131B2E]/95 backdrop-blur-md rounded-3xl p-8 sm:p-10 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center animate-in fade-in zoom-in-95 duration-200"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white mb-4 shadow-lg shadow-purple-600/30 ring-2 ring-indigo-400/30">
-                  <div className="w-7 h-7 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  {effectiveStoreName || 'Store Workspace'}
-                </h2>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
-                  {effectiveStoreName ? `Loading ${effectiveStoreName} Workspace...` : 'Loading Store Workspace...'}
-                </p>
-              </div>
-            </PublicLayout>
+          {(isInitializing || !isRequestedTenantVerified) ? (
+            <TenantWorkspaceSkeleton
+              storeName={effectiveStoreName || (activeTenant?.name ? activeTenant.name : 'Store Workspace')}
+              activeTab={currentTab}
+              statusMessage={effectiveStoreName ? `Loading ${effectiveStoreName} Workspace...` : 'Synchronizing Store Workspace...'}
+            />
           ) : !currentUser ? (
             <PublicLayout
               storeName={effectiveStoreName || 'Store Workspace'}
