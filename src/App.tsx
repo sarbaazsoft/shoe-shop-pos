@@ -277,41 +277,35 @@ export default function App() {
   })();
 
   // Name shown for the app: the store name for tenants (same as the PWA name), with
-  // fixed names for the landing page and the SuperAdmin panel.
-  const pwaAppName =
+  // Mobile home screen title and iOS bundle display name (Shoe POS) to prevent truncation
+  const pwaShortName =
+    saasMode === 'SUPERADMIN'
+      ? 'POS Admin'
+      : 'Shoe POS';
+
+  // Desktop / web page title: Sarbaazsoft Shoe POS | /storeName
+  const storeSlug = effectiveStoreName
+    ? (effectiveStoreName.startsWith('/') ? effectiveStoreName : `/${effectiveStoreName}`)
+    : '';
+
+  const pageTitle =
     saasMode === 'SUPERADMIN'
       ? 'POS SaaS C-Panel'
-      : saasMode === 'LANDING'
-      ? 'SarbaazSoft Shoe POS'
-      : effectiveStoreName || 'SarbaazSoft Shoe POS';
-  // Installed PWA windows / status bars already show the app name (the store name) next to the
-  // page title, so the title must not repeat any name there. Normal browser tabs keep the
-  // "Store | SarbaazSoft Shoe POS" credit.
-  const isInstalledPwa =
-    typeof window !== 'undefined' &&
-    ((typeof window.matchMedia === 'function' &&
-      ['standalone', 'minimal-ui', 'window-controls-overlay', 'fullscreen'].some(
-        (mode) => window.matchMedia(`(display-mode: ${mode})`).matches
-      )) ||
-      (window.navigator as any).standalone === true);
-  const pageTitle =
-    saasMode === 'SUPERADMIN' || saasMode === 'LANDING' || !effectiveStoreName
-      ? pwaAppName
-      : isInstalledPwa
-      ? effectiveStoreName
-      : `${effectiveStoreName} | SarbaazSoft Shoe POS`;
+      : saasMode === 'LANDING' || !effectiveStoreName
+      ? 'Sarbaazsoft Shoe POS'
+      : `Sarbaazsoft Shoe POS | ${storeSlug}`;
 
-  // Dynamically update <link rel="manifest"> and <meta name="theme-color"> for the tenant or SuperAdmin PWA
+  // Dynamically update <link rel="manifest">, Apple meta tags, and <meta name="theme-color">
   useEffect(() => {
     document.title = pageTitle;
 
     const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
     if (appleTitle) {
-      appleTitle.setAttribute('content', pwaAppName);
+      appleTitle.setAttribute('content', pwaShortName);
     }
     const appNameMeta = document.querySelector('meta[name="application-name"]');
     if (appNameMeta) {
-      appNameMeta.setAttribute('content', pwaAppName);
+      appNameMeta.setAttribute('content', pwaShortName);
     }
 
     const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
@@ -355,14 +349,17 @@ export default function App() {
         manifestLink.setAttribute('href', `/api/tenants/manifest?tenantId=${encodeURIComponent(String(activeTenant.id))}`);
       }
       if (themeMeta) {
-        themeMeta.setAttribute('content', '#2563EB');
+        themeMeta.setAttribute('content', '#4F46E5');
       }
     } else {
       if (manifestLink) {
         manifestLink.setAttribute('href', `/manifest.webmanifest?store=${encodeURIComponent(effectiveStoreName)}`);
       }
+      if (themeMeta) {
+        themeMeta.setAttribute('content', '#4F46E5');
+      }
     }
-  }, [pwaAppName, pageTitle, effectiveStoreName, saasMode, activeTenant]);
+  }, [pwaShortName, pageTitle, effectiveStoreName, saasMode, activeTenant]);
 
   // Resolve the shared tenant directory and selected store status.
   const refreshTenantDirectory = useCallback(async (targetMode?: SaasRouteMode) => {

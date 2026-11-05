@@ -1,10 +1,10 @@
 {
   "id": "/",
-  "name": "SarbaazSoft Shoe POS",
+  "name": "Sarbaazsoft Shoe POS",
   "short_name": "Shoe POS",
   "description": "Multi-tenant retail shoe shop POS and inventory management system",
-  "theme_color": "#2563EB",
-  "background_color": "#ffffff",
+  "theme_color": "#4F46E5",
+  "background_color": "#4F46E5",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",

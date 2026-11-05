@@ -94,6 +94,19 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchRole,
 }) => {
   const headerUserName = String(currentUser?.name || '').trim() || String(currentUser?.email || '').split('@')[0] || 'User';
+  const currentStoreName =
+    companySettings?.name ||
+    companySettings?.company_name ||
+    companySettings?.companyName ||
+    companySettings?.storeName ||
+    currentUser?.tenantName ||
+    '';
+  const formattedStoreSlug = currentStoreName
+    ? (currentStoreName.startsWith('/') ? currentStoreName : `/${currentStoreName}`)
+    : '';
+  const fullAppHeaderTitle = formattedStoreSlug
+    ? `Sarbaazsoft Shoe POS | ${formattedStoreSlug}`
+    : 'Sarbaazsoft Shoe POS';
   const { themeMode } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -1379,6 +1392,23 @@ export const Header: React.FC<HeaderProps> = ({
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+
+        {/* Dynamic In-App Header Title: Renders full name 'Sarbaazsoft Shoe POS | /storeName' where there is plenty of screen real estate */}
+        <div
+          className="hidden md:flex items-center gap-2 px-3 py-1 rounded-xl bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200/80 dark:border-indigo-500/30 text-indigo-950 dark:text-indigo-100 select-none shadow-xs shrink-0 max-w-xs lg:max-w-md xl:max-w-lg transition-all"
+          title={fullAppHeaderTitle}
+        >
+          <Store className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="font-heading font-bold text-xs tracking-tight truncate">
+            Sarbaazsoft Shoe POS
+            {formattedStoreSlug && (
+              <>
+                <span className="mx-1.5 text-indigo-400 dark:text-indigo-500 font-normal">|</span>
+                <span className="text-purple-600 dark:text-purple-300 font-semibold">{formattedStoreSlug}</span>
+              </>
+            )}
+          </span>
         </div>
       </div>
 

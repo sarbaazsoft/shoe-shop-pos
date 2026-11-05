@@ -14,8 +14,8 @@ import { getCachedAppSetting } from '../services/appSettingsService.ts';
 const router = Router();
 
 // Standard PWA colors (match public/manifest.webmanifest and index.html)
-const DEFAULT_PWA_THEME_COLOR = '#2563EB';
-const DEFAULT_PWA_BACKGROUND_COLOR = '#ffffff';
+const DEFAULT_PWA_THEME_COLOR = '#4F46E5';
+const DEFAULT_PWA_BACKGROUND_COLOR = '#4F46E5';
 
 export function extractRequestOrigin(req: Request): string {
   const origin = req.get('origin');
@@ -74,8 +74,8 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
 
     const manifest = {
       id: `/?tenantId=${tenant.id}`,
-      name: tenant.name,
-      short_name: shortName,
+      name: `Sarbaazsoft Shoe POS | /${tenant.name}`,
+      short_name: 'Shoe POS',
       description: `Dedicated Retail POS & Inventory Terminal for ${tenant.name}`,
       start_url: `/?tenantId=${tenant.id}`,
       scope: '/',

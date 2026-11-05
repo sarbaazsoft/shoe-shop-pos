@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SarbaazSoft Shoe POS</title>
+    <title>Sarbaazsoft Shoe POS</title>
     <meta name="description" content="Multi-tenant retail shoe shop POS and inventory management system with offline sync, barcode label printing, and multi-store support." />
-    <meta property="og:title" content="SarbaazSoft Shoe POS" />
+    <meta property="og:title" content="Sarbaazsoft Shoe POS" />
     <meta property="og:description" content="Multi-tenant retail shoe shop POS and inventory management system with offline sync, barcode label printing, and multi-store support." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -15,14 +15,26 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@600;700;800&display=swap" />
 
-    <!-- PWA & Mobile Meta Tags -->
-    <meta name="theme-color" content="#2563EB" />
+    <!-- PWA & Mobile Meta Tags (Brand Indigo Theme) -->
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Shoe POS" />
+    <meta name="application-name" content="Shoe POS" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Prevent white flash during bootstrap with brand indigo background -->
+    <style>
+      html, body {
+        background-color: #4F46E5;
+      }
+    </style>
 
     <!-- Initialize Theme before React renders to prevent flash of wrong theme -->
     <script>
