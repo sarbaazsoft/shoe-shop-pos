@@ -93,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               id="landing-mobile-menu-toggle"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 sm:p-2.5 rounded-xl border border-indigo-400/30 lt:border-slate-300/80 bg-indigo-950/20 lt:bg-slate-100 text-slate-200 lt:text-slate-700 hover:text-white lt:hover:text-slate-900 hover:bg-indigo-500/20 lt:hover:bg-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/50"
+              className="p-2 sm:p-2.5 rounded-xl border-0 bg-transparent text-slate-200 lt:text-slate-700 shadow-none cursor-pointer focus:outline-none"
               aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={mobileMenuOpen}
             >

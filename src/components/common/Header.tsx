@@ -889,10 +889,10 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={onToggleMobileMenu}
-          className="btn-outline-landing lg:hidden h-8.5 w-8.5 flex items-center justify-center p-1.5 rounded-lg border border-slate-200 dark:border-purple-400/40 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-purple-500/20 dark:text-purple-200 dark:hover:bg-purple-500/30 dark:hover:text-white cursor-pointer shrink-0 shadow-2xs transition"
+          className="lg:hidden h-8.5 w-8.5 flex items-center justify-center p-1.5 rounded-lg border-0 bg-transparent text-slate-700 dark:text-slate-200 cursor-pointer shrink-0 shadow-none focus:outline-none"
           aria-label="Toggle navigation menu"
         >
-          <Menu className="w-4 h-4 stroke-[2.2]" />
+          <Menu className="w-5 h-5 stroke-[2.2]" />
         </button>
 
         {/* Quick Price Retrieval Search Bar */}

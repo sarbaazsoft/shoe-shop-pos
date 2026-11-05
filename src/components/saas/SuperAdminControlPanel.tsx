@@ -1907,10 +1907,10 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="lg:hidden p-2 rounded-xl border-0 bg-transparent text-slate-600 dark:text-slate-300 shadow-none cursor-pointer focus:outline-none"
               aria-label="Open Navigation Drawer"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5 h-5 stroke-[2.2]" />
             </button>
           </div>
 
