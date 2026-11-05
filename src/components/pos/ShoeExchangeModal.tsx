@@ -48,8 +48,8 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
   // Wholesale-specific Return State (NO Invoice Required)
   const [wholesaleInvoiceInput, setWholesaleInvoiceInput] = useState('');
   const [productSearchQuery, setProductSearchQuery] = useState('');
-  const [productSearchResults, setProductSearchResults] = useState<any[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const [productSearchResults, setProductSearchResults] = useState<any[]>([]);
   const [wholesaleReturnItems, setWholesaleReturnItems] = useState<WholesaleReturnDraftItem[]>([]);
   const [wholesaleReason, setWholesaleReason] = useState('Defective Sole / Upper');
   const wholesaleSearchInputRef = useRef<HTMLInputElement>(null);
@@ -192,6 +192,7 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
     const clean = q.trim();
     if (!clean) {
       setProductSearchResults([]);
+      setIsSearchingProducts(false);
       return;
     }
     setIsSearchingProducts(true);

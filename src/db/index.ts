@@ -792,6 +792,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
 
         if (role === 'ADMIN') {
           if (pn.tenant_id !== null && Number(pn.tenant_id) !== tenantId) return false;
+          if (notifRole === 'CASHIER' || notifMsg.includes('staff account (cashier)')) return false;
           return notifRole === 'ALL' || notifRole === 'ADMIN';
         }
 

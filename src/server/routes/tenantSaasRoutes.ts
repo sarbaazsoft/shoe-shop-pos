@@ -1868,10 +1868,6 @@ router.post('/superadmin/import-sql', requireAuth, requireSuperAdmin, async (req
           ALTER TABLE categories ADD COLUMN IF NOT EXISTS tenant_id INTEGER DEFAULT 1;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
-        BEGIN
-          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug TEXT DEFAULT '';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
       END $$;
     `).catch(() => {});
     await pgClient.exec(sql);
@@ -2058,12 +2054,6 @@ async function handleDeleteTenantStore(req: AuthenticatedRequest, res: Response)
       { sql: `DELETE FROM suppliers WHERE tenant_id = $1`, params: [tenantId] },
       {
         sql: `DELETE FROM password_reset_tokens
-              WHERE tenant_id = $1
-                 OR user_id IN (SELECT id FROM users WHERE tenant_id = $1 AND role != 'SUPERADMIN')`,
-        params: [tenantId],
-      },
-      {
-        sql: `DELETE FROM api_tokens
               WHERE tenant_id = $1
                  OR user_id IN (SELECT id FROM users WHERE tenant_id = $1 AND role != 'SUPERADMIN')`,
         params: [tenantId],

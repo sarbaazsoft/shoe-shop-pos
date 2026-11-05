@@ -118,12 +118,6 @@ export function dropLegacyDocumentPrefixColumns(): Promise<void> {
           ALTER TABLE public.tenants DROP COLUMN IF EXISTS pricing_policy CASCADE;
           ALTER TABLE public.tenants DROP COLUMN IF EXISTS business_type CASCADE;
         END IF;
-        IF to_regclass('public.store_requests') IS NOT NULL THEN
-          DROP TABLE public.store_requests CASCADE;
-        END IF;
-        IF to_regclass('public.deleted_store_requests') IS NOT NULL THEN
-          DROP TABLE public.deleted_store_requests CASCADE;
-        END IF;
       END $$;
     `).then(() => undefined).catch((error) => {
       documentPrefixMigrationPromise = null;
@@ -1360,8 +1354,6 @@ export async function ensureDatabaseSchema(): Promise<void> {
             ALTER TABLE company_settings DROP COLUMN IF EXISTS is_installed CASCADE;
             ALTER TABLE tenants DROP COLUMN IF EXISTS city CASCADE;
             ALTER TABLE tenants DROP COLUMN IF EXISTS tagline CASCADE;
-            DROP TABLE IF EXISTS store_requests CASCADE;
-            DROP TABLE IF EXISTS deleted_store_requests CASCADE;
             ALTER TABLE trial_activations DROP COLUMN IF EXISTS city CASCADE;
             ALTER TABLE trial_activations DROP COLUMN IF EXISTS tagline CASCADE;
           EXCEPTION WHEN OTHERS THEN NULL;
@@ -1688,30 +1680,6 @@ export async function ensureSaasControlPlane(): Promise<void> {
       await migrateLegacyWholesaleProductPrices();
       await dropLegacyDocumentPrefixColumns();
 
-      // Always ensure deprecated slug, subdomain columns, and store_requests tables are dropped
-      await pgClient.exec(`
-        DO $$
-        BEGIN
-          BEGIN
-            DROP TABLE IF EXISTS store_requests CASCADE;
-            DROP TABLE IF EXISTS deleted_store_requests CASCADE;
-          EXCEPTION WHEN OTHERS THEN NULL;
-          END;
-          BEGIN
-            ALTER TABLE tenants DROP COLUMN IF EXISTS slug CASCADE;
-          EXCEPTION WHEN OTHERS THEN NULL;
-          END;
-          BEGIN
-            ALTER TABLE tenants DROP COLUMN IF EXISTS subdomain CASCADE;
-          EXCEPTION WHEN OTHERS THEN NULL;
-          END;
-          BEGIN
-            ALTER TABLE tenants DROP COLUMN IF EXISTS sub_domain CASCADE;
-          EXCEPTION WHEN OTHERS THEN NULL;
-          END;
-        END $$;
-      `).catch(() => {});
-
       // Ensure trial_activations tracking table and indexes are created
       await pgClient.exec(`
         CREATE TABLE IF NOT EXISTS trial_activations (
@@ -1775,14 +1743,6 @@ export async function ensureSaasControlPlane(): Promise<void> {
       }
 
       await ensureDatabaseSchema();
-
-      // Ensure deprecated store_requests tables and enums are permanently dropped
-      await pgClient.exec(`
-        DROP TABLE IF EXISTS store_requests CASCADE;
-        DROP TABLE IF EXISTS deleted_store_requests CASCADE;
-        DROP TYPE IF EXISTS store_request_status_enum CASCADE;
-        DROP TYPE IF EXISTS store_request_type_enum CASCADE;
-      `).catch(() => {});
 
     // 2. Ensure every existing user-created tenant in the database has subscription_plan, subscription dates, and verified Store Owner/Cashier users
     const allTenants = await pgClient.query<{
@@ -1953,9 +1913,14 @@ export async function dropAllTables(): Promise<void> {
 
   await pgClient.exec(`
     DROP TABLE IF EXISTS 
-      deleted_store_requests,
-      store_requests,
-      tenants,
+      pos_notification_dismissals,
+      platform_notification_reads,
+      platform_notifications,
+      push_subscriptions,
+      app_settings,
+      trial_activations,
+      customer_ledger,
+      supplier_ledger,
       password_reset_tokens,
       stock_movements,
       return_items,
@@ -1971,9 +1936,9 @@ export async function dropAllTables(): Promise<void> {
       customers,
       suppliers,
       categories,
-      api_tokens,
       company_settings,
-      users
+      users,
+      tenants
     CASCADE;
   `);
 

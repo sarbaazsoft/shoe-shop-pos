@@ -40,6 +40,8 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
   onNavigateTab,
 }) => {
   const userId = currentUser?.id || currentUser?.userId || 0;
+  const userRole = String(currentUser?.role || '').toUpperCase();
+  const isCashier = userRole === 'CASHIER';
   const cashierName =
     String(currentUser?.name || '').trim() ||
     String(currentUser?.email || '').split('@')[0] ||
@@ -138,9 +140,13 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
       const msgLower = (n.message || '').toLowerCase();
       const targetRole = (n.targetRole || 'ALL').toUpperCase();
 
-      // Role isolation: Only ALL or CASHIER notices
+      // Role isolation: Cashiers receive ALL or CASHIER notices; non-cashiers (ADMIN) only receive ALL or ADMIN notices
       if (targetRole === 'SUPERADMIN') continue;
-      if (targetRole !== 'ALL' && targetRole !== 'CASHIER') continue;
+      if (isCashier) {
+        if (targetRole !== 'ALL' && targetRole !== 'CASHIER') continue;
+      } else {
+        if (targetRole === 'CASHIER') continue;
+      }
 
       // Filter out SuperAdmin-only administrative events
       if (
@@ -152,7 +158,7 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
         continue;
       }
 
-      // Filter out store-owner specific welcome notices
+      // Filter out store-owner specific welcome notices from POS banner
       if (
         titleLower.includes('welcome to sarbaazsoft') ||
         msgLower.includes('thank you for choosing sarbaazsoft')
@@ -165,8 +171,11 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
         msgLower.includes('welcome') ||
         msgLower.includes('account has been activated');
 
-      // CRITICAL: Ensure welcome message renders only ONCE across the banner
+      // CRITICAL: Cashier welcome message is strictly for Cashier role. Store owner/admin must never receive or view it.
       if (isThisAWelcomeNotice) {
+        if (!isCashier) {
+          continue;
+        }
         if (hasWelcomeNotice || isWelcomeDismissed) {
           continue;
         }
@@ -195,9 +204,8 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
       });
     }
 
-    // 2. If no server welcome notice exists and the cashier hasn't dismissed their welcome message,
-    // inject the single canonical cashier welcome message directly into the banner
-    if (!hasWelcomeNotice && !isWelcomeDismissed) {
+    // 2. Only inject cashier welcome notice if the current user is strictly a CASHIER
+    if (isCashier && !hasWelcomeNotice && !isWelcomeDismissed) {
       const canonicalWelcomeTitle = `Welcome to ${storeName}, ${cashierName}!`;
       const normWelcomeTitle = canonicalWelcomeTitle.trim().toLowerCase();
 
@@ -217,7 +225,7 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
     }
 
     return list;
-  }, [rawServerNotices, dismissedIds, isWelcomeDismissed, storeName, cashierName]);
+  }, [rawServerNotices, dismissedIds, isWelcomeDismissed, storeName, cashierName, isCashier]);
 
   // Keep currentIndex valid when active notices change
   useEffect(() => {

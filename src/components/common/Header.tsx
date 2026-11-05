@@ -434,6 +434,9 @@ export const Header: React.FC<HeaderProps> = ({
         if (targetRoles && !targetRoles.includes('ADMIN')) {
           return;
         }
+        if (titleLower.includes('welcome') || msgLower.includes('welcome') || msgLower.includes('staff account')) {
+          return;
+        }
       }
 
       fetchLiveNotifications();
@@ -697,6 +700,8 @@ export const Header: React.FC<HeaderProps> = ({
       } else if (isAdminUser) {
         // Store Owners never receive CASHIER-only or SUPERADMIN-only notices
         if (aTargetRole !== 'ALL' && aTargetRole !== 'ADMIN') return false;
+        // Welcome notices are displayed in the dashboard top banner, not in alerts dropdown
+        if (isWelcome || msgLower.includes('staff account')) return false;
       } else {
         if (aTargetRole !== 'ALL') return false;
       }

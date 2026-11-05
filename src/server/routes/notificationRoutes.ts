@@ -118,14 +118,17 @@ router.get('/grouped', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'CASHIER'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
+               AND pn.message NOT ILIKE '%staff account (cashier)%'
              )
              WHEN $3 = 'CASHIER' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'ADMIN'
                AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%'
                AND pn.message NOT ILIKE '%thank you for choosing SarbaazSoft%'
                AND pn.title NOT ILIKE 'New Free Trial%'
@@ -355,14 +358,17 @@ router.get('/all', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'CASHIER'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
+               AND pn.message NOT ILIKE '%staff account (cashier)%'
              )
              WHEN $3 = 'CASHIER' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'ADMIN'
                AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%' AND pn.message NOT ILIKE '%thank you for choosing SarbaazSoft%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
@@ -807,14 +813,17 @@ router.get('/', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'CASHIER'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
+               AND pn.message NOT ILIKE '%staff account (cashier)%'
              )
              WHEN $3 = 'CASHIER' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'ADMIN'
                AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%' AND pn.message NOT ILIKE '%thank you for choosing SarbaazSoft%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
@@ -920,14 +929,17 @@ router.get('/platform', async (req: Request, res: Response) => {
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'ADMIN')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'CASHIER'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
+               AND pn.message NOT ILIKE '%staff account (cashier)%'
              )
              WHEN $3 = 'CASHIER' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
                AND COALESCE(pn.target_role, 'ALL') IN ('ALL', 'CASHIER')
                AND COALESCE(pn.target_role, 'ALL') != 'SUPERADMIN'
+               AND COALESCE(pn.target_role, 'ALL') != 'ADMIN'
                AND pn.title NOT ILIKE 'Welcome to SarbaazSoft%' AND pn.message NOT ILIKE '%thank you for choosing SarbaazSoft%'
                AND pn.title NOT ILIKE 'New Free Trial%'
                AND pn.title NOT ILIKE 'Renewal Request%'
