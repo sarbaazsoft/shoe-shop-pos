@@ -1046,7 +1046,7 @@ router.get('/vapid-public-key', (_req: Request, res: Response) => {
 // POST /api/notifications/subscribe - Save device push subscription scoped by role
 router.post('/subscribe', async (req: Request, res: Response) => {
   try {
-    const { tenantId, userId, role } = resolveRequestIdentity(req);
+    const identity = resolveRequestIdentity(req);
     const subscription = req.body?.subscription || req.body;
     const userAgent = req.headers['user-agent'] || '';
 
@@ -1054,8 +1054,13 @@ router.post('/subscribe', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Invalid subscription object' });
     }
 
+    const tenantId = Number(req.body?.tenantId || req.body?.subscription?.tenantId || identity.tenantId) || 1;
+    const userId = Number(req.body?.userId || req.body?.subscription?.userId || identity.userId) || 0;
+    const rawRole = req.body?.userRole || req.body?.role || req.body?.subscription?.userRole || identity.role || 'ADMIN';
+    const role = String(rawRole).toUpperCase();
+
     const success = await savePushSubscription(tenantId, userId, role, subscription, userAgent);
-    res.json({ success });
+    res.json({ success, tenantId, role });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to save subscription' });
   }

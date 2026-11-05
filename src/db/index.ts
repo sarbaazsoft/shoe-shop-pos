@@ -545,15 +545,17 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.PUSH_SUBSCRIPTIONS')) {
       const tenantId = Number(params[0] || 1);
       const userId = Number(params[1] || 0);
-      const endpoint = String(params[2] || '');
-      const p256dh = String(params[3] || '');
-      const auth = String(params[4] || '');
-      const userAgent = String(params[5] || '');
+      const userRole = String(params[2] || 'ADMIN').toUpperCase();
+      const endpoint = String(params[3] || '');
+      const p256dh = String(params[4] || '');
+      const auth = String(params[5] || '');
+      const userAgent = String(params[6] || '');
       const existingIdx = mockStore.push_subscriptions.findIndex((s) => s.endpoint === endpoint);
       const entry = {
         id: existingIdx >= 0 ? mockStore.push_subscriptions[existingIdx].id : nextMockId('push_subscriptions'),
         tenant_id: tenantId,
         user_id: userId,
+        user_role: userRole,
         endpoint,
         p256dh,
         auth,
@@ -570,9 +572,21 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     }
     if (upper.startsWith('SELECT')) {
       const tenantId = params.length > 0 && params[0] !== null && params[0] !== undefined ? Number(params[0]) : null;
-      let subs = mockStore.push_subscriptions;
-      if (tenantId !== null) {
+      let subs = [...(mockStore.push_subscriptions || [])];
+      if (tenantId !== null && tenantId !== 0) {
         subs = subs.filter((s) => Number(s.tenant_id) === tenantId);
+      }
+      if (upper.includes('UPPER(USER_ROLE) = ANY') || upper.includes('USER_ROLE = ANY')) {
+        const roles: string[] = Array.isArray(params[1]) ? params[1].map((r: string) => String(r).toUpperCase()) : [];
+        if (roles.length > 0) {
+          subs = subs.filter((s) => roles.includes(String(s.user_role || '').toUpperCase()) || String(s.user_role || '').toUpperCase() === 'ADMIN');
+        }
+      } else if (upper.includes("UPPER(USER_ROLE) = 'ADMIN'")) {
+        subs = subs.filter((s) => String(s.user_role || '').toUpperCase() === 'ADMIN');
+      } else if (upper.includes("UPPER(USER_ROLE) = 'SUPERADMIN'")) {
+        subs = subs.filter((s) => String(s.user_role || '').toUpperCase() === 'SUPERADMIN');
+      } else if (upper.includes("UPPER(USER_ROLE) = 'CASHIER'")) {
+        subs = subs.filter((s) => String(s.user_role || '').toUpperCase() === 'CASHIER');
       }
       return { rows: subs as unknown as T[], rowCount: subs.length };
     }

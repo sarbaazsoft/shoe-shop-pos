@@ -344,6 +344,15 @@ export const Header: React.FC<HeaderProps> = ({
   const [isTogglingPush, setIsTogglingPush] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => getNotificationPermissionState());
   const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
+  const [showAdminPushPrompt, setShowAdminPushPrompt] = useState<boolean>(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return localStorage.getItem('pos_dismissed_admin_push_banner') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
   const [livePushToast, setLivePushToast] = useState<{
     id: string;
     type: 'SALE' | 'RETURN' | 'EXCHANGE' | 'PLATFORM_ANNOUNCEMENT' | 'ANNOUNCEMENT' | string;
@@ -375,7 +384,11 @@ export const Header: React.FC<HeaderProps> = ({
         .then(() => isDeviceSubscribedToPush())
         .then((subbed) => {
           setIsPushSubscribed(subbed);
-          setPushPermission(getNotificationPermissionState());
+          const perm = getNotificationPermissionState();
+          setPushPermission(perm);
+          if (subbed || perm === 'granted' || perm === 'denied') {
+            setShowAdminPushPrompt(false);
+          }
         });
     }
 
@@ -468,21 +481,32 @@ export const Header: React.FC<HeaderProps> = ({
   const handleTogglePushNotifications = async () => {
     if (isTogglingPush) return;
     setIsTogglingPush(true);
+    setPushStatusMessage(null);
     try {
       if (isPushSubscribed) {
         await unsubscribeDeviceFromWebPush();
         setIsPushSubscribed(false);
+        setPushStatusMessage('Push notifications disabled on this device.');
+        setTimeout(() => setPushStatusMessage(null), 4000);
       } else {
-        const res = await subscribeDeviceToWebPush();
+        const res = await subscribeDeviceToWebPush('ADMIN');
         if (res.success) {
           setIsPushSubscribed(true);
           setPushPermission('granted');
+          setShowAdminPushPrompt(false);
+          try {
+            localStorage.setItem('pos_dismissed_admin_push_banner', 'true');
+          } catch {}
+          setPushStatusMessage('✅ Push alerts active! Store owner alerts enabled for all cashier invoices.');
+          setTimeout(() => setPushStatusMessage(null), 5000);
         } else if (res.error) {
-          alert(res.error);
+          setPushStatusMessage(res.error);
+          setTimeout(() => setPushStatusMessage(null), 7000);
         }
       }
     } catch (err: any) {
-      alert('Error updating push notification settings: ' + err.message);
+      setPushStatusMessage('Error updating push notification settings: ' + (err?.message || err));
+      setTimeout(() => setPushStatusMessage(null), 6000);
     } finally {
       setIsTogglingPush(false);
       setPushPermission(getNotificationPermissionState());
@@ -494,10 +518,18 @@ export const Header: React.FC<HeaderProps> = ({
       setTestPushStatus('sending');
       const res = await api.notifications.testPush();
       setTestPushStatus(res.success ? 'success' : 'error');
-      setTimeout(() => setTestPushStatus(null), 3500);
+      setPushStatusMessage('🔔 Test alert sent to your registered devices.');
+      setTimeout(() => {
+        setTestPushStatus(null);
+        setPushStatusMessage(null);
+      }, 4000);
     } catch (err: any) {
-      alert('Test notification failed: ' + err.message);
-      setTestPushStatus(null);
+      setTestPushStatus('error');
+      setPushStatusMessage('Test alert failed: ' + (err?.message || err));
+      setTimeout(() => {
+        setTestPushStatus(null);
+        setPushStatusMessage(null);
+      }, 5000);
     }
   };
 
@@ -879,6 +911,64 @@ export const Header: React.FC<HeaderProps> = ({
               <X className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Store Owner Push Alert Activation Banner */}
+      {isAdminUser && !isPushSubscribed && pushPermission !== 'denied' && showAdminPushPrompt && (
+        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-3 sm:px-4 py-2 text-xs flex items-center justify-between gap-3 shadow-md border-b border-purple-500/30 no-print z-40 relative animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <BellRing className="w-4 h-4 text-purple-200 shrink-0 animate-pulse" />
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 truncate">
+              <span className="font-bold text-white">Cashier POS Alerts:</span>
+              <span className="text-purple-100 hidden sm:inline">
+                Receive instant push notifications across your devices (Android, Apple, Windows) whenever cashiers ring up sales or process returns.
+              </span>
+              <span className="text-purple-100 sm:hidden">
+                Receive instant alerts for cashier invoices on this device.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleTogglePushNotifications}
+              disabled={isTogglingPush}
+              className="bg-white text-purple-900 hover:bg-purple-50 px-2.5 py-1 rounded-md text-[11px] font-bold transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-60"
+            >
+              {isTogglingPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3 text-purple-600" />}
+              <span>Enable Alerts</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAdminPushPrompt(false);
+                try {
+                  localStorage.setItem('pos_dismissed_admin_push_banner', 'true');
+                } catch {}
+              }}
+              className="p-1 hover:bg-white/10 rounded transition text-white/80 hover:text-white cursor-pointer"
+              title="Dismiss for now"
+              aria-label="Dismiss banner"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Push Status Feedback Notification */}
+      {pushStatusMessage && (
+        <div className="bg-indigo-900/95 text-indigo-100 px-3 sm:px-4 py-1.5 text-xs flex items-center justify-between border-b border-indigo-700/50 no-print z-40 relative">
+          <span className="truncate">{pushStatusMessage}</span>
+          <button
+            type="button"
+            onClick={() => setPushStatusMessage(null)}
+            className="text-indigo-200 hover:text-white ml-2 cursor-pointer p-0.5"
+            aria-label="Close status message"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 

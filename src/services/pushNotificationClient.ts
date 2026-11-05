@@ -58,7 +58,7 @@ export async function isDeviceSubscribedToPush(): Promise<boolean> {
   }
 }
 
-export async function subscribeDeviceToWebPush(): Promise<{
+export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
   success: boolean;
   error?: string;
   permission?: NotificationPermission;
@@ -151,9 +151,28 @@ export async function subscribeDeviceToWebPush(): Promise<{
       };
     }
 
-    // 5. Send subscription to server
+    // 5. Send subscription to server with explicit user, role, and store context
     const rawSub = sub.toJSON();
-    const saveRes = await api.notifications.subscribe(rawSub);
+    let currentRole = overrideRole || 'ADMIN';
+    let currentTenantId = getActiveTenantId() || 1;
+    let currentUserId = 0;
+    try {
+      const stored = localStorage.getItem('pos_current_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (!overrideRole && u.role) currentRole = String(u.role).toUpperCase();
+        if (u.tenantId) currentTenantId = Number(u.tenantId) || currentTenantId;
+        if (u.id) currentUserId = Number(u.id) || 0;
+      }
+    } catch {}
+
+    const saveRes = await api.notifications.subscribe({
+      ...rawSub,
+      userRole: currentRole,
+      role: currentRole,
+      tenantId: currentTenantId,
+      userId: currentUserId,
+    });
     if (saveRes && saveRes.success === false) {
       return {
         success: false,
@@ -176,13 +195,13 @@ export async function subscribeDeviceToWebPush(): Promise<{
 }
 
 /**
- * Silently re-registers this device with the server when the user had already enabled alerts.
+ * Silently re-registers this device with the server when notification permission is already granted.
  * Keeps the server-side subscription row fresh (new DB, rotated VAPID keys, expired endpoint).
  */
 export async function resyncPushSubscriptionIfEnabled(): Promise<void> {
   if (!isWebPushSupported() || Notification.permission !== 'granted') return;
   try {
-    if (localStorage.getItem('pos_push_notifications_enabled') !== 'true') return;
+    if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return;
   } catch {
     return;
   }

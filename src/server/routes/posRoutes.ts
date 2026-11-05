@@ -766,6 +766,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           deepLinkUrl: `/?tab=reports&viewInvoice=${encodeURIComponent(invoiceNumber)}`,
           timestamp: new Date().toISOString(),
           triggeredBy: cashierDisplayName,
+          targetRoles: ['ADMIN', 'CASHIER'],
         }).catch((err) => console.warn('Push notification delivery notice:', err));
       } else {
         const itemNamesStr = validatedItems.slice(0, 3).map((i) => `${i.quantity}x ${i.productName}`).join(', ');
@@ -786,6 +787,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           deepLinkUrl: `/?tab=reports&viewInvoice=${encodeURIComponent(invoiceNumber)}`,
           timestamp: new Date().toISOString(),
           triggeredBy: cashierDisplayName,
+          targetRoles: ['ADMIN', 'CASHIER'],
         }).catch((err) => console.warn('Push notification delivery notice:', err));
       }
     } catch (notifErr) {

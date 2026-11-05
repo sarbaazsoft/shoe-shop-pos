@@ -777,6 +777,7 @@ export function ensurePushSubscriptionsSchema(): Promise<void> {
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
         ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS user_role TEXT NOT NULL DEFAULT 'CASHIER';
+        CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_uidx ON public.push_subscriptions(endpoint);
         CREATE INDEX IF NOT EXISTS push_subscriptions_tenant_idx ON public.push_subscriptions(tenant_id);
         CREATE INDEX IF NOT EXISTS push_subscriptions_user_role_idx ON public.push_subscriptions(user_role);
       `);

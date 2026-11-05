@@ -2,7 +2,7 @@ import webpush from 'web-push';
 import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensurePushSubscriptionsSchema } from '../db/schemaInit.ts';
-import { getCachedAppSetting, getAppSetting, registerSettingsUpdateListener } from './services/appSettingsService.ts';
+import { getCachedAppSetting, getAppSetting, updateAppSettings, registerSettingsUpdateListener } from './services/appSettingsService.ts';
 
 // Deterministic or PostgreSQL-configured VAPID Keys for Web Push API
 let vapidPublicKey = getCachedAppSetting('VAPID_PUBLIC_KEY', '');
@@ -24,6 +24,11 @@ export function configureVapidDetails() {
       vapidPublicKey = generated.publicKey;
       vapidPrivateKey = generated.privateKey;
       fallbackKeysGenerated = true;
+      // Persist generated VAPID keys into app_settings so all client devices stay subscribed across server restarts
+      updateAppSettings({
+        VAPID_PUBLIC_KEY: generated.publicKey,
+        VAPID_PRIVATE_KEY: generated.privateKey,
+      }).catch((err) => console.warn('Could not persist VAPID keys to database:', err));
     } catch (err) {
       console.warn('⚠️ Could not generate fallback VAPID keys:', err);
     }
@@ -144,7 +149,7 @@ export async function savePushSubscription(
     const endpoint = String(subscription?.endpoint || '').trim();
     const p256dh = String(subscription?.keys?.p256dh || '').trim();
     const auth = String(subscription?.keys?.auth || '').trim();
-    const cleanRole = String(userRole || (tenantId === 0 ? 'SUPERADMIN' : 'CASHIER')).trim().toUpperCase();
+    const cleanRole = String(userRole || (tenantId === 0 ? 'SUPERADMIN' : 'ADMIN')).trim().toUpperCase();
 
     if (!endpoint || !p256dh || !auth) {
       return false;
@@ -225,6 +230,10 @@ export async function notifyPosAction(
 
   // 2. Deliver via Web Push API to installed PWAs and subscribed web browsers
   if (!vapidPublicKey || !vapidPrivateKey) {
+    configureVapidDetails();
+  }
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.warn('⚠️ Web Push cannot dispatch: VAPID keys not configured.');
     return;
   }
 
@@ -240,7 +249,7 @@ export async function notifyPosAction(
       `SELECT endpoint, p256dh, auth, user_role, user_id
        FROM public.push_subscriptions
        WHERE tenant_id = $1
-         AND UPPER(user_role) = ANY($2)
+         AND (UPPER(user_role) = 'ADMIN' OR UPPER(user_role) = 'OWNER' OR UPPER(user_role) = ANY($2::text[]))
          AND tenant_id != 0`,
       [cleanTenantId, allowedRoles]
     );
