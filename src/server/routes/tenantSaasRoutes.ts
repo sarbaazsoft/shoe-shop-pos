@@ -2106,22 +2106,6 @@ async function handleDeleteTenantStore(req: AuthenticatedRequest, res: Response)
 router.delete('/superadmin/tenants/:id', requireAuth, requireSuperAdmin, handleDeleteTenantStore);
 router.post('/superadmin/tenants/:id/delete', requireAuth, requireSuperAdmin, handleDeleteTenantStore);
 
-/**
- * 6. SUPERADMIN STORE REQUESTS (DEPRECATED — Replaced by 30-Day Free Trial Activations)
- */
-const deprecatedStoreRequestsHandler = (_req: AuthenticatedRequest, res: Response) => {
-  return res.json({
-    success: true,
-    deprecated: true,
-    message: 'Store requests have been deprecated in favor of 30-day free trial activations.',
-  });
-};
-
-router.post('/superadmin/store-requests/:id/approve', requireAuth, requireSuperAdmin, deprecatedStoreRequestsHandler);
-router.post('/superadmin/store-requests/:id/reject', requireAuth, requireSuperAdmin, deprecatedStoreRequestsHandler);
-router.patch('/superadmin/store-requests/:id', requireAuth, requireSuperAdmin, deprecatedStoreRequestsHandler);
-router.delete('/superadmin/store-requests/:id', requireAuth, requireSuperAdmin, deprecatedStoreRequestsHandler);
-router.post('/superadmin/store-requests/:id/delete', requireAuth, requireSuperAdmin, deprecatedStoreRequestsHandler);
 
 /**
  * 7b. SUPERADMIN TRIAL ACTIVATIONS TRACKING & ANALYTICS (`GET /api/superadmin/trial-activations`)

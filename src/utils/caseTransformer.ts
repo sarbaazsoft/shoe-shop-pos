@@ -4,12 +4,6 @@
  * converting database keys such as pricing_mode and business_type to camelCase.
  */
 
-export function toCamelCaseKey(key: string): string {
-  // If already camelCase without underscores, return as is
-  if (!key.includes('_')) return key;
-  return key.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
-}
-
 /**
  * Normalizes an object or array recursively so that all keys are camelCase.
  * Automatically unifies legacy duplicates:
@@ -37,7 +31,9 @@ export function transformKeysToCamelCase<T = any>(data: any): T {
   const result: Record<string, any> = {};
 
   for (const [rawKey, rawValue] of Object.entries(data)) {
-    const camelKey = toCamelCaseKey(rawKey);
+    const camelKey = !rawKey.includes('_')
+      ? rawKey
+      : rawKey.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
     const transformedValue = transformKeysToCamelCase(rawValue);
 
     // Standard camelCase key

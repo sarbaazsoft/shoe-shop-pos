@@ -111,9 +111,9 @@ export function normalizeFootwearCategory(raw: string | undefined | null): strin
 }
 
 /**
- * Parses abbreviation prefix from a name (default 3-character for Brand)
+ * Parses abbreviation prefix from a brand name (default 3-character for Brand)
  */
-export function parsePrefix(name: string | undefined | null): string {
+export function parseBrandPrefix(name: string | undefined | null): string {
   if (!name || typeof name !== 'string') {
     return 'GEN';
   }
@@ -155,8 +155,6 @@ export function parsePrefix(name: string | undefined | null): string {
   const prefix = words[0].slice(0, 1) + words[1].slice(0, 1) + words[2].slice(0, 1);
   return prefix.padEnd(3, 'X');
 }
-
-export const parseBrandPrefix = parsePrefix;
 
 /**
  * Parses a strictly 2-alphabet abbreviation from Category name.

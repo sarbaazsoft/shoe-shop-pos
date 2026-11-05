@@ -170,27 +170,6 @@ export function isFreeTrial(
   );
 }
 
-/**
- * Returns a human-friendly label for a subscription plan or type.
- */
-export function getSubscriptionLabel(
-  plan?: SubscriptionPlan | SubscriptionType | string | null
-): string {
-  if (isFreeTrial(plan)) {
-    return '30-Day Free Trial';
-  }
-  const normalized = normalizeSubscriptionType(plan);
-  switch (normalized) {
-    case 'free_tier':
-      return '30-Day Free Trial';
-    case '6_months':
-      return '6 Months Plan';
-    case '1_year':
-      return 'Yearly Plan (1 Year)';
-    default:
-      return '30-Day Free Trial';
-  }
-}
 
 /**
  * Returns a concise label for badge/chip displays (e.g. '30-Day Free Tier', '6 Months', 'Yearly').
@@ -225,12 +204,6 @@ export interface RenewalTemplateChip {
   type: RenewalTemplateType;
   label: string;
 }
-
-export const RENEWAL_TEMPLATE_CHIPS: RenewalTemplateChip[] = [
-  { type: 'UPGRADE', label: 'Upgrading Free Tier' },
-  { type: 'RENEWAL', label: 'Standard Renewal' },
-  { type: 'REACTIVATION', label: 'Urgent Reactivation' },
-];
 
 /**
  * Returns dynamically tailored chips based on store's current subscription plan and status.

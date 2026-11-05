@@ -8,7 +8,7 @@ export interface EscPosOptions {
   currencySymbol?: string;
 }
 
-export class EscPosBuilder {
+class EscPosBuilder {
   private buffer: number[] = [];
   private cols: number;
 

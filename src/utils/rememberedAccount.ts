@@ -10,7 +10,7 @@
 
 export type RememberedAccountScope = 'store' | 'platform';
 
-export const REMEMBERED_EMAIL_KEYS: Record<RememberedAccountScope, string> = {
+const REMEMBERED_EMAIL_KEYS: Record<RememberedAccountScope, string> = {
   store: 'pos_remembered_email',
   platform: 'pos_remembered_email_platform',
 };

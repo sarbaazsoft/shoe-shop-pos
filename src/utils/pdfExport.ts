@@ -585,34 +585,10 @@ export function buildSmsInvoiceText(sale: any, companySettings: any): string {
 }
 
 /**
- * Normalizes phone number for digital messaging.
- * Converts local Pakistani phone numbers (e.g. 03001234567) to international format (923001234567) for WhatsApp.
- */
-export function formatPhoneForWhatsApp(phone: string): string {
-  if (!phone) return '';
-  const cleaned = phone.replace(/[^0-9]/g, '');
-  if (cleaned.startsWith('00')) {
-    return cleaned.substring(2);
-  }
-  if (cleaned.startsWith('0') && cleaned.length === 11) {
-    return '92' + cleaned.substring(1);
-  }
-  return cleaned;
-}
-
-/**
- * Normalizes phone number for SMS URI protocol.
- */
-export function formatPhoneForSms(phone: string): string {
-  if (!phone) return '';
-  return phone.trim().replace(/[\s\-\(\)]/g, '');
-}
-
-/**
  * Generates an SMS link compatible with iOS, Android, and desktop messaging clients.
  */
 export function buildSmsLink(phone: string, text: string): string {
-  const cleanPhone = formatPhoneForSms(phone);
+  const cleanPhone = phone ? phone.trim().replace(/[\s\-\(\)]/g, '') : '';
   const isApple = typeof navigator !== 'undefined' && /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
   const separator = isApple ? '&' : '?';
   const encodedText = encodeURIComponent(text);
@@ -623,7 +599,12 @@ export function buildSmsLink(phone: string, text: string): string {
  * Generates a WhatsApp link compatible with WhatsApp Web and mobile WhatsApp app.
  */
 export function buildWhatsAppLink(phone: string, text: string): string {
-  const cleanPhone = formatPhoneForWhatsApp(phone);
+  let cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+  if (cleanPhone.startsWith('00')) {
+    cleanPhone = cleanPhone.substring(2);
+  } else if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+    cleanPhone = '92' + cleanPhone.substring(1);
+  }
   const encodedText = encodeURIComponent(text);
   if (cleanPhone) {
     return `https://wa.me/${cleanPhone}?text=${encodedText}`;

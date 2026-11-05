@@ -1,6 +1,3 @@
-export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'CASHIER' | 'MANAGER';
-export type UserStatus = 'PENDING' | 'APPROVED';
-
 export interface User {
   id: number;
   tenantId?: number;
@@ -8,9 +5,9 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
-  role: UserRole;
+  role: 'SUPERADMIN' | 'ADMIN' | 'CASHIER' | 'MANAGER' | string;
   originalRole?: string;
-  status: UserStatus;
+  status: 'PENDING' | 'APPROVED' | string;
   active?: boolean;
   avatarUrl?: string;
   onboardingCompleted?: boolean;
@@ -20,13 +17,7 @@ export interface User {
 
 export type SubscriptionType = 'free_tier' | '6_months' | '1_year' | 'TRIAL' | '6_MONTHS' | 'YEARLY';
 export type SubscriptionPlan = 'free_tier' | 'TRIAL' | '6_MONTHS' | 'YEARLY' | '6_months' | '1_year';
-export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
-export type TenantStatus = 'ACTIVE' | 'SUSPENDED' | 'EXPIRED';
-export type BusinessType = 'RETAIL' | 'WHOLESALE';
 export type PricingMode = 'FIXED' | 'NEGOTIABLE';
-export type PurchasePaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
-export type PackingType = 'PAIR' | 'CARTON';
-export type SaleType = 'RETAIL' | 'WHOLESALE';
 
 export interface TrialActivation {
   id: number;
@@ -36,7 +27,7 @@ export interface TrialActivation {
   userName?: string;
   phone?: string;
   storeName: string;
-  businessType: BusinessType;
+  businessType: 'RETAIL' | 'WHOLESALE' | string;
   pricingMode: PricingMode;
   plan: string;
   trialDurationDays: number;
@@ -53,14 +44,14 @@ export interface TrialActivation {
 export interface TenantInfo {
   id: number;
   name: string;
-  status: TenantStatus;
-  businessType?: BusinessType;
+  status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | string;
+  businessType?: 'RETAIL' | 'WHOLESALE' | string;
   pricingMode?: PricingMode;
   subscriptionType?: SubscriptionType;
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
-  subscriptionStatus?: SubscriptionStatus;
+  subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string;
   daysLeft?: number;
   logoUrl: string;
   address?: string;
@@ -75,7 +66,7 @@ export interface SuperAdminStoreRow {
   id: number;
   name: string;
   status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED';
-  businessType?: BusinessType;
+  businessType?: 'RETAIL' | 'WHOLESALE' | string;
   pricingMode?: PricingMode;
   minSellingQuantity?: number;
   allowHalfCarton?: boolean;
@@ -83,7 +74,7 @@ export interface SuperAdminStoreRow {
   subscriptionPlan: SubscriptionPlan;
   subscriptionStartDate: string;
   subscriptionEndDate: string;
-  subscriptionStatus: SubscriptionStatus;
+  subscriptionStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string;
   daysLeft?: number;
   logoUrl: string;
   ownerEmail: string;
@@ -103,54 +94,28 @@ export interface SuperAdminStoreRow {
   unitsSold?: number;
   inventoryValue?: number;
   isOnline?: boolean;
-  lastSeenAt?: string | null;
-  manifestUrl: string;
-  appUrl: string;
-  installUrl: string;
+  manifestUrl?: string;
+  appUrl?: string;
+  installUrl?: string;
 }
 
 export interface SuperAdminReportProduct {
   id: number;
   tenantId: number;
   storeName: string;
-  currency: string;
+  currency?: string;
   productName: string;
   barcode: string;
   brand: string;
   category: string;
   imageUrl?: string;
+  maxPrice: number;
   sellingPrice: number;
   costPrice: number;
   totalStock: number;
   unitsSold: number;
   totalRevenue: number;
   orderCount: number;
-}
-
-export interface SuperAdminSevenDayPoint {
-  date: string;
-  label: string;
-  amount: number;
-  txCount: number;
-}
-
-export interface SuperAdminRecentTransaction {
-  id?: number;
-  tenantId?: number;
-  invoiceNumber?: string;
-  saleDate?: string;
-  cashierName?: string;
-  paymentMethod?: string;
-  totalAmount?: number;
-  type: string;
-  reference: string;
-  storeName: string;
-  customerName: string;
-  amount: number;
-  currency: string;
-  status: string;
-  date: string;
-  timeString?: string;
 }
 
 export interface SuperAdminReportBreakdown {
@@ -162,13 +127,56 @@ export interface SuperAdminReportBreakdown {
   revenue?: number;
 }
 
+export interface SuperAdminSevenDayPoint {
+  date: string;
+  label: string;
+  amount: number;
+  txCount: number;
+}
+
+export interface SuperAdminRecentTransaction {
+  id?: number | string;
+  tenantId?: number;
+  type?: string;
+  reference?: string;
+  storeName: string;
+  customerName?: string;
+  amount: number;
+  totalAmount?: number;
+  currency?: string;
+  status?: string;
+  date?: string;
+  saleDate?: string;
+  timeString?: string;
+  invoiceNumber?: string;
+  cashierName?: string;
+  paymentMethod?: string;
+}
+
 export interface TenantPlanBreakdown {
-  plan: SubscriptionPlan;
+  plan: string;
   label: string;
   count: number;
-  percentage: number;
+  percentage?: number;
   activeCount: number;
   expiringCount: number;
+}
+
+export interface SuperAdminAnalytics {
+  totalStores: number;
+  activeStores: number;
+  expiringSoonStores: number;
+  expiredStores: number;
+  suspendedStores: number;
+  totalRevenue: number;
+  totalSalesVolume: number;
+  totalProductsCount: number;
+  totalInvoicesCount: number;
+  activeSubscriptionsCount: number;
+  revenueByPlan: Record<string, number>;
+  storesByPlan: Record<string, number>;
+  recentStores: SuperAdminStoreRow[];
+  totalCashiersCount?: number;
 }
 
 export interface ExpiringTenantAlert {
@@ -179,36 +187,19 @@ export interface ExpiringTenantAlert {
   subscriptionPlan: SubscriptionPlan;
   subscriptionEndDate: string;
   daysLeft: number;
-  subscriptionStatus: SubscriptionStatus;
-  status: TenantStatus;
-}
-
-export interface TenantSaaSHealthMetrics {
-  totalStores: number;
-  activeStores: number;
-  expiringSoonStores: number;
-  expiredStores: number;
-  suspendedStores: number;
-  activeTrials: number;
-  totalTrials: number;
-  onlineStores: number;
-  onboardedStores: number;
-  retailStores: number;
-  wholesaleStores: number;
-  totalPlatformRevenue: number;
-  totalInvoicesCount: number;
-  totalStaffAccounts: number;
+  subscriptionStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string;
+  status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | string;
 }
 
 export interface CompanySettings {
   id: number;
   tenantId?: number;
-  tenantStatus?: TenantStatus;
-  businessType?: BusinessType;
+  tenantStatus?: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | string;
+  businessType?: 'RETAIL' | 'WHOLESALE' | string;
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
-  subscriptionStatus?: SubscriptionStatus;
+  subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string;
   name: string;
   logo: string;
   showReceiptLogo?: boolean;
@@ -243,27 +234,23 @@ export interface Brand {
 
 export type AiConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
 
-export interface AiBrandSuggestion {
-  suggestedName: string;
-  matchedName?: string | null;
-  matchedId?: number | null;
-  isExisting?: boolean;
-  isUnknown?: boolean;
-  confidence?: AiConfidenceLevel;
-}
-
-export interface AiCategorySuggestion {
-  suggestedName: string;
-  matchedName?: string | null;
-  matchedId?: number | null;
-  isExisting?: boolean;
-  confidence?: AiConfidenceLevel;
-}
-
 export interface AiProductSuggestionResult {
   title: string;
-  category: AiCategorySuggestion;
-  brand: AiBrandSuggestion;
+  category: {
+    suggestedName: string;
+    matchedName?: string | null;
+    matchedId?: number | null;
+    isExisting?: boolean;
+    confidence?: AiConfidenceLevel;
+  };
+  brand: {
+    suggestedName: string;
+    matchedName?: string | null;
+    matchedId?: number | null;
+    isExisting?: boolean;
+    isUnknown?: boolean;
+    confidence?: AiConfidenceLevel;
+  };
   confidence: AiConfidenceLevel;
   shoeType?: string;
   isFootwear?: boolean;
@@ -276,7 +263,6 @@ export interface Category {
   productCount?: number;
   totalUnits?: number;
 }
-
 
 export interface Product {
   id: number;
@@ -295,7 +281,7 @@ export interface Product {
   sellingPrice: number;
   minPrice: number;
   maxPrice: number;
-  pairsPerCarton?: number; // Stored product lot size for retail or wholesale
+  pairsPerCarton?: number;
   pairs_per_carton?: number;
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
@@ -330,14 +316,12 @@ export interface ProductFormValues extends Pick<
   lowStockThresholdCartons?: number;
 }
 
-export type CustomerType = 'RETAILER' | 'WHOLESALER';
-
 export interface Customer {
   id: number;
   code?: string;
   name: string;
-  customerType?: CustomerType;
-  customer_type?: CustomerType;
+  customerType?: 'RETAILER' | 'WHOLESALER' | string;
+  customer_type?: 'RETAILER' | 'WHOLESALER' | string;
   shopName?: string;
   marketName?: string;
   city?: string;
@@ -357,31 +341,6 @@ export interface Customer {
   balance?: number | string;
   lastVisit?: string | null;
   createdAt: string;
-}
-
-export interface CustomerLedgerEntry {
-  id: number;
-  tenantId?: number;
-  customerId: number;
-  transactionDate: string;
-  transaction_date?: string;
-  invoiceId?: number | null;
-  invoice_id?: number | null;
-  invoiceNumber?: string;
-  invoice_number?: string;
-  totalBill: number;
-  total_bill?: number;
-  amountPaid: number;
-  amount_paid?: number;
-  balanceChange: number;
-  balance_change?: number;
-  runningBalance: number;
-  running_balance?: number;
-  paymentMethod?: string;
-  payment_method?: string;
-  notes?: string;
-  createdAt?: string;
-  created_at?: string;
 }
 
 export interface Supplier {
@@ -424,26 +383,10 @@ export interface CartItem {
   originalPrice?: number;
 }
 
-export interface SaleItem {
-  id: number;
-  saleId: number;
-  productId: number;
-  article?: string;
-  productName?: string;
-  packingType?: PackingType;
-  cartonQuantity?: number;
-  pairsPerCarton?: number;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  subtotal: number;
-  purchasePrice: number;
-}
-
 export interface Sale {
   id: number;
   invoiceNumber: string;
-  saleType?: SaleType;
+  saleType?: 'RETAIL' | 'WHOLESALE' | string;
   customerId?: number | null;
   customerName?: string;
   customerPhone?: string;
@@ -469,18 +412,7 @@ export interface Sale {
   overriddenBy?: number | null;
   notes?: string;
   createdAt: string;
-  items?: SaleItem[];
-}
-
-export interface PurchaseItem {
-  id?: number;
-  purchaseId?: number;
-  productId: number;
-  article?: string;
-  productName?: string;
-  quantity: number;
-  unitPurchasePrice: number;
-  subtotal: number;
+  items?: any[];
 }
 
 export interface Purchase {
@@ -490,72 +422,13 @@ export interface Purchase {
   purchaseDate: string;
   totalAmount: number;
   paidAmount?: number;
-  paymentStatus?: PurchasePaymentStatus;
+  paymentStatus?: 'UNPAID' | 'PARTIAL' | 'PAID' | string;
   paymentMethod?: string;
   notes?: string;
   createdBy: number;
   createdByName?: string;
   createdAt: string;
-  items?: PurchaseItem[];
-}
-
-export interface PurchaseReturnItem {
-  id?: number;
-  purchaseReturnId?: number;
-  productId: number;
-  article?: string;
-  productName?: string;
-  barcode?: string;
-  quantity: number;
-  unitPurchasePrice: number;
-  subtotal: number;
-  defectType?: string;
-}
-
-export interface PurchaseReturn {
-  id: number;
-  returnNumber: string;
-  purchaseId?: number | null;
-  purchaseNumber?: string | null;
-  supplierId?: number | null;
-  supplierName: string;
-  supplierPhone?: string;
-  returnDate: string;
-  totalDebitAmount: number;
-  reason: string;
-  notes?: string;
-  createdBy: number;
-  createdByName?: string;
-  createdAt: string;
-  items?: PurchaseReturnItem[];
-}
-
-export interface ReturnItem {
-  id: number;
-  returnId: number;
-  saleItemId: number;
-  productId: number;
-  article?: string;
-  productName?: string;
-  quantity: number;
-  unitRefundPrice: number;
-  subtotal: number;
-}
-
-export interface ReturnRecord {
-  id: number;
-  returnNumber: string;
-  originalSaleId: number;
-  invoiceNumber?: string;
-  customerId?: number | null;
-  customerName?: string;
-  returnDate: string;
-  totalRefundAmount: number;
-  reason: string;
-  createdBy: number;
-  createdByName?: string;
-  createdAt: string;
-  items?: ReturnItem[];
+  items?: any[];
 }
 
 export interface ExchangeItem {
@@ -580,33 +453,6 @@ export interface ActiveExchange {
   items: ExchangeItem[];
 }
 
-export type MovementType = 'PURCHASE' | 'SALE' | 'SALE_RETURN' | 'PURCHASE_RETURN' | 'ADJUSTMENT';
-
-export interface StockMovement {
-  id: number;
-  productId: number;
-  article?: string;
-  productName?: string;
-  qtyChange: number;
-  prevStock: number;
-  newStock: number;
-  movementType: MovementType;
-  referenceId?: string;
-  userId: number;
-  userName?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-export interface ApiToken {
-  id: number;
-  name: string;
-  token: string;
-  isActive: boolean;
-  createdAt: string;
-  lastUsedAt?: string | null;
-}
-
 export type AppSettingCategory = 'billing' | 'email' | 'notifications' | 'system';
 
 export interface AppSettingItem {
@@ -617,9 +463,6 @@ export interface AppSettingItem {
   isSecret: boolean;
   updatedAt?: string;
 }
-
-export type AppSettingsMap = Record<string, string>;
-export type AppSettingsGrouped = Record<AppSettingCategory, AppSettingItem[]>;
 
 export type PlatformNotificationType = 'INFO' | 'WARNING' | 'SUCCESS' | 'URGENT';
 
@@ -641,26 +484,24 @@ export interface PlatformNotification {
   isRead?: boolean;
 }
 
-export interface PosOperationalNotification {
-  id: string; // e.g. "sale-101"
-  rawId: number;
-  itemType: 'SALE' | 'RETURN' | 'EXCHANGE' | 'COUNTER_EVENT' | string;
-  type: string;
-  title: string;
-  message: string;
-  totalAmount?: number;
-  invoiceNumber?: string;
-  returnNumber?: string;
-  deepLinkUrl?: string;
-  actionTab?: string;
-  createdAt: string;
-  timestamp: string;
-  isRead?: boolean;
-}
-
 export interface GroupedNotificationsResponse {
   notices: PlatformNotification[];
-  notifications: PosOperationalNotification[];
+  notifications: Array<{
+    id: string; // e.g. "sale-101"
+    rawId: number;
+    itemType: 'SALE' | 'RETURN' | 'EXCHANGE' | 'COUNTER_EVENT' | string;
+    type: string;
+    title: string;
+    message: string;
+    totalAmount?: number;
+    invoiceNumber?: string;
+    returnNumber?: string;
+    deepLinkUrl?: string;
+    actionTab?: string;
+    createdAt: string;
+    timestamp: string;
+    isRead?: boolean;
+  }>;
   unreadNoticesCount: number;
   unreadNotificationsCount: number;
   totalUnread: number;
@@ -703,5 +544,3 @@ export interface AllNotificationsResponse {
     unreadOperational: number;
   };
 }
-
-

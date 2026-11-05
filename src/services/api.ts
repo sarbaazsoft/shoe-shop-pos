@@ -499,44 +499,6 @@ export const api = {
       subscriptionStartDate?: string;
       subscriptionEndDate?: string;
     }) => apiFetch('/superadmin/tenants', { method: 'POST', body: data }),
-    approveRequest: (
-      requestId: number,
-      data?: {
-        password?: string;
-        storeName?: string;
-        businessType?: 'RETAIL' | 'WHOLESALE' | string;
-        pricingMode?: 'FIXED' | 'NEGOTIABLE' | string;
-        minSellingQuantity?: number;
-        allowHalfCarton?: boolean;
-        subscriptionPlan?: '6_MONTHS' | 'YEARLY' | string;
-      }
-    ) =>
-      apiFetch(`/superadmin/store-requests/${requestId}/approve`, {
-        method: 'POST',
-        body: data || {},
-      }),
-    rejectRequest: (requestId: number) =>
-      apiFetch(`/superadmin/store-requests/${requestId}/reject`, {
-        method: 'POST',
-      }),
-    updateRequest: (
-      requestId: number,
-      data: {
-        status?: 'PENDING' | 'APPROVED' | 'REJECTED';
-        storeName?: string;
-        ownerEmail?: string;
-        ownerPhone?: string;
-        plan?: string;
-      }
-    ) =>
-      apiFetch(`/superadmin/store-requests/${requestId}`, {
-        method: 'PATCH',
-        body: data,
-      }),
-    deleteRequest: (requestId: number) =>
-      apiFetch(`/superadmin/store-requests/${requestId}/delete`, {
-        method: 'POST',
-      }),
     getNotifications: () =>
       apiFetch<{ notifications: PlatformNotification[] }>('/superadmin/notifications'),
     sendNotification: (data: {

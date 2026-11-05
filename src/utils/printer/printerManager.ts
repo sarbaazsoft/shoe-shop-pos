@@ -23,7 +23,7 @@ export interface PrinterHardwareSettings {
 
 const STORAGE_KEY = 'shoe_shop_hardware_printers';
 
-export const DEFAULT_PRINTER_SETTINGS: PrinterHardwareSettings = {
+const DEFAULT_PRINTER_SETTINGS: PrinterHardwareSettings = {
   receiptMode: 'system',
   stickerMode: 'system',
   receiptPaperWidth: 50,

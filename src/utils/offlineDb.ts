@@ -129,7 +129,7 @@ export function resolveActiveTenantId(explicitTenantId?: number | string | null)
  * Verifies that the current authenticated store user is allowed to access/modify
  * the offline product cache for the target tenantId. Prevents cross-tenant access.
  */
-export function verifyOfflineTenantId(explicitTenantId?: number | string | null): number {
+function verifyOfflineTenantId(explicitTenantId?: number | string | null): number {
   const activeTenantId = resolveActiveTenantId(explicitTenantId);
 
   if (typeof localStorage !== 'undefined') {
@@ -192,7 +192,7 @@ export function verifyOfflineTenantId(explicitTenantId?: number | string | null)
  * Normalizes any product object from online catalog or API into a consistent
  * tenant-scoped POS product structure for offline billing using Product.tenantId.
  */
-export function normalizeCachedProduct(p: any, tenantId: number): any {
+function normalizeCachedProduct(p: any, tenantId: number): any {
   if (!p || p.id === undefined || p.id === null) return null;
   const resolvedTenantId = parseValidTenantId(tenantId);
   if (!resolvedTenantId) return null;
