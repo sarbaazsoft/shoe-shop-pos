@@ -20,6 +20,7 @@ import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.t
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 import { PosNotificationBanner } from './PosNotificationBanner.tsx';
+import { QuickReceiveChips } from './QuickReceiveChips.tsx';
 
 export interface CartItem {
   productId: number;
@@ -130,6 +131,13 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   // Business Type & Wholesale B2B Cargo / Dispatch State
   const isWholesaleStore =
     String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
+  const selectedCustomer = customers.find((c: any) => c.id === selectedCustomerId);
+  const isWholesaleCustomer = Boolean(
+    selectedCustomer &&
+    (String(selectedCustomer.customerType || selectedCustomer.customer_type || '').toUpperCase().includes('WHOLESALE') ||
+     String(selectedCustomer.notes || '').toUpperCase().includes('WHOLESALE'))
+  );
+  const isWholesaleTransaction = isWholesaleStore || isWholesaleCustomer;
   // Dynamic minimum sale quantity & half-carton permission
   // Determination: Half-cartons are allowed if either the store setting is enabled
   // (company_setting.allow_half_carton == true) OR the specific product override is enabled
@@ -2432,6 +2440,18 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   {paymentMethod === 'KHATA' ? 'Enter 0 for full credit' : 'Collected now'}
                 </span>
               </div>
+
+              {/* Dynamic Quick-Receive Payment Chips for Retail POS Terminal */}
+              {!isWholesaleTransaction && paymentMethod === 'CASH' && netTotalPayable > 0 && !isEvenExchange && !isCustomerRefund && (
+                <QuickReceiveChips
+                  totalAmount={netTotalPayable}
+                  cashReceived={cashReceived}
+                  currencySymbol={currencySymbol}
+                  onSelectAmount={(amount) => setCashReceived(amount)}
+                  formatPrice={formatStockPrice}
+                />
+              )}
+
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm">
                   {currencySymbol}
@@ -2496,7 +2516,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   </button>
                 </div>
               )}
-              {!isWholesaleStore && (
+              {!isWholesaleTransaction && (paymentMethod !== 'CASH' || netTotalPayable === 0) && (
                 <button
                   type="button"
                   onClick={() => setCashReceived(netTotalPayable)}
