@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Info, Shield, Check, AlertCircle } from 'lucide-react';
+import { Info, Shield, Check } from 'lucide-react';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 export interface PasswordRequirementsTooltipProps {

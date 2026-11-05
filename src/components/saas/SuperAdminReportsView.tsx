@@ -26,7 +26,6 @@ export const SuperAdminReportsView: React.FC<SuperAdminReportsViewProps> = ({
   stores,
   reportProducts,
   reportCategories,
-  reportBrands,
   recentTransactions,
   loading,
   onRefresh,

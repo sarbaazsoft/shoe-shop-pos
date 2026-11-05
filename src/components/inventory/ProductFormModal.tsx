@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload, Loader2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { SideEndBoxLabelModal } from './SideEndBoxLabelModal.tsx';
 import { BarcodeStickerModal } from './BarcodeStickerModal.tsx';
@@ -158,7 +158,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return rawStored !== undefined && rawStored !== null && Number(rawStored) > 0 ? Number(rawStored) : 5;
   });
 
-  const effectiveCartonSize = isWholesaleStore ? (pairsPerCarton === 16 ? 16 : 12) : lotSize;
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string>(product?.primaryImageUrl || '');
 
   // AI Vision Suggestor State (strictly for retail stores only)
@@ -358,7 +357,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Helper to recompute article and default Code-128 barcode based on classification
   const updateClassificationCodes = (
-    targetBrand = brand,
+    _targetBrand = brand,
     targetCat = category,
     pId = effectiveProductId,
     forceResetArticle = false

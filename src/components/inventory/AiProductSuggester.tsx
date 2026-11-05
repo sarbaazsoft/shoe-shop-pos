@@ -58,13 +58,13 @@ const SAMPLE_SHOE_IMAGES = [
 export const AiProductSuggester: React.FC<AiProductSuggesterProps> = ({
   imageUrl,
   onImageUrlChange,
-  brands,
+  brands: _brands,
   categories,
   onSelectBrand,
   onSelectCategory,
   onSetTitle,
-  onBrandsUpdated,
-  onCategoriesUpdated,
+  onBrandsUpdated: _onBrandsUpdated,
+  onCategoriesUpdated: _onCategoriesUpdated,
 }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -77,8 +77,8 @@ export const AiProductSuggester: React.FC<AiProductSuggesterProps> = ({
   const [appliedBrand, setAppliedBrand] = useState(false);
   const [appliedCategory, setAppliedCategory] = useState(false);
   const [appliedTitle, setAppliedTitle] = useState(false);
-  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const isCreatingBrand = false;
+  const isCreatingCategory = false;
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);

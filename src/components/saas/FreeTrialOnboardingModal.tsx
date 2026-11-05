@@ -699,7 +699,6 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                 {(() => {
                   const strength = evaluatePasswordStrength(password, { minChars: 6 });
                   const isMatch = Boolean(confirmPassword && password && confirmPassword === password);
-                  const isMismatch = Boolean(confirmPassword && password && confirmPassword !== password);
 
                   return (
                     <div className="space-y-3 pt-1">

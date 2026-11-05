@@ -348,7 +348,6 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                 {(() => {
                   const strength = evaluatePasswordStrength(password, { minChars: 8 });
                   const isMatch = Boolean(password && confirmPassword && password === confirmPassword);
-                  const isMismatch = Boolean(password && confirmPassword && password !== confirmPassword);
 
                   return (
                     <>

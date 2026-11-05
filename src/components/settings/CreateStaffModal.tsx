@@ -698,7 +698,6 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                 {(() => {
                   const strength = evaluatePasswordStrength(formData.password, { minChars: 6 });
                   const isMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
-                  const isMismatch = formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword;
 
                   return (
                     <>

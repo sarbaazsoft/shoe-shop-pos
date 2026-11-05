@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
-  Info,
   X,
   ChevronLeft,
   ChevronRight,
   Sparkles,
   ExternalLink,
-  BellRing,
-  RotateCcw,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import type { PlatformNotification, PlatformNotificationType } from '../../types.ts';
@@ -43,8 +39,6 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
   companySettings,
   onNavigateTab,
 }) => {
-  const currentRole = String(currentUser?.role || '').trim().toUpperCase();
-  const isCashier = currentRole === 'CASHIER';
   const userId = currentUser?.id || currentUser?.userId || 0;
   const cashierName =
     String(currentUser?.name || '').trim() ||

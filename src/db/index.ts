@@ -540,11 +540,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: rows as unknown as T[], rowCount: rows.length };
   }
 
-  // Deleted store requests tracking (deprecated & dropped)
-  if (upper.includes('DELETED_STORE_REQUESTS')) {
-    return { rows: [], rowCount: 0 };
-  }
-
   // Push Subscriptions tracking for Web Push API
   if (upper.includes('PUSH_SUBSCRIPTIONS')) {
     if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.PUSH_SUBSCRIPTIONS')) {
@@ -1333,11 +1328,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     const targetId = Number(params[0]);
     mockStore.tenants = mockStore.tenants.filter((t) => Number(t.id) !== targetId);
     return { rows: [], rowCount: 1 };
-  }
-
-  // STORE_REQUESTS queries (deprecated & dropped)
-  if (upper.includes('STORE_REQUESTS')) {
-    return { rows: [], rowCount: 0 };
   }
 
   // USERS count queries (only when querying FROM USERS directly)

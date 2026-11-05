@@ -60,7 +60,6 @@ export async function checkInstallationStatus(): Promise<InstallationStatus> {
     const tablesExist = isDatabaseReady;
 
     let isSettingsConfigured = false;
-    let isInstalledFlag = false;
     let storeName = '';
 
     if (hasSettingsTable) {
@@ -74,7 +73,6 @@ export async function checkInstallationStatus(): Promise<InstallationStatus> {
         );
         if (settingsRes.rows.length > 0) {
           isSettingsConfigured = true;
-          isInstalledFlag = true;
           if (settingsRes.rows[0].name) {
             storeName = settingsRes.rows[0].name;
           }
@@ -82,7 +80,6 @@ export async function checkInstallationStatus(): Promise<InstallationStatus> {
       } catch {
         // Table not ready or dropped during installation reset
         isSettingsConfigured = false;
-        isInstalledFlag = false;
       }
     }
 
@@ -230,11 +227,6 @@ async function checkInstallerAuth(req: Request): Promise<{
   }
 
   return { authorized: false, forbidden: false };
-}
-
-async function verifyInstallerAuthorization(req: Request): Promise<boolean> {
-  const res = await checkInstallerAuth(req);
-  return res.authorized;
 }
 
 // =========================================================================

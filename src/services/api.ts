@@ -1,7 +1,7 @@
 // Central API service with JWT token injection, tenant isolation, and offline catalog fallback
 import { cacheCatalogOffline, deleteCachedProductOffline, lookupCachedProductOffline, searchCachedProductsOffline } from '../utils/offlineDb.ts';
 import { transformKeysToCamelCase } from '../utils/caseTransformer.ts';
-import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult, GroupedNotificationsResponse, AllNotificationsResponse, HistoricalNotificationItem } from '../types.ts';
+import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult, GroupedNotificationsResponse, AllNotificationsResponse } from '../types.ts';
 
 const TOKEN_KEY = 'pos_auth_token';
 const ALT_TOKEN_KEY = 'shoe_pos_jwt_token';

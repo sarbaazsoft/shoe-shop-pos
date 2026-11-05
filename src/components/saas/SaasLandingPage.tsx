@@ -1,18 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShoppingCart, Package, Truck, Printer, Users, BarChart3, ShieldCheck, Settings, ArrowRight, Check, Calendar, Store, X, DollarSign, Sparkles, Search, Menu, Sun, Moon, Zap, Headphones, LayoutDashboard, Tag, LogIn, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShoppingCart, Package, Truck, Printer, Users, BarChart3, ShieldCheck, Settings, ArrowRight, Check, Calendar, Store, DollarSign, Sparkles, Search, Zap, Headphones, LayoutDashboard, Tag, LogIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import shoeStoreBg from '../../assets/images/shoe_store_blurred_bg_1790706924465.jpg';
 import { api } from '../../services/api';
-import { toTitleCaseTrimmed, toLowerTrimmed } from '../../utils/textFormat';
-import type { TenantInfo, BusinessType, PricingMode } from '../../types';
+import type { TenantInfo } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
 import { useTheme } from '../../context/ThemeContext';
 import { Navbar } from './Navbar';
-
-const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-  </svg>
-);
 
 interface PublicStats {
   stores: number;
@@ -171,8 +164,6 @@ const DashboardMockup: React.FC = () => {
   );
 };
 
-// Set this to your demo video URL to make the hero's "Watch Demo" button open it.
-const DEMO_VIDEO_URL = '';
 
 /**
  * Interface representing a store displayed in the JS slider.
@@ -323,14 +314,13 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
   const [platformOwnerEmail, setPlatformOwnerEmail] = useState<string>('');
   const [platformOwnerPhone, setPlatformOwnerPhone] = useState<string>('');
-  const [platformOwnerName, setPlatformOwnerName] = useState<string>('');
   const [storeDirectory, setStoreDirectory] = useState<TenantInfo[]>(availableTenants);
   const [statsInView, setStatsInView] = useState(false);
   const [statsAnimationStartTime, setStatsAnimationStartTime] = useState<number | null>(null);
   const statsSectionRef = useRef<HTMLElement>(null);
   const storesSwiperRef = useRef<HTMLDivElement>(null);
   const swiperInstanceRef = useRef<any>(null);
-  const { theme, themeMode, setThemeMode } = useTheme();
+  const { theme, setThemeMode } = useTheme();
   const landingTheme = theme;
 
   useEffect(() => {
@@ -372,7 +362,6 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         if (isMounted) {
           if (owner?.email) setPlatformOwnerEmail(owner.email);
           if (owner?.phone) setPlatformOwnerPhone(owner.phone);
-          if (owner?.name) setPlatformOwnerName(owner.name);
         }
       })
       .catch(() => {});
@@ -591,246 +580,13 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     }
   };
 
-  // Store request form states
-  const [storeName, setStoreName] = useState('');
-  const [ownerEmail, setOwnerEmail] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
   const [plan, setPlan] = useState('TRIAL');
-  const [businessType, setBusinessType] = useState<BusinessType>('RETAIL');
-  const [pricingMode, setPricingMode] = useState<PricingMode>('FIXED');
-  const [minSellingQuantity, setMinSellingQuantity] = useState<number>(1.0);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<{
-    message: string;
-    storeName?: string;
-    ownerEmail?: string;
-    superAdminEmail?: string;
-    superAdminPhone?: string;
-    trialActivated?: boolean;
-    tenantId?: number;
-    initialPassword?: string;
-    loginUrl?: string;
-    subscriptionEndDate?: string;
-    trialDays?: number;
-  } | null>(null);
-
-  // Real-time validation & email availability states
-  const [storeNameTouched, setStoreNameTouched] = useState(false);
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [phoneTouched, setPhoneTouched] = useState(false);
-  const [emailAvailability, setEmailAvailability] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
-  const [emailAvailabilityMsg, setEmailAvailabilityMsg] = useState<string>('');
-
-  const trimmedStoreName = storeName.trim();
-  const isDuplicateStoreName =
-    trimmedStoreName.length >= 2 &&
-    storeDirectory.some((t) => String(t.name || '').trim().toLowerCase() === trimmedStoreName.toLowerCase());
-  const isStoreNameValid =
-    trimmedStoreName.length >= 3 &&
-    trimmedStoreName.length <= 80 &&
-    /[A-Za-z]{2,}/.test(trimmedStoreName) &&
-    /^[A-Za-z0-9][A-Za-z0-9\s&'.,()-]{2,79}$/.test(trimmedStoreName) &&
-    !isDuplicateStoreName;
-
-  const storeNameErrorMsg = !trimmedStoreName
-    ? 'Store name is required.'
-    : isDuplicateStoreName
-    ? 'A store with this name already exists. Please choose a different store name.'
-    : trimmedStoreName.length < 3
-    ? 'Store name must be at least 3 characters.'
-    : !/[A-Za-z]{2,}/.test(trimmedStoreName)
-    ? 'Store name must include letters (e.g. Metro Footwear).'
-    : !isStoreNameValid
-    ? 'Store name contains invalid characters.'
-    : '';
-
-  const trimmedEmail = ownerEmail.trim().toLowerCase();
-  const isEmailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmedEmail);
-
-  const trimmedPhone = ownerPhone.trim();
-  const phoneDigitsCount = trimmedPhone.replace(/\D/g, '').length;
-  const isPhoneValid =
-    trimmedPhone.length > 0 &&
-    /^[+]?[0-9\s\-()]{7,20}$/.test(trimmedPhone) &&
-    phoneDigitsCount >= 10 &&
-    phoneDigitsCount <= 15;
-
-  const phoneErrorMsg = !trimmedPhone
-    ? 'Phone / WhatsApp number is required.'
-    : !/^[+]?[0-9\s\-()]+$/.test(trimmedPhone)
-    ? 'Phone number can only contain digits, +, spaces, or hyphens.'
-    : phoneDigitsCount < 10
-    ? `Enter at least 10 digits (${phoneDigitsCount}/10 entered).`
-    : phoneDigitsCount > 15
-    ? 'Phone number cannot exceed 15 digits.'
-    : '';
-
-  // Real-time debounced email availability check
-  useEffect(() => {
-    if (!showRequestModal) return;
-    if (!trimmedEmail || !isEmailFormatValid) {
-      setEmailAvailability('idle');
-      setEmailAvailabilityMsg('');
-      return;
-    }
-
-    let cancelled = false;
-    setEmailAvailability('checking');
-    setEmailAvailabilityMsg('Checking email availability...');
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const res = await api.saas.checkEmailAvailability(trimmedEmail);
-        if (cancelled) return;
-        if (res.available) {
-          setEmailAvailability('available');
-          setEmailAvailabilityMsg(res.message || 'Email is available.');
-        } else {
-          setEmailAvailability('taken');
-          setEmailAvailabilityMsg(
-            res.message || 'This email is already in use. Please use a different email address.'
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setEmailAvailability('available');
-          setEmailAvailabilityMsg('Email format is valid.');
-        }
-      }
-    }, 280);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [trimmedEmail, isEmailFormatValid, showRequestModal]);
-
-  const canSubmitStoreRequest =
-    isStoreNameValid &&
-    isEmailFormatValid &&
-    emailAvailability === 'available' &&
-    isPhoneValid &&
-    !submitting;
 
   const openGetStartedWithPlan = (selectedPlan: string) => {
     setPlan(selectedPlan);
-    setSubmitError(null);
-    setStoreNameTouched(false);
-    setEmailTouched(false);
-    setPhoneTouched(false);
     setShowRequestModal(true);
   };
 
-  const handleSubmitRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStoreNameTouched(true);
-    setEmailTouched(true);
-    setPhoneTouched(true);
-    setSubmitError(null);
-    setSubmitSuccess(null);
-
-    if (!isStoreNameValid) {
-      setSubmitError(storeNameErrorMsg || 'Please enter a valid store name.');
-      return;
-    }
-    if (!isEmailFormatValid) {
-      setSubmitError('Please enter a valid owner email address.');
-      return;
-    }
-    if (emailAvailability === 'checking') {
-      setSubmitError('Please wait while we verify email availability.');
-      return;
-    }
-    if (emailAvailability === 'taken') {
-      setSubmitError(emailAvailabilityMsg || 'This email is already in use. Please use a different email address.');
-      return;
-    }
-    if (!isPhoneValid) {
-      setSubmitError(phoneErrorMsg || 'Please enter a valid Phone / WhatsApp number (10 to 15 digits).');
-      return;
-    }
-
-    const requestedStoreName = toTitleCaseTrimmed(storeName);
-    const requestedOwnerEmail = toLowerTrimmed(ownerEmail);
-    setSubmitting(true);
-    try {
-      const res = await api.saas.submitStoreRequest({
-        storeName: requestedStoreName,
-        ownerEmail: requestedOwnerEmail,
-        ownerPhone: ownerPhone.trim(),
-        plan,
-        businessType,
-        pricingMode: businessType === 'WHOLESALE' ? 'FIXED' : pricingMode,
-        minSellingQuantity: businessType === 'WHOLESALE' ? minSellingQuantity : undefined,
-        allowHalfCarton: businessType === 'WHOLESALE' ? minSellingQuantity <= 0.5 : undefined,
-      });
-      const resolvedSuperAdminEmail = res.superAdminEmail || platformOwnerEmail;
-      const resolvedSuperAdminPhone = res.superAdminPhone || platformOwnerPhone;
-      if (res.superAdminEmail) {
-        setPlatformOwnerEmail(res.superAdminEmail);
-      }
-      if (res.superAdminPhone) {
-        setPlatformOwnerPhone(res.superAdminPhone);
-      }
-      setSubmitSuccess({
-        message: res.message,
-        storeName: requestedStoreName,
-        ownerEmail: requestedOwnerEmail,
-        superAdminEmail: resolvedSuperAdminEmail,
-        superAdminPhone: resolvedSuperAdminPhone,
-        trialActivated: res.trialActivated,
-        tenantId: res.tenantId,
-        initialPassword: res.initialPassword,
-        loginUrl: res.loginUrl,
-        subscriptionEndDate: res.subscriptionEndDate,
-        trialDays: res.trialDays || 30,
-      });
-
-      if (res.tenantId) {
-        const newRegisteredTenant: TenantInfo = {
-          id: res.tenantId,
-          name: requestedStoreName,
-          status: 'ACTIVE',
-          subscriptionStatus: 'ACTIVE',
-          businessType: businessType,
-          pricingMode: pricingMode,
-          logoUrl: '',
-          currency: 'PKR',
-          onboardingCompleted: true,
-          appPath: `/?tenantId=${res.tenantId}`,
-        };
-        try {
-          const existingRaw = localStorage.getItem('pos_registered_stores_cache');
-          const existing = existingRaw ? JSON.parse(existingRaw) : [];
-          const updated = [newRegisteredTenant, ...existing.filter((s: any) => s.id !== res.tenantId)];
-          localStorage.setItem('pos_registered_stores_cache', JSON.stringify(updated));
-        } catch {}
-        setStoreDirectory((prev) => [newRegisteredTenant, ...prev.filter((t) => t.id !== res.tenantId)]);
-        if (res.token && res.user) {
-          handleStoreCreated(res.tenantId, res.loginUrl || '/dashboard', res.user, res.token);
-          return;
-        }
-      }
-
-      setStoreName('');
-      setOwnerEmail('');
-      setOwnerPhone('');
-      setStoreNameTouched(false);
-      setEmailTouched(false);
-      setPhoneTouched(false);
-      setEmailAvailability('idle');
-      setEmailAvailabilityMsg('');
-    } catch (err: any) {
-      if (err?.code === 'EMAIL_ALREADY_EXISTS' || err?.code === 'PENDING_REQUEST_EXISTS') {
-        setEmailAvailability('taken');
-        setEmailAvailabilityMsg(err.message || 'This email is already in use.');
-      }
-      setSubmitError(err.message || 'Failed to submit store request.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const scrollToSection = (id: string, navKey: 'home' | 'features' | 'stores' | 'pricing' | 'about') => {
     setActiveNav(navKey);
@@ -918,14 +674,6 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     { key: 'about', label: 'About', section: 'about' },
   ] as const;
 
-  const handleWatchDemo = () => {
-    if (DEMO_VIDEO_URL) {
-      window.open(DEMO_VIDEO_URL, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    scrollToSection('features', 'features');
-  };
-
   const planFeatures = [
     'Full access to all features',
     'Multi-role staff access',
@@ -936,7 +684,6 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
 
   const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 dark:from-purple-600 dark:to-indigo-600 dark:hover:from-purple-500 dark:hover:to-indigo-500 text-white font-bold border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]';
   const outlineBtn = 'inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-400/50 lt:border-indigo-300 bg-transparent hover:bg-indigo-500/10 lt:hover:bg-indigo-50 text-white lt:text-slate-900 font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300';
-  const panel = 'rounded-2xl border border-indigo-400/25 lt:border-indigo-200 bg-gradient-to-b from-[#12154A]/70 lt:from-white to-[#0A0C2E]/80 lt:to-[#F3F4FF] shadow-[0_20px_60px_-25px_rgba(91,75,255,0.5)]';
 
   const handleStoreCreated = (tenantId: number, loginUrl: string, user?: any, token?: string) => {
     const createdStoreName = user?.storeName || 'New Registered Store';
@@ -1352,6 +1099,14 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 lt:bg-emerald-500" aria-hidden="true" />
                 System Online
               </span>
+              <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
+              <button
+                type="button"
+                onClick={onOpenSuperAdmin}
+                className="text-slate-400 hover:text-white lt:text-slate-500 lt:hover:text-slate-800 transition cursor-pointer underline-offset-2 hover:underline"
+              >
+                SuperAdmin
+              </button>
               <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
               <span className="text-slate-400 lt:text-slate-500">&copy; 2026 All rights reserved.</span>
             </div>

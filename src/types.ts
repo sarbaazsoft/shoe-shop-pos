@@ -27,8 +27,6 @@ export type PricingMode = 'FIXED' | 'NEGOTIABLE';
 export type PurchasePaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
 export type PackingType = 'PAIR' | 'CARTON';
 export type SaleType = 'RETAIL' | 'WHOLESALE';
-export type StoreRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-export type StoreRequestType = 'NEW_STORE' | 'RENEWAL';
 
 export interface TrialActivation {
   id: number;
@@ -200,22 +198,6 @@ export interface TenantSaaSHealthMetrics {
   totalPlatformRevenue: number;
   totalInvoicesCount: number;
   totalStaffAccounts: number;
-}
-
-export interface StoreRequestRecord {
-  id: number;
-  storeName: string;
-  ownerEmail: string;
-  ownerPhone: string;
-  plan: string;
-  businessType?: BusinessType;
-  pricingMode?: PricingMode;
-  requestType?: StoreRequestType;
-  notes?: string;
-  provisionedTenantId?: number | null;
-  status: StoreRequestStatus;
-  createdAt: string;
-  updatedAt?: string;
 }
 
 export interface CompanySettings {

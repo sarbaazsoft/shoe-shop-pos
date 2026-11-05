@@ -2,7 +2,7 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { pgClient } from '../../db/index.ts';
-import { getAllAppSettings, getCachedAppSetting } from '../services/appSettingsService.ts';
+import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
 export type EmailProvider = 'resend' | 'gmail';
 

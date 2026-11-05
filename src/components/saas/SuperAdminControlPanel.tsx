@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink, Bell, BellRing, CheckCheck, Check, SlidersHorizontal, CreditCard } from 'lucide-react';
+import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink, Bell, BellRing, CheckCheck, SlidersHorizontal, CreditCard } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api';
 import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
@@ -2662,14 +2662,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                 rawChartSeries.length > 0
                   ? Number(rawChartSeries[rawChartSeries.length - 1]?.amount || 0)
                   : Math.round(totalRevenueAll * 0.14);
-              const totalStockUnitsAll = stores.reduce(
-                (sum, s) => sum + (s.totalStockUnits || 0),
-                0
-              );
-              const totalUnitsSoldAll = stores.reduce(
-                (sum, s) => sum + (s.unitsSold || 0),
-                0
-              );
               const totalInvoicesAll = stores.reduce(
                 (sum, s) => sum + (s.salesCount || 0),
                 0
@@ -2687,11 +2679,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
               const cumulativePlatformTarget = Math.max(
                 1000000,
                 Math.ceil((Math.max(totalRevenueAll, weeklyPlatformTarget * 3) * 1.18) / 50000) * 50000
-              );
-
-              const maxCatUnits = Math.max(
-                1,
-                ...reportCategories.map((c) => Math.max(c.unitsSold || 0, c.totalStock || 1))
               );
 
               // Compute Tenant-centric SaaS Plans and Retention Health
@@ -5360,7 +5347,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                 {(() => {
                   const strength = evaluatePasswordStrength(newOwnerPassword, { minChars: 6 });
                   const isMatch = Boolean(newOwnerPassword && newOwnerConfirmPassword && newOwnerPassword === newOwnerConfirmPassword);
-                  const isMismatch = Boolean(newOwnerPassword && newOwnerConfirmPassword && newOwnerPassword !== newOwnerConfirmPassword);
 
                   return (
                     <>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, AlertCircle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame } from 'lucide-react';
+import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
@@ -717,71 +717,6 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadCount = unreadPosCount + unreadAnnouncementsCount;
   const activeUrgentNotice = visibleAnnouncements.find((a) => !a.isRead && a.type === 'URGENT');
 
-  // Unified Notifications list combining Notices and Store Activity in a single column with strict role isolation
-  const unifiedNotifications = useMemo(() => {
-    const parseTime = (val: any) => {
-      if (!val) return 0;
-      const t = new Date(val).getTime();
-      return isNaN(t) ? 0 : t;
-    };
-
-    const announcementItems = visibleAnnouncements.map((a) => ({
-      kind: 'ANNOUNCEMENT' as const,
-      id: `notice-${a.id}`,
-      rawId: a.id,
-      title: a.title,
-      message: a.message,
-      type: a.type,
-      actionUrl: a.actionUrl,
-      actionLabel: a.actionLabel,
-      tenantId: a.tenantId,
-      createdAt: a.createdAt,
-      isRead: Boolean(a.isRead),
-      timestamp: parseTime(a.createdAt),
-      raw: a,
-    }));
-
-    // Strict role isolation for activity feed
-    let filteredNotifications = notifications;
-    if (isSuperAdminUser) {
-      filteredNotifications = [];
-    } else if (isCashierUser) {
-      // Cashiers only receive their counter POS checkout activities, never store owner administrative alerts
-      filteredNotifications = notifications.filter((n) => {
-        const typeUpper = (n.type || '').toUpperCase();
-        return !['PURCHASE', 'STOCK', 'LOW_STOCK', 'SUPPLIER'].includes(typeUpper);
-      });
-    }
-
-    const activityItems = filteredNotifications.map((n) => {
-      const isRead = readNotifIds.includes(n.id);
-      const ts = n.timestamp || n.created_at || n.sale_date;
-      return {
-        kind: 'ACTIVITY' as const,
-        id: `activity-${n.id}`,
-        rawId: n.id,
-        title: n.title,
-        message: n.message,
-        type: (n.type || 'ACTIVITY').toUpperCase(),
-        icon: n.icon,
-        color: n.color,
-        actionTab: n.actionTab,
-        deepLinkUrl: n.deepLinkUrl,
-        createdAt: ts || new Date().toISOString(),
-        isRead,
-        timestamp: parseTime(ts),
-        raw: n,
-      };
-    });
-
-    return [...announcementItems, ...activityItems].sort((a, b) => {
-      const aUrgent = a.kind === 'ANNOUNCEMENT' && a.type === 'URGENT' && !a.isRead ? 1 : 0;
-      const bUrgent = b.kind === 'ANNOUNCEMENT' && b.type === 'URGENT' && !b.isRead ? 1 : 0;
-      if (aUrgent !== bUrgent) return bUrgent - aUrgent;
-      return b.timestamp - a.timestamp;
-    });
-  }, [visibleAnnouncements, notifications, readNotifIds, isSuperAdminUser, isCashierUser]);
-
   const handleActivityClick = (item: any) => {
     const raw = item.raw || item;
     markAsRead(raw.id);
@@ -896,31 +831,6 @@ export const Header: React.FC<HeaderProps> = ({
           badgeClass: 'bg-indigo-100 text-indigo-800 dark:bg-purple-900/60 dark:text-purple-300 border border-indigo-300 dark:border-purple-700',
           icon: <Info className="w-2.5 h-2.5 text-indigo-600 dark:text-purple-300" />,
         };
-    }
-  };
-
-  const renderNotificationIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'boxes':
-        return <Boxes className="w-3 h-3 text-purple-600 dark:text-purple-300 stroke-[2]" />;
-      case 'alert-circle':
-        return <AlertCircle className="w-3 h-3 text-rose-500 stroke-[2]" />;
-      case 'alert-triangle':
-        return <AlertTriangle className="w-3 h-3 text-amber-500 stroke-[2]" />;
-      case 'shopping-bag':
-        return <ShoppingBag className="w-3 h-3 text-purple-600 dark:text-purple-300 stroke-[2]" />;
-      case 'check-circle':
-        return <CheckCircle2 className="w-3 h-3 text-emerald-500 stroke-[2]" />;
-      case 'arrow-left-right':
-        return <ArrowLeftRight className="w-3 h-3 text-indigo-500 stroke-[2]" />;
-      case 'truck':
-        return <Truck className="w-3 h-3 text-cyan-500 stroke-[2]" />;
-      case 'shield':
-        return <ShieldCheck className="w-3 h-3 text-purple-600 dark:text-purple-300 stroke-[2]" />;
-      case 'database':
-        return <ShieldCheck className="w-3 h-3 text-purple-600 dark:text-purple-300 stroke-[2]" />;
-      default:
-        return <Bell className="w-3 h-3 text-purple-600 dark:text-purple-300 stroke-[2]" />;
     }
   };
 

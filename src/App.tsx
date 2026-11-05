@@ -1203,7 +1203,7 @@ export default function App() {
               window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(selectedStore.id)}`);
             }}
             onOpenSuperAdmin={() => handleNavigateDomain({ mode: 'SUPERADMIN' })}
-            onStoreCreated={(tenantId, loginUrl, user, token) => {
+            onStoreCreated={(tenantId, _loginUrl, user, token) => {
               refreshTenantDirectory('LANDING');
               if (token && user) {
                 setAuthSession(token, user);

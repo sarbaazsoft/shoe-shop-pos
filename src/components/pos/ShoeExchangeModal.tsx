@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, AlertCircle, ArrowRight, X, Repeat, Minus, Plus, Package, Trash2, RotateCcw } from 'lucide-react';
+import { Search, AlertCircle, ArrowRight, X, Repeat, Minus, Plus, Package, Trash2, RotateCcw, Loader2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
@@ -404,7 +404,11 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
                     onChange={(e) => handleSearchProducts(e.target.value)}
                     className="app-input w-full pl-[2.125rem] pr-8 py-2.5 text-xs font-medium"
                   />
-                  {productSearchQuery && (
+                  {isSearchingProducts ? (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-600 dark:text-purple-400 pointer-events-none">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                  ) : productSearchQuery ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -415,7 +419,7 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Dropdown suggestions */}

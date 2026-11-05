@@ -26,12 +26,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onLogin,
   onStartFreeTrial,
-  landingTheme,
-  onToggleTheme,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { theme, themeMode, setThemeMode } = useTheme();
-  const isDark = (landingTheme || theme) === 'dark';
+  const { themeMode, setThemeMode } = useTheme();
 
   const handleNavClick = (section: string, key: string) => {
     setMobileMenuOpen(false);

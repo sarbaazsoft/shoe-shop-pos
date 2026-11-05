@@ -355,7 +355,7 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
     return barcodeMatch || articleMatch || brandMatch;
   });
 
-  const handleSelectProduct = (prod: any, isBarcode = false) => {
+  const handleSelectProduct = (prod: any, _isBarcode = false) => {
     setSelectedProduct(prod);
     setProductQuery('');
     setIsSuggestionsOpen(false);

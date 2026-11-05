@@ -1,16 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Bell,
   CheckCircle2,
   AlertTriangle,
-  AlertCircle,
   Flame,
   Info,
   ShoppingBag,
   ArrowLeftRight,
   Search,
-  Filter,
   CheckCheck,
   RefreshCw,
   Clock,
@@ -19,30 +16,25 @@ import {
   ChevronRight,
   Store,
   Globe,
-  Radio,
   Check,
   X,
-  FileText,
   Calendar,
   Layers,
   Sparkles,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { HistoricalNotificationItem, PlatformNotificationType } from '../../types.ts';
-import { formatCurrency } from '../../utils/priceFormat.ts';
+import type { HistoricalNotificationItem } from '../../types.ts';
 import { ClickableMessage } from '../common/ClickableMessage.tsx';
 
 interface NotificationsViewProps {
-  currentUser: any;
-  companySettings: any;
+  currentUser?: any;
+  companySettings?: any;
   onNavigateTab: (tab: string) => void;
 }
 
 type TabCategory = 'all' | 'notices' | 'operational' | 'sales' | 'returns' | 'urgent';
 
 export const NotificationsView: React.FC<NotificationsViewProps> = ({
-  currentUser,
-  companySettings,
   onNavigateTab,
 }) => {
   const [items, setItems] = useState<HistoricalNotificationItem[]>([]);
@@ -68,8 +60,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const searchTimeoutRef = useRef<any>(null);
-
-  const currency = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
 
   const fetchHistory = async () => {
     try {

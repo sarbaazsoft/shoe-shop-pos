@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
-import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailableTemplateChips, RENEWAL_TEMPLATE_CHIPS, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
+import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';

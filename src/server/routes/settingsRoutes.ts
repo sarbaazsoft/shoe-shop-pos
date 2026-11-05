@@ -3,14 +3,14 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
-import { getAllAppSettings, updateAppSettings, APP_SETTINGS_DEFAULTS } from '../services/appSettingsService.ts';
+import { getAllAppSettings, updateAppSettings } from '../services/appSettingsService.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
-import { testEmailConfiguration, testResendConfiguration } from '../utils/email.ts';
+import { testEmailConfiguration } from '../utils/email.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -121,12 +121,7 @@ async function ensureTenantSubscriptionPopulated(tenantId: number): Promise<any>
   }
 }
 
-async function getPendingRenewalRequest(_tenantId: number): Promise<any | null> {
-  // store_requests table is deprecated and dropped in favor of direct 30-day free trial activations
-  return null;
-}
-
-function buildSubscriptionInfo(tenantRow?: any, pendingRenewalRequest?: any | null) {
+function buildSubscriptionInfo(tenantRow?: any) {
   const subscriptionPlan = normalizeSubscriptionPlan(
     tenantRow?.subscription_plan ||
     tenantRow?.subscriptionPlan ||
@@ -183,11 +178,11 @@ function buildSubscriptionInfo(tenantRow?: any, pendingRenewalRequest?: any | nu
     daysRemaining,
     daysLeft: daysRemaining,
     isExpired,
-    pendingRenewalRequest: pendingRenewalRequest || null,
+    pendingRenewalRequest: null,
   };
 }
 
-function formatSettingsResponse(s: any, tenantRow?: any, pendingRenewalRequest?: any | null) {
+function formatSettingsResponse(s: any, tenantRow?: any) {
   const isLocked = tenantRow
     ? Boolean(tenantRow.onboarding_completed)
     : Boolean(s.pricing_policy_locked ?? true);
@@ -199,7 +194,7 @@ function formatSettingsResponse(s: any, tenantRow?: any, pendingRenewalRequest?:
   const logo = s.logo || '';
   const receiptLogo = s.receipt_logo || logo || '';
   const showReceiptLogo = Boolean(s.show_receipt_logo);
-  const subInfo = buildSubscriptionInfo(tenantRow, pendingRenewalRequest);
+  const subInfo = buildSubscriptionInfo(tenantRow);
   const storeName = tenantRow?.name || s.name || 'Retail Store';
   const businessType: 'RETAIL' | 'WHOLESALE' =
     String(s.business_type || 'RETAIL').toUpperCase() === 'WHOLESALE'
@@ -267,16 +262,15 @@ router.get('/subscription', async (req: Request, res: Response) => {
     await ensureSettingsPricingColumns();
     const tenantId = await resolvePublicOrAuthTenantId(req);
     const tenantRow = await ensureTenantSubscriptionPopulated(tenantId);
-    const pendingRenewal = await getPendingRenewalRequest(tenantRow?.id || tenantId);
-    const subscriptionInfo = buildSubscriptionInfo(tenantRow, pendingRenewal);
+    const subscriptionInfo = buildSubscriptionInfo(tenantRow);
     return res.json({
       tenantId: tenantRow?.id || tenantId,
       storeName: tenantRow?.name || 'Retail Store',
-      pendingRenewalRequest: pendingRenewal,
+      pendingRenewalRequest: null,
       subscriptionInfo,
     });
   } catch (err: any) {
-    const fallbackSub = buildSubscriptionInfo(null, null);
+    const fallbackSub = buildSubscriptionInfo(null);
     return res.status(200).json({
       tenantId: 1,
       storeName: 'Retail Store',
@@ -370,7 +364,7 @@ router.post('/renew-subscription', requireAuth, requireAdmin, async (req: Authen
       updated_at: new Date().toISOString(),
     };
 
-    const subscriptionInfo = buildSubscriptionInfo(tenantRow, renewalRow);
+    const subscriptionInfo = buildSubscriptionInfo(tenantRow);
     return res.status(201).json({
       success: true,
       renewalRequest: renewalRow,
@@ -541,7 +535,6 @@ router.get('/', async (req: Request, res: Response) => {
       pgClient.query('SELECT * FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenantId]),
       ensureTenantSubscriptionPopulated(tenantId),
     ]);
-    const pendingRenewal = await getPendingRenewalRequest(tenantRow?.id || tenantId);
 
     if (result.rows.length === 0) {
       const fallback = await pgClient.query('SELECT * FROM company_settings ORDER BY id ASC LIMIT 1');
@@ -549,13 +542,13 @@ router.get('/', async (req: Request, res: Response) => {
         return res.status(404).json({ error: 'Company settings not initialized.' });
       }
       return res.json({
-        settings: formatSettingsResponse(fallback.rows[0], tenantRow, pendingRenewal),
+        settings: formatSettingsResponse(fallback.rows[0], tenantRow),
       });
     }
 
     const s: any = result.rows[0];
     res.json({
-      settings: formatSettingsResponse(s, tenantRow, pendingRenewal),
+      settings: formatSettingsResponse(s, tenantRow),
     });
   } catch (err: any) {
     const fallbackSub = buildSubscriptionInfo(null);

@@ -3,12 +3,12 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, ensureEmailVerificationSchema, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, daysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, ensureDatabaseSchema, ensurePlatformNotificationsSchema, ensureTenantStoreUsers, ensureEmailVerificationSchema, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions, clearSubscriptionAlertsOnRenewal } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type AuthenticatedRequest, type AuthUser } from '../auth.ts';
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
 import { sendTrialActivationEmail } from '../utils/email.ts';
-import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getOnlineTenantCount, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
+import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
 
 const router = Router();
@@ -309,7 +309,6 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
     const ownerName = String(body.ownerName || body.name || storeName || 'Store Owner').trim();
     const ownerPhone = String(body.ownerPhone || body.phone || '').trim();
     const password = body.password ? String(body.password).trim() : 'admin123';
-    const plan = String(body.plan || 'TRIAL').toUpperCase();
     const businessType: 'RETAIL' | 'WHOLESALE' =
       String(body.businessType || 'RETAIL').toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
     const pricingMode: 'FIXED' | 'NEGOTIABLE' =

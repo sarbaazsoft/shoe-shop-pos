@@ -24,7 +24,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
   initialSelectedProduct,
   companySettings,
   onClose,
-  onRefreshProducts,
+  onRefreshProducts: _onRefreshProducts,
 }) => {
   const storeName =
     companySettings?.name ||

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Bell, Cpu, KeyRound, Receipt, Save, Send, Check } from 'lucide-react';
+import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Bell, Cpu, KeyRound, Save, Send, Check } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { PrinterHardwareSettings } from './PrinterHardwareSettings.tsx';
 import { DataBackupRestore } from './DataBackupRestore.tsx';
@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed, formatPhoneNumber, cleanPhoneNumber, getPhoneValidationError, isValidPhoneNumber } from '../../utils/textFormat.ts';
-import { calculateDaysLeft, daysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionLabel, getSubscriptionShortLabel, RENEWAL_TEMPLATE_CHIPS, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
+import { calculateDaysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType, isFreeTrial, getSubscriptionShortLabel, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
@@ -650,7 +650,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     DISABLE_HMR: 'false',
   });
   const [emailProviderTab, setEmailProviderTab] = useState<'resend' | 'gmail'>('resend');
-  const [appSettingsGrouped, setAppSettingsGrouped] = useState<Record<string, any[]>>({});
+  const [, setAppSettingsGrouped] = useState<Record<string, any[]>>({});
   const [isLoadingAppSettings, setIsLoadingAppSettings] = useState(false);
   const [isSavingAppSettings, setIsSavingAppSettings] = useState(false);
   const [appSettingsSuccess, setAppSettingsSuccess] = useState(false);

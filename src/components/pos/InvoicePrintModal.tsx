@@ -108,11 +108,10 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const items = sale.items || [];
 
   // Wholesale Calculations & Half-Carton Detection
-  const { totalPairsDispatched, calculatedTotalCartons, halfCartonItemsCount, fullCartonsCount } = useMemo(() => {
+  const { totalPairsDispatched, calculatedTotalCartons, halfCartonItemsCount } = useMemo(() => {
     let pairsSum = 0;
     let cartonsSum = 0;
     let halfCount = 0;
-    let fullCount = 0;
 
     items.forEach((it: any) => {
       const qty = Number(it.quantity) || 0;
@@ -128,9 +127,6 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
       if (ctn === 0.5 || ctn % 1 === 0.5) {
         halfCount += 1;
-        fullCount += Math.floor(ctn);
-      } else {
-        fullCount += Math.round(ctn);
       }
     });
 
@@ -138,7 +134,6 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       totalPairsDispatched: pairsSum,
       calculatedTotalCartons: cartonsSum,
       halfCartonItemsCount: halfCount,
-      fullCartonsCount: fullCount,
     };
   }, [items]);
 
@@ -150,11 +145,10 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
         : '0');
 
   // Digital Receipt State (SMS & WhatsApp)
-  const [recipientPhone, setRecipientPhone] = useState<string>(customerPhone);
-  const [customNote, setCustomNote] = useState<string>('');
+  const recipientPhone = customerPhone;
+  const customNote = '';
   const [showPreviewDrawer, setShowPreviewDrawer] = useState<boolean>(false);
   const [previewType, setPreviewType] = useState<'whatsapp' | 'sms'>('whatsapp');
-  const [copiedType, setCopiedType] = useState<'whatsapp' | 'sms' | null>(null);
 
   const currencySymbol = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
 
@@ -318,11 +312,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       navigator.clipboard
         .writeText(textToCopy)
         .then(() => {
-          setCopiedType(type);
           setDirectFeedback(
             `${type === 'whatsapp' ? 'WhatsApp' : 'SMS'} receipt text copied to clipboard!`
           );
-          setTimeout(() => setCopiedType(null), 2500);
         })
         .catch(() => {
           setDirectFeedback('Could not copy text to clipboard.');
@@ -334,9 +326,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      setCopiedType(type);
       setDirectFeedback('Receipt text copied to clipboard!');
-      setTimeout(() => setCopiedType(null), 2500);
     }
   };
 

@@ -1379,7 +1379,6 @@ router.put('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, 
       maxSalePrice,
       max_sale_price,
       totalStock,
-      lowStockLimit,
       active,
     } = req.body;
 

@@ -14,7 +14,7 @@ export interface PasswordStrengthIndicatorProps {
 export const PasswordStrengthIndicator: React.FC<PasswordStrengthIndicatorProps> = ({
   password,
   minChars = 8,
-  compact = false,
+  compact: _compact = false,
   className = '',
   onStrengthChange,
 }) => {
