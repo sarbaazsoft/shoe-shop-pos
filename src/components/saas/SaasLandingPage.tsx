@@ -6,6 +6,12 @@ import type { TenantInfo } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
 import { useTheme } from '../../context/ThemeContext';
 import { Navbar } from './Navbar';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Autoplay, Pagination } from 'swiper/modules';
+import type { Swiper as SwiperType } from 'swiper';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
 
 interface PublicStats {
   stores: number;
@@ -318,8 +324,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   const [statsInView, setStatsInView] = useState(false);
   const [statsAnimationStartTime, setStatsAnimationStartTime] = useState<number | null>(null);
   const statsSectionRef = useRef<HTMLElement>(null);
-  const storesSwiperRef = useRef<HTMLDivElement>(null);
-  const swiperInstanceRef = useRef<any>(null);
+  const swiperRef = useRef<SwiperType | null>(null);
   const { theme, setThemeMode } = useTheme();
   const landingTheme = theme;
 
@@ -480,104 +485,12 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     }
   }, [statsInView, publicStats, statsAnimationStartTime]);
 
-  useEffect(() => {
-    const container = storesSwiperRef.current;
-    if (!container || storesForSlider.length === 0) return;
-
-    type SwiperInstance = {
-      destroy: (deleteInstance?: boolean, cleanStyles?: boolean) => void;
-      update: () => void;
-      slidePrev: () => void;
-      slideNext: () => void;
-    };
-    let swiperInstance: SwiperInstance | null = null;
-    let fallbackScrollInterval: number | null = null;
-
-    const initializeSwiper = () => {
-      const SwiperConstructor = (window as Window & {
-        Swiper?: new (element: HTMLElement, options: Record<string, unknown>) => SwiperInstance;
-      }).Swiper;
-      if (!SwiperConstructor) return;
-
-      if (swiperInstanceRef.current) {
-        try {
-          swiperInstanceRef.current.destroy(true, true);
-        } catch {
-          // Re-create if destroy failed
-        }
-      }
-
-      try {
-        swiperInstance = new SwiperConstructor(container, {
-          slidesPerView: 'auto',
-          spaceBetween: 10,
-          centeredSlides: true,
-          centeredSlidesBounds: true,
-          watchOverflow: true,
-          breakpointsBase: 'container',
-          navigation: {
-            nextEl: '#nextBtn',
-            prevEl: '#prevBtn',
-          },
-          breakpoints: {
-            480: { slidesPerView: 2.1, spaceBetween: 16 },
-            768: { slidesPerView: 2.4, spaceBetween: 20 },
-            920: { slidesPerView: 3.4, spaceBetween: 24 },
-            1020: { slidesPerView: 4.2, spaceBetween: 30 },
-          },
-        });
-        swiperInstanceRef.current = swiperInstance;
-        container.style.overflow = 'hidden';
-      } catch (err) {
-        console.warn('Swiper init notice:', err);
-      }
-    };
-
-    const swiperScript = document.querySelector<HTMLScriptElement>('script[data-swiper-cdn]');
-    if ((window as Window & { Swiper?: unknown }).Swiper) {
-      initializeSwiper();
-    } else {
-      swiperScript?.addEventListener('load', initializeSwiper);
-      // Fallback smooth auto-scroll in case CDN script loading is delayed
-      let isPaused = false;
-      const onEnter = () => { isPaused = true; };
-      const onLeave = () => { isPaused = false; };
-      container.addEventListener('mouseenter', onEnter);
-      container.addEventListener('mouseleave', onLeave);
-
-      fallbackScrollInterval = window.setInterval(() => {
-        if (!swiperInstance && container && !isPaused) {
-          container.scrollLeft += 1.2;
-          if (container.scrollLeft >= container.scrollWidth - container.clientWidth - 5) {
-            container.scrollLeft = 0;
-          }
-        }
-      }, 25);
-    }
-
-    return () => {
-      swiperScript?.removeEventListener('load', initializeSwiper);
-      if (fallbackScrollInterval) window.clearInterval(fallbackScrollInterval);
-      swiperInstance?.destroy(true, true);
-      swiperInstance = null;
-      swiperInstanceRef.current = null;
-    };
-  }, [storesForSlider]);
-
   const handlePrevSlide = () => {
-    if (swiperInstanceRef.current) {
-      swiperInstanceRef.current.slidePrev();
-    } else if (storesSwiperRef.current) {
-      storesSwiperRef.current.scrollBy({ left: -240, behavior: 'smooth' });
-    }
+    swiperRef.current?.slidePrev();
   };
 
   const handleNextSlide = () => {
-    if (swiperInstanceRef.current) {
-      swiperInstanceRef.current.slideNext();
-    } else if (storesSwiperRef.current) {
-      storesSwiperRef.current.scrollBy({ left: 240, behavior: 'smooth' });
-    }
+    swiperRef.current?.slideNext();
   };
 
   const [plan, setPlan] = useState('TRIAL');
@@ -946,28 +859,50 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
             )}
           </div>
 
-          {/* JS Slider Container */}
+          {/* Swiper Slider Container */}
           {storesForSlider.length > 0 ? (
-            <div
-              ref={storesSwiperRef}
-              className="swiper w-full overflow-hidden pb-4 cursor-grab active:cursor-grabbing select-none"
-              aria-label="Retail stores currently registered in SarbaazSoft POS"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              <div className="swiper-wrapper">
+            <div className="w-full relative pb-4 select-none">
+              <Swiper
+                onSwiper={(swiper) => {
+                  swiperRef.current = swiper;
+                }}
+                modules={[Navigation, Autoplay, Pagination]}
+                navigation={{
+                  prevEl: '#prevBtn',
+                  nextEl: '#nextBtn',
+                }}
+                autoplay={{
+                  delay: 3500,
+                  disableOnInteraction: false,
+                  pauseOnMouseEnter: true,
+                }}
+                loop={storesForSlider.length >= 5}
+                grabCursor={true}
+                slidesPerView={1.2}
+                spaceBetween={12}
+                breakpoints={{
+                  420: { slidesPerView: 1.8, spaceBetween: 14 },
+                  560: { slidesPerView: 2.3, spaceBetween: 16 },
+                  768: { slidesPerView: 3.1, spaceBetween: 18 },
+                  1024: { slidesPerView: 4, spaceBetween: 20 },
+                  1280: { slidesPerView: 5, spaceBetween: 22 },
+                }}
+                className="w-full !overflow-hidden"
+                aria-label="Retail stores currently registered in SarbaazSoft POS"
+              >
                 {storesForSlider.map((tenant, index) => (
-                  <div
+                  <SwiperSlide
                     key={`${tenant.id || tenant.name}-${index}`}
-                    className="swiper-slide store-item shrink-0 h-auto w-[240px] max-w-[85%]"
+                    className="!h-auto flex"
                   >
                     <StoreSliderCard
                       tenant={tenant}
                       index={index}
                       onSelect={onSelectStore}
                     />
-                  </div>
+                  </SwiperSlide>
                 ))}
-              </div>
+              </Swiper>
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-indigo-400/30 lt:border-indigo-200/80 bg-white/5 lt:bg-white p-8 text-center text-slate-300 lt:text-slate-600">
