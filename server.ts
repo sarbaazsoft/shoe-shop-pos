@@ -148,11 +148,11 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (_req, res) => {
   }
   res.json({
     id: '/',
-    name: 'SarbaazSoft Shoe POS',
-    short_name: 'Shoe POS',
+    name: 'Shoe POS',
+    short_name: 'ShoePOS',
     description: 'Multi-tenant retail shoe shop POS and inventory management system',
-    theme_color: '#2563EB',
-    background_color: '#ffffff',
+    theme_color: '#4F46E5',
+    background_color: '#4F46E5',
     display: 'standalone',
     display_override: ['standalone', 'minimal-ui'],
     orientation: 'any',
@@ -172,10 +172,14 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (_req, res) => {
 app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const adminManifestPath = path.join(rootDir, 'public', 'admin', 'manifest.json');
+  if (fs.existsSync(adminManifestPath)) {
+    return res.sendFile(adminManifestPath);
+  }
   res.json({
     id: '/admin/',
-    name: 'POS SaaS C-Panel',
-    short_name: 'POS Admin',
+    name: 'POS Admin',
+    short_name: 'POSAdmin',
     description: 'Dedicated SuperAdmin Control Panel for Multi-Tenant POS SaaS Platform',
     start_url: '/admin',
     scope: '/',

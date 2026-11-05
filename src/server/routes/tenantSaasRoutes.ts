@@ -70,12 +70,12 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
     }
 
     const tenant = tenantRes.rows[0];
-    const shortName = tenant.name.length > 12 ? tenant.name.slice(0, 12).trim() : tenant.name;
+    const shortName = (tenant.name && tenant.name.length > 12 ? tenant.name.slice(0, 12).trim() : tenant.name) || 'ShoePOS';
 
     const manifest = {
       id: `/?tenantId=${tenant.id}`,
-      name: `Sarbaazsoft Shoe POS | /${tenant.name}`,
-      short_name: shortName || 'Shoe POS',
+      name: tenant.name || 'Shoe POS',
+      short_name: shortName,
       description: `Dedicated Retail POS & Inventory Terminal for ${tenant.name}`,
       start_url: `/?tenantId=${tenant.id}`,
       scope: '/',

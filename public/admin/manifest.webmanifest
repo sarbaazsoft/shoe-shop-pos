@@ -1,7 +1,7 @@
 {
   "id": "/admin/",
-  "name": "POS SaaS C-Panel",
-  "short_name": "POS Admin",
+  "name": "POS Admin",
+  "short_name": "POSAdmin",
   "description": "Dedicated SuperAdmin Control Plane for Multi-Tenant POS Provisioning, Store Suspension & SaaS Analytics",
   "start_url": "/admin",
   "scope": "/",

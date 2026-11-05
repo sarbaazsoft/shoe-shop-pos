@@ -229,8 +229,8 @@ export default function App() {
   );
 
   const effectiveStoreName = (() => {
-    if (saasMode === 'SUPERADMIN') return 'POS SaaS C-Panel';
-    if (saasMode === 'LANDING' && !tenantIdParam) return 'SarbaazSoft Shoe POS';
+    if (saasMode === 'SUPERADMIN') return 'POS Admin';
+    if (saasMode === 'LANDING' && !tenantIdParam) return 'Shoe POS';
 
     if (
       saasMode === 'TENANT_ACTIVE' ||
@@ -276,24 +276,19 @@ export default function App() {
     return '';
   })();
 
-  // Name shown for the app: the store name for tenants (same as the PWA name), with
-  // Mobile home screen title and iOS bundle display name (Shoe POS) to prevent truncation
+  // Mobile home screen title and iOS bundle display name (ShoePOS) to prevent truncation
   const pwaShortName =
     saasMode === 'SUPERADMIN'
-      ? 'POS Admin'
-      : 'Shoe POS';
+      ? 'POSAdmin'
+      : 'ShoePOS';
 
-  // Desktop / web page title: Sarbaazsoft Shoe POS | /storeName
-  const storeSlug = effectiveStoreName
-    ? (effectiveStoreName.startsWith('/') ? effectiveStoreName : `/${effectiveStoreName}`)
-    : '';
-
+  // Direct, clean page title without prepending or appending duplicate store names, slogans, or platform credits
   const pageTitle =
     saasMode === 'SUPERADMIN'
-      ? 'POS SaaS C-Panel'
+      ? 'POS Admin'
       : saasMode === 'LANDING' || !effectiveStoreName
-      ? 'Sarbaazsoft Shoe POS'
-      : `Sarbaazsoft Shoe POS | ${storeSlug}`;
+      ? 'Shoe POS'
+      : effectiveStoreName;
 
   // Dynamically update <link rel="manifest">, Apple meta tags, and <meta name="theme-color">
   useEffect(() => {

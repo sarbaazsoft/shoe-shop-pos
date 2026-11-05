@@ -19,7 +19,7 @@ const ANDROID_APK_URL: string = (import.meta as any).env?.VITE_ANDROID_APK_URL |
 export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, storeName }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [activeTab, setActiveTab] = useState<PlatformTab>('android');
-  const effectiveStoreName = storeName || localStorage.getItem('cached_store_name') || 'SarbaazSoft Shoe POS';
+  const effectiveStoreName = storeName || localStorage.getItem('cached_store_name') || 'Shoe POS';
   const pwaAppName = effectiveStoreName;
 
   const { containerRef: installTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeTab, {

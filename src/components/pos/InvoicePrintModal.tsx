@@ -291,8 +291,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
   const handlePrintStandard = () => {
     const originalTitle = document.title;
-    // Suppress "{Store Name} | SarbaazSoft Shoe POS" or unwanted credit headers from browser print margins
-    document.title = sale.invoice_number ? `Invoice_${sale.invoice_number}` : 'Invoice';
+    // Assign clean, direct invoice ID without prepending or appending duplicate store names, slogans, or platform credits
+    document.title = sale.invoice_number ? `Invoice #${sale.invoice_number}` : 'Invoice';
 
     const restoreTitle = () => {
       document.title = originalTitle;
