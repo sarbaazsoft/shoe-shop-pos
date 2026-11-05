@@ -39,10 +39,6 @@ export function getApplicationBaseUrl(fallbackOrigin?: string | null): string {
     return recordedBaseUrl;
   }
 
-  if (process.env.APP_URL) {
-    return process.env.APP_URL.replace(/\/+$/, '');
-  }
-
   return 'http://localhost:3000';
 }
 

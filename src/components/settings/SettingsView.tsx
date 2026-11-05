@@ -1340,7 +1340,7 @@ setFormErrors(errors);
             }`}
           >
             <Sliders className={`w-4 h-4 transition-colors duration-200 ${activeTab === 'app_settings' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
-            <span>App &amp; Environment Config</span>
+            <span>App Config</span>
             {activeTab === 'app_settings' && (
               <motion.div
                 layoutId="settingsActiveUnderline"
@@ -3504,7 +3504,7 @@ setFormErrors(errors);
             onClick={() => setActiveTab('app_settings')}
             className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold cursor-pointer"
           >
-            Open App &amp; Environment Config
+            Open App Config
           </button>
         </div>
       )}

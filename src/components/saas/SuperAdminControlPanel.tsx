@@ -1473,7 +1473,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         },
         {
           id: 'settings' as SuperAdminTab,
-          label: 'App & Environment Config',
+          label: 'App Config',
           icon: Sliders,
           shortcut: 'F6',
         },
@@ -2381,7 +2381,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                       <span className="truncate text-xs font-semibold">Profile &amp; Security</span>
                     </button>
 
-                    {/* App & Environment Config Item */}
+                    {/* App Config Item */}
                     <button
                       type="button"
                       id="superadmin-app-settings-btn"
@@ -2392,7 +2392,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                       className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition cursor-pointer text-slate-700 dark:text-purple-200 hover:bg-gradient-to-r hover:from-purple-600 hover:via-indigo-600 hover:to-purple-700 hover:text-white dark:hover:text-white dark:hover:bg-purple-500/25 group border border-transparent"
                     >
                       <Sliders className="w-3.5 h-3.5 stroke-[2] transition-colors shrink-0 text-current opacity-80 group-hover:opacity-100" />
-                      <span className="truncate text-xs font-semibold">App &amp; Environment Config</span>
+                      <span className="truncate text-xs font-semibold">App Config</span>
                     </button>
 
                     {/* Sign Out Item */}
