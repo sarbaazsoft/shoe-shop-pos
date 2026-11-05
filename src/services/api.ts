@@ -129,10 +129,6 @@ export function clearAllSessionState(): void {
   }
 }
 
-export function clearAuthSession() {
-  clearAllSessionState();
-}
-
 /**
  * Tells the server to terminate the current session (revokes the token, clears auth cookies).
  * Fire-and-forget on purpose: logging out in the UI must be immediate and must never be blocked
@@ -155,7 +151,7 @@ export function revokeSessionOnServer(): void {
   }
 }
 
-export function getStoredUser() {
+function getStoredUser() {
   const raw = localStorage.getItem(USER_KEY) || localStorage.getItem(ALT_USER_KEY);
   if (!raw) return null;
   try {
@@ -325,7 +321,7 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestOption
 
   if (!response.ok) {
     if (response.status === 401 && !endpoint.includes('/auth/') && !endpoint.includes('/login')) {
-      clearAuthSession();
+      clearAllSessionState();
     }
     if (data?.code === 'SUBSCRIPTION_EXPIRED' && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tenant:subscription-expired', { detail: data }));

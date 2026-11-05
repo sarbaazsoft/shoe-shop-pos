@@ -162,23 +162,6 @@ export interface TenantPlanBreakdown {
   expiringCount: number;
 }
 
-export interface SuperAdminAnalytics {
-  totalStores: number;
-  activeStores: number;
-  expiringSoonStores: number;
-  expiredStores: number;
-  suspendedStores: number;
-  totalRevenue: number;
-  totalSalesVolume: number;
-  totalProductsCount: number;
-  totalInvoicesCount: number;
-  activeSubscriptionsCount: number;
-  revenueByPlan: Record<string, number>;
-  storesByPlan: Record<string, number>;
-  recentStores: SuperAdminStoreRow[];
-  totalCashiersCount?: number;
-}
-
 export interface ExpiringTenantAlert {
   id: number;
   name: string;
@@ -194,13 +177,18 @@ export interface ExpiringTenantAlert {
 export interface CompanySettings {
   id: number;
   tenantId?: number;
+  tenant_id?: number;
   tenantStatus?: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | string;
+  tenant_status?: string;
   businessType?: 'RETAIL' | 'WHOLESALE' | string;
+  business_type?: string;
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
   subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | string;
   name: string;
+  companyName?: string;
+  company_name?: string;
   logo: string;
   showReceiptLogo?: boolean;
   receiptLogo?: string;
@@ -213,16 +201,21 @@ export interface CompanySettings {
   taxRate?: number;
   currency: string;
   currencyName: string;
+  currency_name?: string;
   currencySymbol: string;
+  currency_symbol?: string;
   invoiceFooter: string;
   lowStockLimit: number;
   pricingMode: PricingMode;
+  pricing_mode?: PricingMode;
   pricingPolicyLocked: boolean;
+  pricing_policy_locked?: boolean;
   minSellingQuantity?: number;
   min_selling_quantity?: number;
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
   updatedAt: string;
+  updated_at?: string;
 }
 
 export interface Brand {

@@ -28,7 +28,7 @@ import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
 import { NotificationsView } from './components/notifications/NotificationsView.tsx';
 import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
-import type { ActiveExchange, TenantInfo } from './types.ts';
+import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
 type SaasRouteMode =
   | 'INSTALLER'
@@ -163,7 +163,7 @@ export default function App() {
     }
   });
 
-  const [companySettings, setCompanySettings] = useState<any | null>(() => {
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(() => {
     try {
       const token = localStorage.getItem('pos_auth_token') || localStorage.getItem('shoe_pos_jwt_token');
       if (!token || token === 'null' || token === 'undefined') return null;

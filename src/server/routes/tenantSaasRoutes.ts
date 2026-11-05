@@ -75,7 +75,7 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
     const manifest = {
       id: `/?tenantId=${tenant.id}`,
       name: `Sarbaazsoft Shoe POS | /${tenant.name}`,
-      short_name: 'Shoe POS',
+      short_name: shortName || 'Shoe POS',
       description: `Dedicated Retail POS & Inventory Terminal for ${tenant.name}`,
       start_url: `/?tenantId=${tenant.id}`,
       scope: '/',

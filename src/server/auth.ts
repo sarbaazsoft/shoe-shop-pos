@@ -389,8 +389,6 @@ export function requireSuperAdmin(req: AuthenticatedRequest, res: Response, next
   next();
 }
 
-export const requirePlatformOwner = requireSuperAdmin;
-
 /**
  * Route Middleware Safeguard:
  * Explicitly protects trial/dashboard route groups and sensitive store operations.
