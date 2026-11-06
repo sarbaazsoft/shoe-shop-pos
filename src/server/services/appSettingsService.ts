@@ -200,11 +200,9 @@ export async function ensureAppSettingsSchema(): Promise<void> {
           AND value NOT ILIKE 'https://%'
       `).catch(() => {});
 
-      // Seed all default settings if not already present
+      // Seed all default settings if not already present (preferring .env as initial seed if present)
       for (const def of APP_SETTINGS_DEFAULTS) {
-        // RESEND_API_KEY and email settings must NEVER be loaded or seeded from process.env or .env
-        const isEmailCat = def.category === 'email' || def.key === 'RESEND_API_KEY';
-        const envVal = !isEmailCat ? process.env[def.key]?.trim() : undefined;
+        const envVal = process.env[def.key]?.trim();
         const initialVal = envVal !== undefined && envVal !== '' ? envVal : def.defaultValue;
 
         await pgClient.query(
@@ -263,12 +261,12 @@ export async function loadAppSettingsCache(): Promise<void> {
 /**
  * Dynamic asynchronous getter for an app setting with fallback value.
  * PostgreSQL app_settings table is the primary and authoritative source of truth.
- * Email settings (RESEND_API_KEY, RESEND_FROM, etc.) are strictly read from app_settings, never from .env.
+ * Email settings and other configurations fallback to .env when not configured in app_settings.
  */
 export async function getAppSetting(key: string, fallback?: string): Promise<string> {
   if (key === 'RESEND_API_KEY') {
-    // CRITICAL REQUIREMENT: Do not use .env for resend_api_key.
-    // Retrieve resend_api_key dynamically from the app_setting database table.
+    // Retrieve resend_api_key dynamically from the app_settings database table,
+    // falling back to .env (process.env.RESEND_API_KEY) if not yet configured in DB.
     try {
       const res = await pgClient.query<{ value: string }>(
         `SELECT value FROM public.app_settings WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
@@ -277,15 +275,17 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
           `SELECT value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
         );
       });
-      if (res.rows.length > 0) {
-        const val = (res.rows[0].value || '').trim();
+      if (res.rows.length > 0 && res.rows[0].value && res.rows[0].value.trim()) {
+        const val = res.rows[0].value.trim();
         settingsCache.set('RESEND_API_KEY', val);
         return val;
       }
     } catch (err) {
       console.warn('Notice querying RESEND_API_KEY dynamically from app_setting table:', err);
     }
-    return settingsCache.get('RESEND_API_KEY') || fallback || '';
+    const cached = settingsCache.get('RESEND_API_KEY');
+    if (cached && cached.trim()) return cached.trim();
+    return (process.env.RESEND_API_KEY || fallback || '').trim();
   }
 
   if (!cacheLoaded) {
@@ -315,12 +315,10 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
     }
   }
 
-  // Environment variable fallback if not set in database (NEVER used for RESEND_API_KEY)
-  if (key !== 'RESEND_API_KEY') {
-    const envVal = process.env[key]?.trim();
-    if (envVal !== undefined && envVal !== '') {
-      return envVal;
-    }
+  // Environment variable fallback if not set in database
+  const envVal = process.env[key]?.trim();
+  if (envVal !== undefined && envVal !== '') {
+    return envVal;
   }
   if (key === 'RESEND_FROM_EMAIL') {
     const altEnv = process.env.RESEND_FROM?.trim();
@@ -340,12 +338,14 @@ export async function getAppSetting(key: string, fallback?: string): Promise<str
 
 /**
  * Synchronous getter for hot paths (e.g. middleware, request headers).
- * If cache is loaded, returns the cached value from PostgreSQL app_settings.
+ * If cache is loaded, returns the cached value from PostgreSQL app_settings,
+ * falling back to .env if empty.
  */
 export function getCachedAppSetting(key: string, fallback?: string): string {
   if (key === 'RESEND_API_KEY') {
-    // Strictly read from database-synced cache, never from process.env
-    return settingsCache.get('RESEND_API_KEY') || fallback || '';
+    const dbVal = settingsCache.get('RESEND_API_KEY');
+    if (dbVal && dbVal.trim()) return dbVal.trim();
+    return (process.env.RESEND_API_KEY || fallback || '').trim();
   }
 
   const def = APP_SETTINGS_DEFAULTS.find((d) => d.key === key);
@@ -373,11 +373,9 @@ export function getCachedAppSetting(key: string, fallback?: string): string {
     }
   }
 
-  if (key !== 'RESEND_API_KEY') {
-    const envVal = process.env[key]?.trim();
-    if (envVal !== undefined && envVal !== '') {
-      return envVal;
-    }
+  const envVal = process.env[key]?.trim();
+  if (envVal !== undefined && envVal !== '') {
+    return envVal;
   }
   if (key === 'RESEND_FROM_EMAIL') {
     const altEnv = process.env.RESEND_FROM?.trim();

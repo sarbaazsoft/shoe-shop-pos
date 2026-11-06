@@ -194,8 +194,8 @@ export async function getDynamicGmailCredentials(): Promise<{ user: string; pass
 }
 
 /**
- * Dynamically retrieves the Resend API key directly from the database app_setting / app_settings table.
- * Strictly adheres to requirement: Do NOT use .env for resend_api_key.
+ * Dynamically retrieves the Resend API key directly from the database app_setting / app_settings table,
+ * falling back to .env (process.env.RESEND_API_KEY) if not yet configured in the database.
  */
 export async function getDynamicResendApiKey(): Promise<string> {
   try {
@@ -206,15 +206,17 @@ export async function getDynamicResendApiKey(): Promise<string> {
         `SELECT key, value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
       );
     });
-    if (res.rows.length > 0 && res.rows[0].value) {
+    if (res.rows.length > 0 && res.rows[0].value && res.rows[0].value.trim()) {
       return res.rows[0].value.trim();
     }
   } catch (dbErr) {
     console.error('[email.ts] Error dynamically querying app_setting table for resend_api_key:', dbErr);
   }
 
-  // Fallback to database-synced cache only (never process.env / .env)
-  return (getCachedAppSetting('RESEND_API_KEY') || '').trim();
+  // Fallback to database-synced cache, then fallback to .env (process.env.RESEND_API_KEY)
+  const cached = getCachedAppSetting('RESEND_API_KEY');
+  if (cached && cached.trim()) return cached.trim();
+  return (process.env.RESEND_API_KEY || '').trim();
 }
 
 async function sendViaWebhookFallback(
