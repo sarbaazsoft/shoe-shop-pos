@@ -195,27 +195,18 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     companySettings?.invoiceFooter ||
     'Thank you for your business!';
 
-  // Sanitize invoice footer: completely remove any application branding, platform watermarks, or footer credits
+  // Sanitize invoice footer: completely remove any application branding, platform watermarks, or footer credits from inside the receipt box
   const sanitizeInvoiceFooter = (footer?: string): string => {
     if (!footer) return '';
     const trimmed = footer.trim();
-    if (
-      trimmed === 'Powered by SarbaazSoft Shoe POS • © 2026 All rights reserved.' ||
-      trimmed === 'Powered by SarbaazSoft Shoe POS' ||
-      trimmed === 'SarbaazSoft Shoe POS' ||
-      trimmed.toLowerCase().includes('sarbaazsoft')
-    ) {
-      const sanitized = trimmed
-        .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
-        .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
-        .replace(/SarbaazSoft Shoe POS/gi, '')
-        .replace(/SarbaazSoft POS/gi, '')
-        .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
-        .replace(/Powered by[\s\S]*$/gi, '')
-        .trim();
-      return sanitized;
-    }
-    return trimmed;
+    const sanitized = trimmed
+      .replace(/Powered by\s+SarbaazSoft(\s+Shoe\s+POS)?[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+      .replace(/Powered by\s+SarbaazSoft(\s+Shoe\s+POS)?/gi, '')
+      .replace(/SarbaazSoft(\s+Shoe\s+POS)?/gi, '')
+      .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+      .replace(/Powered by[\s\S]*$/gi, '')
+      .trim();
+    return sanitized;
   };
 
   const cleanInvoiceFooter = sanitizeInvoiceFooter(rawInvoiceFooter);
@@ -632,8 +623,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
         {/* =================================================================== */}
         {/* INTERACTIVE PREVIEW CONTAINER                                       */}
         {/* =================================================================== */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 dark:bg-[#080D1A] flex justify-center items-start">
-          {useThermalLayout ? (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 dark:bg-[#080D1A] flex flex-col items-center justify-start">
+          <div className="flex flex-col items-center w-fit max-w-full">
+            {useThermalLayout ? (
             /* =============================================================== */
             /* 50MM THERMAL RECEIPT PREVIEW (DEFAULT FOR RETAIL TRANSACTIONS)  */
             /* =============================================================== */
@@ -1110,6 +1102,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               </div>
             </div>
           )}
+
+            {/* App branding/credit text cleanly outside and below the bottom border of the invoice container */}
+            <div className="mt-3.5 pb-2 text-center text-xs text-slate-400 dark:text-slate-500 font-medium tracking-wide select-none no-print">
+              Powered by <span className="font-semibold text-slate-600 dark:text-slate-300">SarbaazSoft</span>
+            </div>
+          </div>
         </div>
       </div>
 
