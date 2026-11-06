@@ -390,6 +390,9 @@ const DATABASE_TABLE_DDL: string[] = [
     business_type business_type_enum NOT NULL DEFAULT 'RETAIL',
     min_selling_quantity NUMERIC(3, 1) NOT NULL DEFAULT 1.0,
     allow_half_carton BOOLEAN NOT NULL DEFAULT true,
+    telegram_bot_token TEXT DEFAULT '',
+    telegram_chat_id TEXT DEFAULT '',
+    telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false,
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
@@ -1250,6 +1253,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
           BEGIN
             ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS min_selling_quantity NUMERIC(3, 1) NOT NULL DEFAULT 1.0;
             ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS allow_half_carton BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_bot_token TEXT DEFAULT '';
+            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT '';
+            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false;
           EXCEPTION WHEN OTHERS THEN NULL;
           END;
           BEGIN
@@ -1962,4 +1968,26 @@ export async function dropAllTables(): Promise<void> {
 
   resetSaasControlPlaneState();
   console.log('🗑️ All database tables successfully dropped with CASCADE.');
+}
+
+let telegramSchemaPromise: Promise<void> | null = null;
+export async function ensureTelegramSettingsSchema(): Promise<void> {
+  if (telegramSchemaPromise) return telegramSchemaPromise;
+  telegramSchemaPromise = (async () => {
+    try {
+      await pgClient.exec(`
+        DO $$ BEGIN
+          IF to_regclass('public.company_settings') IS NOT NULL THEN
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_bot_token TEXT DEFAULT '';
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT '';
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false;
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS email_alerts_enabled BOOLEAN NOT NULL DEFAULT true;
+          END IF;
+        END $$;
+      `);
+    } catch (err) {
+      console.warn('Notice ensuring Telegram settings schema:', err);
+    }
+  })();
+  return telegramSchemaPromise;
 }

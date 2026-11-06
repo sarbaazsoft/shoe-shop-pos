@@ -3,6 +3,8 @@ import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensurePushSubscriptionsSchema } from '../db/schemaInit.ts';
 import { getCachedAppSetting, getAppSetting, updateAppSettings, registerSettingsUpdateListener } from './services/appSettingsService.ts';
+import { dispatchPosTelegramAlert } from './services/telegramService.ts';
+import { dispatchPosEmailAlert } from './services/emailAlertService.ts';
 
 // Deterministic or PostgreSQL-configured VAPID Keys for Web Push API
 let vapidPublicKey = getCachedAppSetting('VAPID_PUBLIC_KEY', '');
@@ -312,7 +314,9 @@ export async function notifyPosAction(
         });
       } catch (pushErr: any) {
         const code = pushErr?.statusCode;
-        if (code === 404 || code === 410 || code === 401 || code === 403) {
+        // RFC 8292: ONLY HTTP 404 (Not Found) or 410 (Gone) indicates that subscription is dead.
+        // Never delete subscription on 401/403 (server auth issues).
+        if (code === 404 || code === 410) {
           await removePushSubscription(row.endpoint).catch(() => {});
         } else {
           console.warn(`Web push delivery notice for endpoint: ${pushErr?.message || pushErr}`);
@@ -323,6 +327,20 @@ export async function notifyPosAction(
     await Promise.allSettled(sendPromises);
   } catch (err) {
     console.error('Error during Web Push dispatch:', err);
+  }
+
+  // 3. Deliver instant push alert to Store Owner's Telegram (runs even when app/browser is completely closed)
+  try {
+    await dispatchPosTelegramAlert(cleanTenantId, enrichedPayload);
+  } catch (tgErr) {
+    console.warn('⚠️ Telegram dispatch notice:', tgErr);
+  }
+
+  // 4. Deliver instant email notification to Store Owner & SuperAdmin (runs via Gmail SMTP to mobile Mail app)
+  try {
+    await dispatchPosEmailAlert(cleanTenantId, enrichedPayload);
+  } catch (emailErr) {
+    console.warn('⚠️ Email alert dispatch notice:', emailErr);
   }
 }
 

@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions, ensureTelegramSettingsSchema } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
@@ -11,6 +11,7 @@ import { getAllAppSettings, updateAppSettings } from '../services/appSettingsSer
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
 import { testEmailConfiguration } from '../utils/email.ts';
+import { testTelegramConnection, getStoreTelegramConfig } from '../services/telegramService.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -254,6 +255,14 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     pricingMode: mode,
     pricingPolicyLocked: locked,
     pricing_policy_locked: locked,
+    telegramBotToken: s.telegram_bot_token || '',
+    telegram_bot_token: s.telegram_bot_token || '',
+    telegramChatId: s.telegram_chat_id || '',
+    telegram_chat_id: s.telegram_chat_id || '',
+    telegramAlertsEnabled: Boolean(s.telegram_alerts_enabled),
+    telegram_alerts_enabled: Boolean(s.telegram_alerts_enabled),
+    emailAlertsEnabled: s.email_alerts_enabled !== false,
+    email_alerts_enabled: s.email_alerts_enabled !== false,
     updatedAt: s.updated_at,
   };
 }
@@ -595,6 +604,8 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
   try {
     await ensureSettingsPricingColumns();
 
+    await ensureTelegramSettingsSchema();
+
     const userRole = String(req.user?.role || '').toUpperCase();
     const isPlatformOwner = userRole === 'SUPERADMIN';
 
@@ -633,6 +644,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const invoiceFooter = req.body.invoice_footer || req.body.invoiceFooter || '';
     const lowStockLimit = parseInt(req.body.low_stock_limit || req.body.lowStockLimit, 10) || 5;
 
+    const telegramBotToken = String(req.body.telegram_bot_token ?? req.body.telegramBotToken ?? '').trim();
+    const telegramChatId = String(req.body.telegram_chat_id ?? req.body.telegramChatId ?? '').trim();
+    const telegramAlertsEnabled = Boolean(req.body.telegram_alerts_enabled ?? req.body.telegramAlertsEnabled ?? false);
+
     const [currentSettingsRes, tenantRes] = await Promise.all([
       pgClient.query<{
         id: number;
@@ -642,8 +657,12 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
         currency: string;
         currency_name: string;
         currency_symbol: string;
+        telegram_bot_token?: string;
+        telegram_chat_id?: string;
+        telegram_alerts_enabled?: boolean;
+        email_alerts_enabled?: boolean;
       }>(
-        'SELECT id, pricing_policy_locked, pricing_mode, business_type, currency, currency_name, currency_symbol FROM company_settings WHERE tenant_id = $1 LIMIT 1',
+        'SELECT id, pricing_policy_locked, pricing_mode, business_type, currency, currency_name, currency_symbol, telegram_bot_token, telegram_chat_id, telegram_alerts_enabled, email_alerts_enabled FROM company_settings WHERE tenant_id = $1 LIMIT 1',
         [tenantId]
       ),
       pgClient.query<{
@@ -718,6 +737,20 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       }
     }
 
+    // Persist Telegram and Email notification preferences
+    const finalTelegramBotToken = req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined
+      ? telegramBotToken
+      : (currentRow?.telegram_bot_token || '');
+    const finalTelegramChatId = req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined
+      ? telegramChatId
+      : (currentRow?.telegram_chat_id || '');
+    const finalTelegramAlertsEnabled = req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined
+      ? telegramAlertsEnabled
+      : Boolean(currentRow?.telegram_alerts_enabled);
+    const finalEmailAlertsEnabled = req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined
+      ? Boolean(req.body.email_alerts_enabled ?? req.body.emailAlertsEnabled)
+      : (currentRow?.email_alerts_enabled !== undefined ? Boolean(currentRow?.email_alerts_enabled) : true);
+
     let updateRes;
     if (currentRow) {
       updateRes = await pgClient.query(
@@ -728,7 +761,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
            invoice_footer = $11, low_stock_limit = $12,
            pricing_mode = $13, business_type = $14, pricing_policy_locked = $19,
            min_selling_quantity = $20, allow_half_carton = $21,
-           show_receipt_logo = $15, receipt_logo = $16, updated_at = NOW()
+           show_receipt_logo = $15, receipt_logo = $16,
+           telegram_bot_token = $22, telegram_chat_id = $23, telegram_alerts_enabled = $24,
+           email_alerts_enabled = $25,
+           updated_at = NOW()
          WHERE id = $17 AND tenant_id = $18
          RETURNING *`,
         [
@@ -753,6 +789,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           isLocked,
           finalMinSellingQuantity,
           finalAllowHalfCarton,
+          finalTelegramBotToken,
+          finalTelegramChatId,
+          finalTelegramAlertsEnabled,
+          finalEmailAlertsEnabled,
         ]
       );
     } else {
@@ -760,8 +800,9 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
         `INSERT INTO company_settings (
            tenant_id, phone, email, address, strn, tax_id, website, logo,
            currency_name, currency, currency_symbol,
-           invoice_footer, low_stock_limit, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked, show_receipt_logo, receipt_logo
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+           invoice_footer, low_stock_limit, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked, show_receipt_logo, receipt_logo,
+           telegram_bot_token, telegram_chat_id, telegram_alerts_enabled, email_alerts_enabled
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
          RETURNING *`,
         [
           tenantId,
@@ -784,6 +825,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           isLocked,
           showReceiptLogo,
           receiptLogo,
+          finalTelegramBotToken,
+          finalTelegramChatId,
+          finalTelegramAlertsEnabled,
+          finalEmailAlertsEnabled,
         ]
       );
     }
@@ -824,6 +869,54 @@ router.patch('/changeSetting', requireAuth, requireAdmin, handleUpdateSettings);
 router.post('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.put('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.patch('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
+
+// POST /api/settings/test-telegram - Verification endpoint to test Telegram bot notifications
+router.post('/test-telegram', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await ensureTelegramSettingsSchema();
+    const tenantId = await resolvePublicOrAuthTenantId(req);
+    const customToken = String(req.body?.botToken || req.body?.bot_token || req.body?.telegramBotToken || '').trim();
+    const customChatId = String(req.body?.chatId || req.body?.chat_id || req.body?.telegramChatId || '').trim();
+
+    let botToken = customToken;
+    let chatId = customChatId;
+    let storeName = 'SarbaazSoft Shoe Store';
+
+    if (!chatId || !botToken) {
+      const config = await getStoreTelegramConfig(tenantId);
+      if (!botToken) botToken = config.botToken;
+      if (!chatId) chatId = config.chatId;
+      if (config.storeName) storeName = config.storeName;
+    }
+
+    if (!chatId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Telegram Chat ID is required. In Telegram, message @userinfobot to find your Chat ID.',
+      });
+    }
+
+    if (!botToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Telegram Bot Token is required. Create a bot using @BotFather in Telegram and paste the token.',
+      });
+    }
+
+    const testRes = await testTelegramConnection(botToken, chatId, storeName);
+    return res.json({
+      success: testRes.ok,
+      message: testRes.message,
+      error: testRes.error,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to dispatch test Telegram alert: ' + (err?.message || 'Unknown error'),
+    });
+  }
+});
+
 
 // --- USER MANAGEMENT (Store Admin Only, Strictly scoped to store tenant) ---
 

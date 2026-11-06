@@ -98,6 +98,20 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     description: 'Require email verification for new free trial registrations before access is activated',
     isSecret: false,
   },
+  {
+    key: 'EMAIL_POS_ALERTS_ENABLED',
+    defaultValue: 'true',
+    category: 'email',
+    description: 'Send instant transaction receipts and invoice alerts to store owner email',
+    isSecret: false,
+  },
+  {
+    key: 'EMAIL_SUPERADMIN_ON_SALES',
+    defaultValue: 'false',
+    category: 'email',
+    description: 'Send copy of all cashier store sales to SuperAdmin Gmail address',
+    isSecret: false,
+  },
 
   // 3. Notifications Group
   {
@@ -119,6 +133,27 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     defaultValue: 'mailto:support@sarbaazsoft.com',
     category: 'notifications',
     description: 'Web Push contact subject URI or mailto link',
+    isSecret: false,
+  },
+  {
+    key: 'TELEGRAM_BOT_TOKEN',
+    defaultValue: '',
+    category: 'notifications',
+    description: 'Platform Telegram Bot Token for POS alert dispatch (e.g. 7891234567:AAFl...)',
+    isSecret: true,
+  },
+  {
+    key: 'TELEGRAM_SUPERADMIN_CHAT_ID',
+    defaultValue: '',
+    category: 'notifications',
+    description: 'Telegram Chat ID or Group ID for SuperAdmin platform alerts',
+    isSecret: false,
+  },
+  {
+    key: 'TELEGRAM_ALERTS_ENABLED',
+    defaultValue: 'true',
+    category: 'notifications',
+    description: 'Global master toggle for Telegram push notification delivery',
     isSecret: false,
   },
 
