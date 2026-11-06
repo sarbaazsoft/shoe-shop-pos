@@ -125,6 +125,7 @@ export interface PosActionNotification {
   deepLinkUrl: string;
   timestamp: string;
   triggeredBy?: string;
+  targetRole?: 'ALL' | 'ADMIN' | 'CASHIER';
   targetRoles?: ('ADMIN' | 'CASHIER')[];
 }
 
@@ -198,6 +199,11 @@ export async function removePushSubscription(endpoint: string): Promise<boolean>
  * Dispatches instant real-time notifications to:
  * 1. Active Web browser sessions via Server-Sent Events (SSE) with strict role isolation
  * 2. Mobile Android/Apple installed PWAs and background web sessions via Web Push API with role filtering
+ * 
+ * CRITICAL ROUTING RULES:
+ * - Store Owners (ADMIN / OWNER) MUST ALWAYS receive transactional sale & invoice alerts across all cashiers.
+ * - Cashiers ONLY receive real-time alerts for operations they performed themselves.
+ * - SuperAdmin NEVER receives store POS notifications.
  */
 export async function notifyPosAction(
   tenantId: number,
@@ -205,19 +211,22 @@ export async function notifyPosAction(
 ): Promise<void> {
   const cleanTenantId = Number(tenantId) || 1;
   const allowedRoles = payload.targetRoles || ['ADMIN', 'CASHIER'];
+  const enrichedPayload: PosActionNotification = {
+    ...payload,
+    targetRole: payload.targetRole || 'ALL',
+    targetRoles: allowedRoles,
+  };
 
   // 1. Deliver to active browser dashboard sessions via Server-Sent Events (SSE)
-  // CRITICAL: SuperAdmin NEVER receives store POS notifications (prevent cross-role leakage).
-  // Only deliver to matching tenant store sessions with permitted roles (ADMIN and/or CASHIER).
-  // Cashiers ONLY receive real-time alerts for operations they performed themselves.
-  const sseMessage = `event: pos_action\ndata: ${JSON.stringify(payload)}\n\n`;
+  // Store Owner (ADMIN) receives all store counter actions. Cashiers only receive their own.
+  const sseMessage = `event: pos_action\ndata: ${JSON.stringify(enrichedPayload)}\n\n`;
   for (const client of sseClients) {
     if (
       client.tenantId === cleanTenantId &&
       client.role !== 'SUPERADMIN' &&
       allowedRoles.includes(client.role as any)
     ) {
-      if (client.role === 'CASHIER' && payload.cashierId && client.userId !== payload.cashierId) {
+      if (client.role === 'CASHIER' && enrichedPayload.cashierId && client.userId !== enrichedPayload.cashierId) {
         continue;
       }
       try {
@@ -228,7 +237,7 @@ export async function notifyPosAction(
     }
   }
 
-  // 2. Deliver via Web Push API to installed PWAs and subscribed web browsers
+  // 2. Deliver via Web Push API to installed PWAs (Android/iOS) and subscribed web browsers
   if (!vapidPublicKey || !vapidPrivateKey) {
     configureVapidDetails();
   }
@@ -249,7 +258,7 @@ export async function notifyPosAction(
       `SELECT endpoint, p256dh, auth, user_role, user_id
        FROM public.push_subscriptions
        WHERE tenant_id = $1
-         AND (UPPER(user_role) = 'ADMIN' OR UPPER(user_role) = 'OWNER' OR UPPER(user_role) = ANY($2::text[]))
+         AND (UPPER(user_role) IN ('ADMIN', 'OWNER') OR UPPER(user_role) = ANY($2::text[]))
          AND tenant_id != 0`,
       [cleanTenantId, allowedRoles]
     );
@@ -259,19 +268,21 @@ export async function notifyPosAction(
     }
 
     const pushData = JSON.stringify({
-      title: payload.title,
-      body: payload.message,
+      title: enrichedPayload.title,
+      body: enrichedPayload.message,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      tag: `pos-${payload.type.toLowerCase()}-${payload.invoiceNumber || Date.now()}`,
+      tag: `pos-${enrichedPayload.type.toLowerCase()}-${enrichedPayload.invoiceNumber || Date.now()}`,
       data: {
-        url: payload.deepLinkUrl,
-        type: payload.type,
-        invoiceNumber: payload.invoiceNumber,
-        orderId: payload.orderId,
-        saleId: payload.saleId,
-        returnNumber: payload.returnNumber,
-        timestamp: payload.timestamp,
+        url: enrichedPayload.deepLinkUrl,
+        type: enrichedPayload.type,
+        invoiceNumber: enrichedPayload.invoiceNumber,
+        orderId: enrichedPayload.orderId,
+        saleId: enrichedPayload.saleId,
+        returnNumber: enrichedPayload.returnNumber,
+        timestamp: enrichedPayload.timestamp,
+        targetRole: enrichedPayload.targetRole,
+        targetRoles: enrichedPayload.targetRoles,
       },
       actions: [
         { action: 'open_receipt', title: 'View Receipt / Details' },
@@ -279,8 +290,10 @@ export async function notifyPosAction(
     });
 
     const sendPromises = subsRes.rows.map(async (row) => {
-      // Cashiers only receive Web Push notifications for their own transactions
-      if (String(row.user_role).toUpperCase() === 'CASHIER' && payload.cashierId && Number(row.user_id) !== Number(payload.cashierId)) {
+      const uRole = String(row.user_role || '').toUpperCase();
+      // Store Owners (ADMIN / OWNER) MUST ALWAYS receive transactional sale & invoice alerts!
+      // Cashiers only receive Web Push notifications for their own transactions.
+      if (uRole === 'CASHIER' && enrichedPayload.cashierId && Number(row.user_id) !== Number(enrichedPayload.cashierId)) {
         return;
       }
 

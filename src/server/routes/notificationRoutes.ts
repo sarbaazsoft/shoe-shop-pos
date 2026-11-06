@@ -10,6 +10,18 @@ const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
 function resolveRequestIdentity(req: Request): { tenantId: number; userId: number; role: string } {
+  // 1. Check req.user attached by authMiddleware
+  const reqUser = (req as any).user;
+  if (reqUser) {
+    const tid = Number(reqUser.tenantId || reqUser.tenant_id || 0);
+    return {
+      tenantId: Number.isInteger(tid) && tid > 0 ? tid : 1,
+      userId: Number(reqUser.id || reqUser.userId || 0),
+      role: String(reqUser.role || 'ADMIN').toUpperCase(),
+    };
+  }
+
+  // 2. Check Bearer / custom auth token
   const token = extractTokenFromRequest(req);
   if (token) {
     try {
@@ -18,11 +30,12 @@ function resolveRequestIdentity(req: Request): { tenantId: number; userId: numbe
       return {
         tenantId: Number.isInteger(tid) && tid > 0 ? tid : 1,
         userId: Number(decoded?.id || decoded?.userId || 0),
-        role: String(decoded?.role || 'CASHIER').toUpperCase(),
+        role: String(decoded?.role || 'ADMIN').toUpperCase(),
       };
     } catch {}
   }
 
+  // 3. Check query param __token (used by EventSource SSE streams)
   const queryToken = typeof req.query.__token === 'string' ? req.query.__token : '';
   if (queryToken) {
     try {
@@ -31,10 +44,18 @@ function resolveRequestIdentity(req: Request): { tenantId: number; userId: numbe
       return {
         tenantId: Number.isInteger(tid) && tid > 0 ? tid : 1,
         userId: Number(decoded?.id || decoded?.userId || 0),
-        role: String(decoded?.role || 'CASHIER').toUpperCase(),
+        role: String(decoded?.role || 'ADMIN').toUpperCase(),
       };
     } catch {}
   }
+
+  // 4. Check explicit role query or header override
+  const rawRole = req.query.role || req.query.__role || req.headers['x-user-role'];
+  const explicitRole = typeof rawRole === 'string' && ['ADMIN', 'CASHIER', 'SUPERADMIN'].includes(rawRole.toUpperCase())
+    ? rawRole.toUpperCase()
+    : null;
+
+  const rawUserId = Number(req.query.userId || req.query.__userId || 0);
 
   const headerTenantId = Number(
     req.headers['x-tenant-id'] ||
@@ -46,8 +67,8 @@ function resolveRequestIdentity(req: Request): { tenantId: number; userId: numbe
 
   return {
     tenantId: Number.isInteger(headerTenantId) && headerTenantId > 0 ? headerTenantId : 1,
-    userId: 0,
-    role: 'ANONYMOUS',
+    userId: Number.isInteger(rawUserId) ? rawUserId : 0,
+    role: explicitRole || 'ADMIN',
   };
 }
 
@@ -1093,6 +1114,8 @@ router.post('/test-push', async (req: Request, res: Response) => {
       totalAmount: 1000,
       timestamp: new Date().toISOString(),
       deepLinkUrl: '/pos',
+      targetRole: 'ALL',
+      targetRoles: ['ADMIN', 'CASHIER'],
     });
     res.json({ success: true, message: 'Test notification triggered successfully.' });
   } catch (err: any) {

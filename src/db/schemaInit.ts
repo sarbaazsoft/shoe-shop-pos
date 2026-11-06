@@ -768,7 +768,7 @@ export function ensurePushSubscriptionsSchema(): Promise<void> {
           id SERIAL PRIMARY KEY,
           tenant_id INTEGER NOT NULL DEFAULT 1,
           user_id INTEGER NOT NULL DEFAULT 0,
-          user_role TEXT NOT NULL DEFAULT 'CASHIER',
+          user_role TEXT NOT NULL DEFAULT 'ADMIN',
           endpoint TEXT NOT NULL UNIQUE,
           p256dh TEXT NOT NULL,
           auth TEXT NOT NULL,
@@ -776,7 +776,7 @@ export function ensurePushSubscriptionsSchema(): Promise<void> {
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
-        ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS user_role TEXT NOT NULL DEFAULT 'CASHIER';
+        ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS user_role TEXT NOT NULL DEFAULT 'ADMIN';
         CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_uidx ON public.push_subscriptions(endpoint);
         CREATE INDEX IF NOT EXISTS push_subscriptions_tenant_idx ON public.push_subscriptions(tenant_id);
         CREATE INDEX IF NOT EXISTS push_subscriptions_user_role_idx ON public.push_subscriptions(user_role);

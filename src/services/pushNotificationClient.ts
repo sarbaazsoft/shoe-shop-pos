@@ -344,9 +344,22 @@ export function connectRealtimeNotificationStream(
     if (isClosed) return;
     const token = getAuthToken() || '';
     const tenantId = getActiveTenantId() || 1;
+    let currentRole = 'ADMIN';
+    let currentUserId = 0;
+    try {
+      const stored = localStorage.getItem('pos_current_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.role) currentRole = String(u.role).toUpperCase();
+        if (u.id) currentUserId = Number(u.id) || 0;
+      }
+    } catch {}
+
     const params = new URLSearchParams();
     if (token) params.set('__token', token);
     if (tenantId) params.set('__tenantId', String(tenantId));
+    params.set('role', currentRole);
+    if (currentUserId > 0) params.set('userId', String(currentUserId));
     params.set('_t', String(Date.now()));
 
     const streamUrl = `/api/notifications/stream?${params.toString()}`;

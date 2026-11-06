@@ -766,6 +766,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           deepLinkUrl: `/?tab=reports&viewInvoice=${encodeURIComponent(invoiceNumber)}`,
           timestamp: new Date().toISOString(),
           triggeredBy: cashierDisplayName,
+          targetRole: 'ALL',
           targetRoles: ['ADMIN', 'CASHIER'],
         }).catch((err) => console.warn('Push notification delivery notice:', err));
       } else {
@@ -787,6 +788,7 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
           deepLinkUrl: `/?tab=reports&viewInvoice=${encodeURIComponent(invoiceNumber)}`,
           timestamp: new Date().toISOString(),
           triggeredBy: cashierDisplayName,
+          targetRole: 'ALL',
           targetRoles: ['ADMIN', 'CASHIER'],
         }).catch((err) => console.warn('Push notification delivery notice:', err));
       }

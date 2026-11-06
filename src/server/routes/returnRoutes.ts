@@ -318,6 +318,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =
         deepLinkUrl: `/?tab=returns&viewReturn=${encodeURIComponent(returnNumber)}&invoice=${encodeURIComponent(sale.invoice_number)}`,
         timestamp: new Date().toISOString(),
         triggeredBy: cashierDisplayName,
+        targetRole: 'ALL',
         targetRoles: ['ADMIN', 'CASHIER'],
       }).catch((err) => console.warn('Push notification delivery notice:', err));
     } catch (notifErr) {
