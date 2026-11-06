@@ -232,4 +232,16 @@ export function getPhoneValidationError(
   return null;
 }
 
+/**
+ * Validation check for email addresses:
+ * Validates standard format username@domain.tld with non-empty parts, no whitespace, valid TLD.
+ */
+export function isValidEmail(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(trimmed);
+}
+
+
 
