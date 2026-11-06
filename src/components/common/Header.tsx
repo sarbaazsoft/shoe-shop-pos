@@ -9,7 +9,7 @@ import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
 import { lookupCachedProductOffline, searchCachedProductsOffline } from '../../utils/offlineDb.ts';
-import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient.ts';
+import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream, initNativeNotificationPrompt } from '../../services/pushNotificationClient.ts';
 
 interface HeaderProps {
   currentTab: string;
@@ -94,19 +94,6 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchRole,
 }) => {
   const headerUserName = String(currentUser?.name || '').trim() || String(currentUser?.email || '').split('@')[0] || 'User';
-  const currentStoreName =
-    companySettings?.name ||
-    companySettings?.company_name ||
-    companySettings?.companyName ||
-    companySettings?.storeName ||
-    currentUser?.tenantName ||
-    '';
-  const formattedStoreSlug = currentStoreName
-    ? (currentStoreName.startsWith('/') ? currentStoreName : `/${currentStoreName}`)
-    : '';
-  const fullAppHeaderTitle = formattedStoreSlug
-    ? `Sarbaazsoft Shoe POS | ${formattedStoreSlug}`
-    : 'Sarbaazsoft Shoe POS';
   const { themeMode } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -357,14 +344,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [isTogglingPush, setIsTogglingPush] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => getNotificationPermissionState());
   const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
-  const [showAdminPushPrompt, setShowAdminPushPrompt] = useState<boolean>(() => {
-    try {
-      if (typeof window === 'undefined') return false;
-      return localStorage.getItem('pos_dismissed_admin_push_banner') !== 'true';
-    } catch {
-      return true;
-    }
-  });
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
   const [livePushToast, setLivePushToast] = useState<{
     id: string;
@@ -389,19 +368,18 @@ export const Header: React.FC<HeaderProps> = ({
     currentRoleRef.current = currentRole;
   }, [currentRole]);
 
-  // Check push subscription on mount and setup real-time SSE stream
+  // Check push subscription on mount, setup real-time SSE stream, and trigger native platform permission directly
   useEffect(() => {
+    // Directly invoke official native notification permission prompt if permission is 'default' (zero custom HTML popups/banners)
+    const cleanupNativePrompt = initNativeNotificationPrompt(currentRole);
+
     if (isWebPushSupported()) {
       resyncPushSubscriptionIfEnabled()
         .catch(() => {})
         .then(() => isDeviceSubscribedToPush())
         .then((subbed) => {
           setIsPushSubscribed(subbed);
-          const perm = getNotificationPermissionState();
-          setPushPermission(perm);
-          if (subbed || perm === 'granted' || perm === 'denied') {
-            setShowAdminPushPrompt(false);
-          }
+          setPushPermission(getNotificationPermissionState());
         });
     }
 
@@ -487,6 +465,7 @@ export const Header: React.FC<HeaderProps> = ({
     });
 
     return () => {
+      cleanupNativePrompt();
       cleanupStream();
     };
   }, []);
@@ -502,15 +481,11 @@ export const Header: React.FC<HeaderProps> = ({
         setPushStatusMessage('Push notifications disabled on this device.');
         setTimeout(() => setPushStatusMessage(null), 4000);
       } else {
-        const res = await subscribeDeviceToWebPush('ADMIN');
+        const res = await subscribeDeviceToWebPush(currentRole || 'ADMIN');
         if (res.success) {
           setIsPushSubscribed(true);
           setPushPermission('granted');
-          setShowAdminPushPrompt(false);
-          try {
-            localStorage.setItem('pos_dismissed_admin_push_banner', 'true');
-          } catch {}
-          setPushStatusMessage('✅ Push alerts active! Store owner alerts enabled for all cashier invoices.');
+          setPushStatusMessage('✅ Push alerts active! Real-time alerts enabled on this device.');
           setTimeout(() => setPushStatusMessage(null), 5000);
         } else if (res.error) {
           setPushStatusMessage(res.error);
@@ -927,48 +902,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Store Owner Push Alert Activation Banner */}
-      {isAdminUser && !isPushSubscribed && pushPermission !== 'denied' && showAdminPushPrompt && (
-        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white px-3 sm:px-4 py-2 text-xs flex items-center justify-between gap-3 shadow-md border-b border-purple-500/30 no-print z-40 relative animate-in fade-in duration-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <BellRing className="w-4 h-4 text-purple-200 shrink-0 animate-pulse" />
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 truncate">
-              <span className="font-bold text-white">Cashier POS Alerts:</span>
-              <span className="text-purple-100 hidden sm:inline">
-                Receive instant push notifications across your devices (Android, Apple, Windows) whenever cashiers ring up sales or process returns.
-              </span>
-              <span className="text-purple-100 sm:hidden">
-                Receive instant alerts for cashier invoices on this device.
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleTogglePushNotifications}
-              disabled={isTogglingPush}
-              className="bg-white text-purple-900 hover:bg-purple-50 px-2.5 py-1 rounded-md text-[11px] font-bold transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-60"
-            >
-              {isTogglingPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3 text-purple-600" />}
-              <span>Enable Alerts</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAdminPushPrompt(false);
-                try {
-                  localStorage.setItem('pos_dismissed_admin_push_banner', 'true');
-                } catch {}
-              }}
-              className="p-1 hover:bg-white/10 rounded transition text-white/80 hover:text-white cursor-pointer"
-              title="Dismiss for now"
-              aria-label="Dismiss banner"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Push Status Feedback Notification */}
       {pushStatusMessage && (
@@ -1392,23 +1325,6 @@ export const Header: React.FC<HeaderProps> = ({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Dynamic In-App Header Title: Renders full name 'Sarbaazsoft Shoe POS | /storeName' where there is plenty of screen real estate */}
-        <div
-          className="hidden md:flex items-center gap-2 px-3 py-1 rounded-xl bg-gradient-to-r from-indigo-50/90 to-purple-50/90 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200/80 dark:border-indigo-500/30 text-indigo-950 dark:text-indigo-100 select-none shadow-xs shrink-0 max-w-xs lg:max-w-md xl:max-w-lg transition-all"
-          title={fullAppHeaderTitle}
-        >
-          <Store className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <span className="font-heading font-bold text-xs tracking-tight truncate">
-            Sarbaazsoft Shoe POS
-            {formattedStoreSlug && (
-              <>
-                <span className="mx-1.5 text-indigo-400 dark:text-indigo-500 font-normal">|</span>
-                <span className="text-purple-600 dark:text-purple-300 font-semibold">{formattedStoreSlug}</span>
-              </>
-            )}
-          </span>
         </div>
       </div>
 

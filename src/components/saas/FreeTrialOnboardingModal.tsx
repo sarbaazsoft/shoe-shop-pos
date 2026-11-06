@@ -542,7 +542,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                       onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                       placeholder="owner@shoestore.com"
                       disabled={isLoading}
-                      className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition focus:ring-2 ${
+                      className={`w-full email-focus-pulse pl-10 pr-9 py-2.5 rounded-xl text-xs sm:text-sm outline-none transition ${
                         isDark
                           ? 'bg-[#151E33] text-white placeholder-slate-500'
                           : 'bg-white text-slate-900 placeholder-slate-400'

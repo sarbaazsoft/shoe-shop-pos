@@ -282,7 +282,7 @@ export const InstallationWizard: React.FC<InstallationWizardProps> = ({ onComple
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="admin@example.com"
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono font-medium text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full email-focus-pulse h-11 pl-10 pr-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 font-mono font-medium text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all"
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">

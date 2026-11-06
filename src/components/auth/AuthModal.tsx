@@ -539,7 +539,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     label="Email or Terminal ID"
                     placeholder="admin@shoepos.com"
                     disabled={isLoading}
-                    inputClassName="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-4 transition outline-none"
+                    inputClassName="app-input email-focus-pulse w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-4 transition outline-none"
                   />
 
                   <div>
@@ -660,12 +660,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           setEmail(e.target.value);
                           if (errorMessage) setErrorMessage(null);
                         }}
-                        className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-9 transition outline-none ${
+                        className={`app-input email-focus-pulse w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-9 transition outline-none ${
                           showForgotEmailError
-                            ? 'border-rose-400 dark:border-rose-500/80 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                            ? 'border-rose-400 dark:border-rose-500/80 focus:border-rose-500'
                             : isEmailValid
-                            ? 'border-emerald-400 dark:border-emerald-500/70 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-                            : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/20'
+                            ? 'border-emerald-400 dark:border-emerald-500/70 focus:border-emerald-500'
+                            : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400'
                         }`}
                       />
                       {trimmedEmail.length > 0 && (

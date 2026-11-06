@@ -185,14 +185,14 @@ html.dark .form-select,
 }
 
 /* 2. Focus Shadow Effect: box-shadow: 0 0 8px 0 purple and purple border highlight triggered immediately */
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus-visible,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus-visible,
 select:focus,
 select:focus-visible,
 textarea:focus,
 textarea:focus-visible,
-.app-input:focus,
-.form-input:focus,
+:not([type="email"]):not(.email-focus-pulse).app-input:focus,
+:not([type="email"]):not(.email-focus-pulse).form-input:focus,
 .form-select:focus {
   border-color: #9333ea !important;
   outline: none !important;
@@ -202,23 +202,23 @@ textarea:focus-visible,
   --tw-ring-offset-shadow: none !important;
 }
 
-html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus,
-html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus-visible,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus-visible,
 html.dark select:focus,
 html.dark select:focus-visible,
 html.dark textarea:focus,
 html.dark textarea:focus-visible,
-html.dark .app-input:focus,
-html.dark .form-input:focus,
+html.dark :not([type="email"]):not(.email-focus-pulse).app-input:focus,
+html.dark :not([type="email"]):not(.email-focus-pulse).form-input:focus,
 html.dark .form-select:focus,
-.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus,
-.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):focus-visible,
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus,
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="email"]):not(.email-focus-pulse):focus-visible,
 .dark select:focus,
 .dark select:focus-visible,
 .dark textarea:focus,
 .dark textarea:focus-visible,
-.dark .app-input:focus,
-.dark .form-input:focus,
+.dark :not([type="email"]):not(.email-focus-pulse).app-input:focus,
+.dark :not([type="email"]):not(.email-focus-pulse).form-input:focus,
 .dark .form-select:focus {
   border-color: #c084fc !important;
   outline: none !important;
@@ -383,6 +383,282 @@ html.dark .phone-success-icon svg,
 html.dark svg.phone-success-icon {
   color: #10b981 !important;
   stroke: #10b981 !important;
+}
+
+/* ========================================================================= */
+/* REAL-TIME EMAIL FIELD INTERACTIVE FOCUS PULSE ANIMATION & VALIDATION     */
+/* Subtle interactive breathing pulse matching primary purple brand theme   */
+/* ========================================================================= */
+
+@keyframes email-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.48), 0 0 6px 0 rgba(147, 51, 234, 0.3);
+    border-color: #9333ea;
+  }
+  50% {
+    box-shadow: 0 0 0 4.5px rgba(147, 51, 234, 0.22), 0 0 16px 2px rgba(147, 51, 234, 0.28);
+    border-color: #a855f7;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.48), 0 0 6px 0 rgba(147, 51, 234, 0.3);
+    border-color: #9333ea;
+  }
+}
+
+@keyframes email-focus-pulse-dark {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55), 0 0 6px 0 rgba(168, 85, 247, 0.35);
+    border-color: #c084fc;
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(168, 85, 247, 0.28), 0 0 18px 2px rgba(192, 132, 252, 0.32);
+    border-color: #d8b4fe;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55), 0 0 6px 0 rgba(168, 85, 247, 0.35);
+    border-color: #c084fc;
+  }
+}
+
+@keyframes email-focus-pulse-emerald {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55), 0 0 6px 0 rgba(16, 185, 129, 0.32);
+    border-color: #10b981;
+  }
+  50% {
+    box-shadow: 0 0 0 4.5px rgba(16, 185, 129, 0.24), 0 0 16px 2px rgba(16, 185, 129, 0.24);
+    border-color: #34d399;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55), 0 0 6px 0 rgba(16, 185, 129, 0.32);
+    border-color: #10b981;
+  }
+}
+
+@keyframes email-focus-pulse-rose {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55), 0 0 6px 0 rgba(239, 68, 68, 0.32);
+    border-color: #ef4444;
+  }
+  50% {
+    box-shadow: 0 0 0 4.5px rgba(239, 68, 68, 0.24), 0 0 16px 2px rgba(239, 68, 68, 0.24);
+    border-color: #f87171;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55), 0 0 6px 0 rgba(239, 68, 68, 0.32);
+    border-color: #ef4444;
+  }
+}
+
+@keyframes email-icon-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(147, 51, 234, 0.65));
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+}
+
+/* Light mode email focus pulse */
+input[type="email"]:focus,
+input[type="email"]:focus-visible,
+input[autocomplete="email"]:focus,
+input[autocomplete="email"]:focus-visible,
+input[name="email"]:focus,
+input[name="email"]:focus-visible,
+input[id*="email"]:focus,
+input[id*="email"]:focus-visible,
+input[id*="Email"]:focus,
+input[id*="Email"]:focus-visible,
+.email-focus-pulse:focus,
+.email-focus-pulse:focus-visible {
+  outline: none !important;
+  animation: email-focus-pulse 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Dark mode email focus pulse */
+html.dark input[type="email"]:focus,
+html.dark input[type="email"]:focus-visible,
+html.dark input[autocomplete="email"]:focus,
+html.dark input[autocomplete="email"]:focus-visible,
+html.dark input[name="email"]:focus,
+html.dark input[name="email"]:focus-visible,
+html.dark input[id*="email"]:focus,
+html.dark input[id*="email"]:focus-visible,
+html.dark input[id*="Email"]:focus,
+html.dark input[id*="Email"]:focus-visible,
+html.dark .email-focus-pulse:focus,
+html.dark .email-focus-pulse:focus-visible,
+.dark input[type="email"]:focus,
+.dark input[type="email"]:focus-visible,
+.dark input[autocomplete="email"]:focus,
+.dark input[autocomplete="email"]:focus-visible,
+.dark input[name="email"]:focus,
+.dark input[name="email"]:focus-visible,
+.dark input[id*="email"]:focus,
+.dark input[id*="email"]:focus-visible,
+.dark input[id*="Email"]:focus,
+.dark input[id*="Email"]:focus-visible,
+.dark .email-focus-pulse:focus,
+.dark .email-focus-pulse:focus-visible {
+  outline: none !important;
+  animation: email-focus-pulse-dark 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Validated emerald email focus pulse */
+input[type="email"][class*="border-emerald"]:focus,
+input[type="email"][class*="border-emerald"]:focus-visible,
+input[type="email"][class*="emerald"]:focus,
+input[type="email"][class*="emerald"]:focus-visible,
+input[type="email"].email-border-valid:focus,
+input[type="email"].email-border-valid:focus-visible,
+.email-focus-pulse[class*="border-emerald"]:focus,
+.email-focus-pulse[class*="border-emerald"]:focus-visible,
+.email-focus-pulse.email-border-valid:focus,
+.email-focus-pulse.email-border-valid:focus-visible,
+html.dark input[type="email"][class*="border-emerald"]:focus,
+html.dark input[type="email"][class*="border-emerald"]:focus-visible,
+html.dark input[type="email"][class*="emerald"]:focus,
+html.dark input[type="email"][class*="emerald"]:focus-visible,
+html.dark input[type="email"].email-border-valid:focus,
+html.dark input[type="email"].email-border-valid:focus-visible,
+html.dark .email-focus-pulse[class*="border-emerald"]:focus,
+html.dark .email-focus-pulse[class*="border-emerald"]:focus-visible,
+html.dark .email-focus-pulse.email-border-valid:focus,
+html.dark .email-focus-pulse.email-border-valid:focus-visible,
+.dark input[type="email"][class*="border-emerald"]:focus,
+.dark input[type="email"][class*="border-emerald"]:focus-visible,
+.dark input[type="email"][class*="emerald"]:focus,
+.dark input[type="email"][class*="emerald"]:focus-visible,
+.dark input[type="email"].email-border-valid:focus,
+.dark input[type="email"].email-border-valid:focus-visible,
+.dark .email-focus-pulse[class*="border-emerald"]:focus,
+.dark .email-focus-pulse[class*="border-emerald"]:focus-visible,
+.dark .email-focus-pulse.email-border-valid:focus,
+.dark .email-focus-pulse.email-border-valid:focus-visible {
+  outline: none !important;
+  animation: email-focus-pulse-emerald 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Invalid rose email focus pulse */
+input[type="email"][class*="border-rose"]:focus,
+input[type="email"][class*="border-rose"]:focus-visible,
+input[type="email"][class*="rose"]:focus,
+input[type="email"][class*="rose"]:focus-visible,
+input[type="email"].email-border-invalid:focus,
+input[type="email"].email-border-invalid:focus-visible,
+.email-focus-pulse[class*="border-rose"]:focus,
+.email-focus-pulse[class*="border-rose"]:focus-visible,
+.email-focus-pulse.email-border-invalid:focus,
+.email-focus-pulse.email-border-invalid:focus-visible,
+html.dark input[type="email"][class*="border-rose"]:focus,
+html.dark input[type="email"][class*="border-rose"]:focus-visible,
+html.dark input[type="email"][class*="rose"]:focus,
+html.dark input[type="email"][class*="rose"]:focus-visible,
+html.dark input[type="email"].email-border-invalid:focus,
+html.dark input[type="email"].email-border-invalid:focus-visible,
+html.dark .email-focus-pulse[class*="border-rose"]:focus,
+html.dark .email-focus-pulse[class*="border-rose"]:focus-visible,
+html.dark .email-focus-pulse.email-border-invalid:focus,
+html.dark .email-focus-pulse.email-border-invalid:focus-visible,
+.dark input[type="email"][class*="border-rose"]:focus,
+.dark input[type="email"][class*="border-rose"]:focus-visible,
+.dark input[type="email"][class*="rose"]:focus,
+.dark input[type="email"][class*="rose"]:focus-visible,
+.dark input[type="email"].email-border-invalid:focus,
+.dark input[type="email"].email-border-invalid:focus-visible,
+.dark .email-focus-pulse[class*="border-rose"]:focus,
+.dark .email-focus-pulse[class*="border-rose"]:focus-visible,
+.dark .email-focus-pulse.email-border-invalid:focus,
+.dark .email-focus-pulse.email-border-invalid:focus-visible {
+  outline: none !important;
+  animation: email-focus-pulse-rose 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Mail icon subtle interactive pulse when input is focused */
+.relative:has(input[type="email"]:focus) > div > svg.lucide-mail,
+.relative:has(input[type="email"]:focus) > svg.lucide-mail,
+.relative:has(input[autocomplete="email"]:focus) > div > svg.lucide-mail,
+.relative:has(input[autocomplete="email"]:focus) > svg.lucide-mail,
+.relative:has(input[name="email"]:focus) > div > svg.lucide-mail,
+.relative:has(input[name="email"]:focus) > svg.lucide-mail,
+.relative:has(input[id*="email"]:focus) > div > svg.lucide-mail,
+.relative:has(input[id*="email"]:focus) > svg.lucide-mail,
+.relative:has(input[id*="Email"]:focus) > div > svg.lucide-mail,
+.relative:has(input[id*="Email"]:focus) > svg.lucide-mail,
+.relative:has(.email-focus-pulse:focus) > div > svg.lucide-mail,
+.relative:has(.email-focus-pulse:focus) > svg.lucide-mail,
+div:has(> input[type="email"]:focus) > div > svg.lucide-mail,
+div:has(> input[type="email"]:focus) > svg.lucide-mail,
+div:has(> input[name="email"]:focus) > div > svg.lucide-mail,
+div:has(> input[name="email"]:focus) > svg.lucide-mail {
+  animation: email-icon-pulse 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+
+/* Email validation status classes */
+input.email-border-valid,
+.app-input.email-border-valid,
+html.dark input.email-border-valid,
+html.dark .app-input.email-border-valid {
+  border: 1.5px solid #10b981 !important;
+  border-color: #10b981 !important;
+}
+
+input.email-border-invalid,
+.app-input.email-border-invalid,
+html.dark input.email-border-invalid,
+html.dark .app-input.email-border-invalid {
+  border: 1.5px solid #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.email-success-icon,
+.email-success-icon svg,
+svg.email-success-icon,
+html.dark .email-success-icon,
+html.dark .email-success-icon svg,
+html.dark svg.email-success-icon {
+  color: #10b981 !important;
+  stroke: #10b981 !important;
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  input[type="email"]:focus,
+  input[type="email"]:focus-visible,
+  input[autocomplete="email"]:focus,
+  input[autocomplete="email"]:focus-visible,
+  input[name="email"]:focus,
+  input[name="email"]:focus-visible,
+  input[id*="email"]:focus,
+  input[id*="email"]:focus-visible,
+  input[id*="Email"]:focus,
+  input[id*="Email"]:focus-visible,
+  .email-focus-pulse:focus,
+  .email-focus-pulse:focus-visible,
+  .relative:has(input[type="email"]:focus) > div > svg.lucide-mail,
+  .relative:has(input[type="email"]:focus) > svg.lucide-mail,
+  div:has(> input[type="email"]:focus) > div > svg.lucide-mail,
+  div:has(> input[type="email"]:focus) > svg.lucide-mail {
+    animation: none !important;
+    box-shadow: 0 0 8px 0 purple !important;
+  }
 }
 
 /* 3. Input Icons Styled to Purple (#9333ea in light mode, #c084fc in dark mode):

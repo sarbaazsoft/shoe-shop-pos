@@ -9,94 +9,112 @@ export interface QuickReceiveChip {
 
 /**
  * Calculates dynamic quick-receive cash denominations in Pakistani Rupees (PKR)
- * tailored specifically for retail footwear checkouts.
+ * based on the invoice amount and the highest Pakistani banknote denomination (Rs. 5,000).
  *
- * Rules:
- * - Strict limit of at most 4 chips.
- * - Always includes the "Exact Amount".
- * - Small invoices (<= Rs. 1,000): next 100, next 500, or Rs. 1,000 note.
- * - Medium invoices (Rs. 1,001 to Rs. 5,000): rounds to next 500, 1,000, and 5,000 note.
- * - Larger invoices (Rs. 5,001+): rounds to next 1,000, 5,000, 10,000, 15,000+ notes.
+ * Real-world cash payment rules:
+ * 1. If invoice is an exact multiple of Rs. 5,000 (e.g. Rs. 5,000, 10,000, 15,000, 20,000, 50,000):
+ *    Exactly (total / 5000) notes of Rs. 5,000 pay the bill in full with zero change.
+ *    A customer never tenders an extra Rs. 5,000 note when 1 note is already sufficient.
+ *    -> Returns [total] (Exact only).
+ * 2. If invoice is below Rs. 5,000 (e.g. Rs. 1,200, Rs. 3,800, Rs. 4,000):
+ *    Offers exact amount, intermediate notes (next 500 / 1,000), and a single Rs. 5,000 note.
+ * 3. If invoice is between Rs. 5,000 and Rs. 10,000 (e.g. Rs. 5,500, Rs. 8,000):
+ *    Offers exact amount, intermediate notes (next 500 / 1,000), and two Rs. 5,000 notes = Rs. 10,000.
+ * 4. If invoice exceeds Rs. 10,000 (and is not an exact multiple of 5,000):
+ *    Offers exact amount, next Rs. 5,000 multiple, next Rs. 10,000 multiple, and Rs. 50,000 milestone packet where appropriate.
+ *
+ * Constraints:
+ * - Never displays irrelevant amounts below the invoice total.
+ * - At most 4 chips.
  */
 export function generateRetailQuickReceiveChips(totalAmount: number): QuickReceiveChip[] {
   const total = Math.max(0, Math.round(totalAmount));
   if (total <= 0) return [];
 
+  // Always include the exact invoice amount
+  // RULE 1: If the invoice is ALREADY an exact multiple of Rs. 5,000 (the highest Pakistani banknote),
+  // e.g. Rs. 5,000, Rs. 10,000, Rs. 15,000, Rs. 20,000:
+  // Exactly (total / 5000) notes of Rs. 5,000 pay the bill in full with zero change.
+  // A customer never hands an extra Rs. 5,000 note (e.g. Rs. 10,000 for a Rs. 5,000 bill)
+  // when 1 note is completely sufficient.
+  if (total % 5000 === 0) {
+    return [
+      {
+        amount: total,
+        isExact: true,
+        label: 'Exact',
+      },
+    ];
+  }
+
   const candidates = new Set<number>();
-  // 1. Always include the exact invoice amount
   candidates.add(total);
 
-  if (total <= 1000) {
-    // Next 100 (e.g. 320 -> 400)
-    const next100 = Math.ceil(total / 100) * 100;
-    if (next100 > total) candidates.add(next100);
-
-    // Next 500 note (e.g. 320 -> 500, 750 -> 1000)
+  if (total < 5000) {
+    // Invoices below Rs. 5,000 (not a multiple of 5,000):
+    // Offer intermediate small-note combinations (next 500, next 1,000)
+    // plus exactly one Rs. 5,000 banknote (the highest Pakistani denomination).
     const next500 = Math.ceil(total / 500) * 500;
-    if (next500 > total) candidates.add(next500);
-
-    // Next 1,000 note
-    const next1000 = Math.ceil(total / 1000) * 1000;
-    if (next1000 > total) candidates.add(next1000);
-
-    // Fill up to 4 with convenient common notes (500, 1000, 1500, 2000, 5000)
-    const standardNotes = [500, 1000, 1500, 2000, 5000];
-    for (const note of standardNotes) {
-      if (candidates.size >= 4) break;
-      if (note > total) candidates.add(note);
+    if (next500 > total && next500 < 5000) {
+      candidates.add(next500);
     }
-  } else if (total <= 5000) {
-    // Medium retail invoices (Rs. 1,001 to Rs. 5,000)
-    // Common customer tender: exact, next 500, next 1,000, Rs. 5,000 note
-    // E.g., if total is Rs. 3,250 -> 3,250 (Exact), 3,500, 4,000, 5,000
-    const next500 = Math.ceil(total / 500) * 500;
-    if (next500 > total) candidates.add(next500);
 
     const next1000 = Math.ceil(total / 1000) * 1000;
-    if (next1000 > total) candidates.add(next1000);
-
-    // 5,000 paper note is very common for retail footwear bills
-    const next5000 = Math.ceil(total / 5000) * 5000;
-    if (next5000 > total) candidates.add(next5000);
-
-    // If still have fewer than 4 chips, provide next intermediate note
-    let step = (next1000 > total ? next1000 : next500) + 1000;
-    while (candidates.size < 4 && step <= 10000) {
-      if (step > total) candidates.add(step);
-      step += 1000;
+    if (next1000 > total && next1000 < 5000) {
+      candidates.add(next1000);
     }
 
-    // Fallback if still under 4 (e.g. if total was near 5,000)
-    if (candidates.size < 4) {
-      const extraNotes = [6000, 10000];
-      for (const note of extraNotes) {
-        if (candidates.size >= 4) break;
-        if (note > total) candidates.add(note);
-      }
+    // Single Rs. 5,000 banknote tender
+    candidates.add(5000);
+  } else if (total < 10000) {
+    // Invoices between Rs. 5,000 and Rs. 10,000 (e.g. 5,500, 8,000):
+    // Offer intermediate note tender (next 500, next 1,000)
+    // plus two Rs. 5,000 banknotes = Rs. 10,000 as the final tender chip.
+    const next500 = Math.ceil(total / 500) * 500;
+    if (next500 > total && next500 < 10000) {
+      candidates.add(next500);
     }
+
+    const next1000 = Math.ceil(total / 1000) * 1000;
+    if (next1000 > total && next1000 < 10000) {
+      candidates.add(next1000);
+    }
+
+    // Two Rs. 5,000 notes = Rs. 10,000
+    candidates.add(10000);
   } else {
-    // Larger retail invoices (Rs. 5,001 to Rs. 10,000+)
-    // Suggest rounding to next 1,000
-    const next1000 = Math.ceil(total / 1000) * 1000;
-    if (next1000 > total) candidates.add(next1000);
-
-    // Suggest rounding to next 5,000 (e.g. 6,800 -> 10,000)
+    // Invoices exceeding Rs. 10,000 (and not a multiple of 5,000):
+    // 1. Next Rs. 5,000 banknote multiple (e.g. 12,000 -> 15,000 [three 5k notes])
     const next5000 = Math.ceil(total / 5000) * 5000;
-    if (next5000 > total) candidates.add(next5000);
+    if (next5000 > total) {
+      candidates.add(next5000);
+    }
 
-    // Suggest rounding to next 10,000
+    // 2. Next Rs. 10,000 multiple (e.g. 12,000 -> 20,000 [four 5k notes], 16,000 -> 20,000)
     const next10000 = Math.ceil(total / 10000) * 10000;
-    if (next10000 > total) candidates.add(next10000);
+    if (next10000 > total) {
+      candidates.add(next10000);
+    }
 
-    // Additional 5,000 note increments (e.g. 15,000, 20,000)
-    let extraStep = (next5000 > total ? next5000 : total) + 5000;
-    while (candidates.size < 4 && extraStep <= 100000) {
-      if (extraStep > total) candidates.add(extraStep);
-      extraStep += 5000;
+    // 3. For invoices between Rs. 20,000 and Rs. 48,000, include Rs. 50,000 (ten Rs. 5,000 notes / standard packet)
+    if (total > 20000 && total < 50000 && candidates.size < 4) {
+      candidates.add(50000);
+    }
+
+    // 4. Large invoices exceeding Rs. 50,000: generate next 50,000 and 100,000 milestones
+    if (total > 50000) {
+      const next50000 = Math.ceil(total / 50000) * 50000;
+      if (next50000 > total && candidates.size < 4) {
+        candidates.add(next50000);
+      }
+      const next100000 = Math.ceil(total / 100000) * 100000;
+      if (next100000 > total && candidates.size < 4) {
+        candidates.add(next100000);
+      }
     }
   }
 
-  // Sort ascending and strictly limit to 4 chips
+  // Sort ascending and strictly limit to at most 4 chips
   const sorted = Array.from(candidates).sort((a, b) => a - b).slice(0, 4);
 
   return sorted.map((amt) => ({
@@ -133,11 +151,16 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
           <span>Quick Receive Note:</span>
         </span>
         <span className="text-[10px] text-slate-400 dark:text-slate-500">
-          Tap note for instant change
+          {chips.length === 1 ? 'Tap for exact cash' : 'Tap note for instant change'}
         </span>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div
+        className="grid gap-1.5"
+        style={{
+          gridTemplateColumns: `repeat(${chips.length}, minmax(0, 1fr))`,
+        }}
+      >
         {chips.map((chip) => {
           const isSelected =
             typeof cashReceived === 'number'

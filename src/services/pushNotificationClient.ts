@@ -209,6 +209,96 @@ export async function resyncPushSubscriptionIfEnabled(): Promise<void> {
 }
 
 /**
+ * Prompts the platform's official native system/browser notification permission dialog directly,
+ * exactly like YouTube or Google AI Studio, without any intermediate custom HTML popups, dialogs, or banners.
+ * If permission is granted, automatically registers the device for Web Push notifications.
+ */
+export async function triggerNativeNotificationPrompt(overrideRole?: string): Promise<NotificationPermission> {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'denied';
+  }
+
+  if (Notification.permission === 'granted') {
+    subscribeDeviceToWebPush(overrideRole).catch(() => {});
+    return 'granted';
+  }
+
+  if (Notification.permission === 'denied') {
+    return 'denied';
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      await subscribeDeviceToWebPush(overrideRole).catch(() => {});
+    }
+    return permission;
+  } catch (err) {
+    console.warn('[pushNotificationClient] Error requesting native notification permission:', err);
+    return Notification.permission;
+  }
+}
+
+/**
+ * Directly initializes native notification permission prompt on session load or on first user gesture,
+ * ensuring complete compatibility across Android, iOS, and Web browsers without custom HTML prompts.
+ */
+export function initNativeNotificationPrompt(overrideRole?: string): () => void {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return () => {};
+  }
+
+  // Already granted: keep background subscription synced
+  if (Notification.permission === 'granted') {
+    subscribeDeviceToWebPush(overrideRole).catch(() => {});
+    return () => {};
+  }
+
+  // Already explicitly denied by user in browser settings
+  if (Notification.permission === 'denied') {
+    return () => {};
+  }
+
+  let hasTriggered = false;
+
+  const runNativePrompt = async () => {
+    if (hasTriggered) return;
+    hasTriggered = true;
+    cleanupListeners();
+    await triggerNativeNotificationPrompt(overrideRole);
+  };
+
+  const onUserGesture = () => {
+    runNativePrompt();
+  };
+
+  const cleanupListeners = () => {
+    window.removeEventListener('click', onUserGesture);
+    window.removeEventListener('pointerdown', onUserGesture);
+    window.removeEventListener('touchstart', onUserGesture);
+    window.removeEventListener('keydown', onUserGesture);
+  };
+
+  // 1. Direct attempt without waiting (standard for YouTube/Google AI Studio)
+  triggerNativeNotificationPrompt(overrideRole)
+    .then((result) => {
+      if (result !== 'default') {
+        hasTriggered = true;
+        cleanupListeners();
+      }
+    })
+    .catch(() => {});
+
+  // 2. Also attach one-time user gesture listeners for browsers that enforce a user gesture (e.g., iOS Safari)
+  window.addEventListener('click', onUserGesture, { once: true, passive: true });
+  window.addEventListener('pointerdown', onUserGesture, { once: true, passive: true });
+  window.addEventListener('touchstart', onUserGesture, { once: true, passive: true });
+  window.addEventListener('keydown', onUserGesture, { once: true, passive: true });
+
+  return cleanupListeners;
+}
+
+/**
  * Disables Web Push notifications for this device and unregisters from the server.
  */
 export async function unsubscribeDeviceFromWebPush(): Promise<boolean> {
