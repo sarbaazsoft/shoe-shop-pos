@@ -756,7 +756,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               {/* Footer */}
               <div className="pt-2 text-center space-y-0.5">
                 {invoiceFooter && <p className="text-[8px] text-gray-600 italic px-1">{invoiceFooter}</p>}
-                <p className="text-[7px] text-gray-400 font-normal tracking-tight">
+                <p className="text-[7px] text-gray-600 font-normal tracking-tight">
                   Powered by SarbaazSoft Shoe POS
                 </p>
               </div>
@@ -1086,7 +1086,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-4 items-end">
                 <div className="space-y-0.5">
                   {invoiceFooter && <p className="text-[10px] text-gray-500 max-w-xs">{invoiceFooter}</p>}
-                  <p className="text-[8px] text-gray-400 font-normal tracking-tight max-w-xs">
+                  <p className="text-[8px] text-gray-500 font-normal tracking-tight max-w-xs">
                     Powered by SarbaazSoft Shoe POS
                   </p>
                 </div>
@@ -1237,7 +1237,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
             <div style={{ textAlign: 'center', paddingTop: '6px', color: '#000000' }}>
               {invoiceFooter && <div style={{ fontSize: '8.5px', fontStyle: 'italic', color: '#333333' }}>{invoiceFooter}</div>}
-              <div style={{ fontSize: '7px', color: '#666666', marginTop: '2px', letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: '7px', color: '#333333', marginTop: '2px', letterSpacing: '-0.01em' }}>
                 Powered by SarbaazSoft Shoe POS
               </div>
             </div>
@@ -1461,7 +1461,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', color: '#000000' }}>
               <div>
                 {invoiceFooter && <div style={{ fontSize: '10px' }}>{invoiceFooter}</div>}
-                <div style={{ fontSize: '8px', color: '#666666', marginTop: '2px' }}>
+                <div style={{ fontSize: '8px', color: '#000000', marginTop: '2px' }}>
                   Powered by SarbaazSoft Shoe POS
                 </div>
               </div>
