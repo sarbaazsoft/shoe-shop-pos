@@ -103,14 +103,11 @@ export function clearAllSessionState(): void {
       localStorage.removeItem('sammi_chat_history');
       localStorage.removeItem('pos_barcode_tag_options');
       localStorage.removeItem('pos_last_synced_at');
-      localStorage.removeItem('pos_welcome_partner_dismissed');
 
-      // Clear any tenant-scoped or user-scoped cache keys without removing device preferences like pos_theme or remembered accounts
+      // Clear any tenant-scoped or user-scoped cache keys without removing device preferences like pos_theme, remembered accounts, or permanent welcome dismissals
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
         if (key && (
-          key.startsWith('pos_welcome_partner_dismissed_') ||
-          key.startsWith('pos_welcome_banner_dismissed_') ||
           key.startsWith('pos_dashboard_visited_') ||
           key.startsWith('cached_company_settings') ||
           key.startsWith('cached_store_name') ||
@@ -1168,6 +1165,10 @@ export const api = {
       }),
     dismissAllAnnouncements: () =>
       apiFetch<{ success: boolean; message: string }>('/notifications/platform/dismiss-all', {
+        method: 'POST',
+      }),
+    dismissWelcome: () =>
+      apiFetch<{ success: boolean; message: string }>('/notifications/dismiss-welcome', {
         method: 'POST',
       }),
   },

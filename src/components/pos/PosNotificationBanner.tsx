@@ -52,8 +52,38 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
     companySettings?.companyName ||
     'Shoe Store';
 
+  const tenantId =
+    currentUser?.tenantId ||
+    currentUser?.tenant_id ||
+    companySettings?.tenantId ||
+    companySettings?.id ||
+    1;
+
   const dismissedStorageKey = `pos_cashier_dismissed_notices_${userId}`;
   const welcomeDismissedKey = `pos_cashier_dismissed_welcome_${userId}`;
+
+  const isServerWelcomeDismissed = Boolean(
+    companySettings?.welcomeDismissed ||
+    companySettings?.welcome_dismissed ||
+    currentUser?.welcomeDismissed
+  );
+
+  const checkWelcomeDismissedLocally = useCallback(() => {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      return (
+        localStorage.getItem(welcomeDismissedKey) === 'true' ||
+        localStorage.getItem(`pos_cashier_dismissed_welcome_${tenantId}_${userId}`) === 'true' ||
+        localStorage.getItem(`pos_cashier_dismissed_welcome_${tenantId}`) === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true' ||
+        localStorage.getItem(`pos_welcome_partner_dismissed_${tenantId}`) === 'true' ||
+        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}`) === 'true' ||
+        localStorage.getItem('pos_welcome_dismissed_universal') === 'true'
+      );
+    } catch {
+      return false;
+    }
+  }, [welcomeDismissedKey, tenantId, userId]);
 
   const [rawServerNotices, setRawServerNotices] = useState<PlatformNotification[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -69,12 +99,14 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
   });
 
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(welcomeDismissedKey) === 'true';
-    } catch {
-      return false;
-    }
+    return isServerWelcomeDismissed || checkWelcomeDismissedLocally();
   });
+
+  useEffect(() => {
+    if (isServerWelcomeDismissed || checkWelcomeDismissedLocally()) {
+      setIsWelcomeDismissed(true);
+    }
+  }, [isServerWelcomeDismissed, checkWelcomeDismissedLocally]);
 
   const isFetchingRef = useRef(false);
 
@@ -249,12 +281,22 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
       return next;
     });
 
-    // If welcome message, mark welcome dismissed
-    if (notice.isWelcome) {
+    // If welcome message, mark welcome dismissed across all keys and server
+    if (notice.isWelcome || String(notice.id).includes('welcome')) {
       setIsWelcomeDismissed(true);
       try {
         localStorage.setItem(welcomeDismissedKey, 'true');
+        localStorage.setItem(`pos_cashier_dismissed_welcome_${tenantId}_${userId}`, 'true');
+        localStorage.setItem(`pos_cashier_dismissed_welcome_${tenantId}`, 'true');
+        localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+        localStorage.setItem(`pos_welcome_partner_dismissed_${tenantId}`, 'true');
+        localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
+        localStorage.setItem('pos_welcome_dismissed_universal', 'true');
       } catch {}
+
+      // Inform backend to mark welcome notice permanently dismissed in database
+      api.notifications.dismissWelcome().catch(() => {});
+      api.notifications.dismiss(notice.id, 'WELCOME').catch(() => {});
     }
 
     // If server notice, inform backend to mark dismissed/read
@@ -274,7 +316,15 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
     setIsWelcomeDismissed(true);
     try {
       localStorage.setItem(welcomeDismissedKey, 'true');
+      localStorage.setItem(`pos_cashier_dismissed_welcome_${tenantId}_${userId}`, 'true');
+      localStorage.setItem(`pos_cashier_dismissed_welcome_${tenantId}`, 'true');
+      localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+      localStorage.setItem(`pos_welcome_partner_dismissed_${tenantId}`, 'true');
+      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
+      localStorage.setItem('pos_welcome_dismissed_universal', 'true');
     } catch {}
+
+    api.notifications.dismissWelcome().catch(() => {});
 
     const allIds = activeNotices.map((n) => n.id);
     setDismissedIds((prev) => {

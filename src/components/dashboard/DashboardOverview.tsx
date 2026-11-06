@@ -52,19 +52,47 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     }
   };
 
-  const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
+  const isServerWelcomeDismissed = Boolean(
+    companySettings?.welcomeDismissed ||
+    companySettings?.welcome_dismissed ||
+    currentUser?.welcomeDismissed
+  );
+
+  const checkWelcomeDismissedLocally = () => {
     try {
-      if (
+      if (typeof localStorage === 'undefined') return false;
+      return (
         localStorage.getItem(dismissKey) === 'true' ||
-        localStorage.getItem('pos_welcome_partner_dismissed') === 'true'
-      ) {
-        return false;
-      }
-      return true;
+        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}`) === 'true' ||
+        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`) === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true' ||
+        localStorage.getItem(`pos_welcome_partner_dismissed_${tenantId}`) === 'true' ||
+        localStorage.getItem('pos_welcome_dismissed_universal') === 'true'
+      );
     } catch {
-      return true;
+      return false;
     }
+  };
+
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
+    if (isServerWelcomeDismissed || checkWelcomeDismissedLocally()) {
+      return false;
+    }
+    return true;
   });
+
+  // Automatically keep banner dismissed if server reports welcomeDismissed
+  useEffect(() => {
+    if (companySettings?.welcomeDismissed || companySettings?.welcome_dismissed || currentUser?.welcomeDismissed) {
+      setShowWelcomeBanner(false);
+      try {
+        localStorage.setItem(dismissKey, 'true');
+        localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
+        localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+        localStorage.setItem('pos_welcome_dismissed_universal', 'true');
+      } catch {}
+    }
+  }, [companySettings?.welcomeDismissed, companySettings?.welcome_dismissed, currentUser?.welcomeDismissed, dismissKey, tenantId]);
 
   const [isFirstTime] = useState<boolean>(() => {
     try {
@@ -237,7 +265,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const handleDismissWelcomeBanner = () => {
     try {
       localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+      localStorage.setItem(`pos_welcome_partner_dismissed_${tenantId}`, 'true');
       localStorage.setItem(dismissKey, 'true');
+      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
+      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`, 'true');
+      localStorage.setItem('pos_welcome_dismissed_universal', 'true');
+
+      // Call backend to permanently record tenant welcome dismissal in DB
+      api.notifications.dismissWelcome().catch(() => {});
+      api.notifications.dismiss('welcome', 'WELCOME').catch(() => {});
+
       const welcomeNotices = activeNotices.filter((n) => {
         const titleLower = (n.title || '').toLowerCase();
         const msgLower = (n.message || '').toLowerCase();

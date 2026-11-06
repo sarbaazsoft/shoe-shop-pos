@@ -144,6 +144,13 @@ router.get('/grouped', async (req: Request, res: Response) => {
                AND pn.title NOT ILIKE 'Renewal Request%'
                AND pn.action_url NOT ILIKE '%/superadmin%'
                AND pn.message NOT ILIKE '%staff account (cashier)%'
+               AND NOT (
+                 (pn.title ILIKE '%welcome%' OR pn.message ILIKE '%welcome%' OR pn.message ILIKE '%thank you for choosing%')
+                 AND (
+                   EXISTS (SELECT 1 FROM tenants t WHERE t.id = $1 AND t.welcome_dismissed = true)
+                   OR EXISTS (SELECT 1 FROM pos_notification_dismissals pnd WHERE pnd.tenant_id = $1 AND pnd.item_type = 'WELCOME')
+                 )
+               )
              )
              WHEN $3 = 'CASHIER' THEN (
                (pn.tenant_id IS NULL OR pn.tenant_id = $1)
@@ -595,6 +602,51 @@ router.get('/all', async (req: Request, res: Response) => {
 });
 
 /**
+ * Permanent Welcome Notice Dismissal Endpoint (POST /api/notifications/dismiss-welcome)
+ * Ensures welcome banner & notices are permanently recorded as dismissed on server.
+ */
+router.post('/dismiss-welcome', async (req: Request, res: Response) => {
+  try {
+    await ensurePlatformNotificationsSchema();
+    const { tenantId, userId } = resolveRequestIdentity(req);
+    const cleanTenantId = tenantId || 1;
+
+    await pgClient.query(
+      `UPDATE tenants SET welcome_dismissed = true, updated_at = NOW() WHERE id = $1`,
+      [cleanTenantId]
+    ).catch(() => {});
+
+    await pgClient.query(
+      `INSERT INTO pos_notification_dismissals (tenant_id, user_id, item_type, item_id, dismissed_at)
+       VALUES ($1, $2, 'WELCOME', 0, NOW())
+       ON CONFLICT (tenant_id, user_id, item_type, item_id) DO UPDATE SET dismissed_at = NOW()`,
+      [cleanTenantId, userId]
+    ).catch(() => {});
+
+    await pgClient.query(
+      `INSERT INTO pos_notification_dismissals (tenant_id, user_id, item_type, item_id, dismissed_at)
+       VALUES ($1, 0, 'WELCOME', 0, NOW())
+       ON CONFLICT (tenant_id, user_id, item_type, item_id) DO UPDATE SET dismissed_at = NOW()`,
+      [cleanTenantId]
+    ).catch(() => {});
+
+    await pgClient.query(
+      `INSERT INTO platform_notification_reads (notification_id, tenant_id, user_id, read_at)
+       SELECT pn.id, $1, $2, NOW()
+       FROM platform_notifications pn
+       WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+         AND (pn.title ILIKE '%welcome%' OR pn.message ILIKE '%welcome%' OR pn.message ILIKE '%thank you for choosing%')
+       ON CONFLICT (notification_id, tenant_id, user_id) DO UPDATE SET read_at = NOW()`,
+      [cleanTenantId, userId]
+    ).catch(() => {});
+
+    return res.json({ success: true, message: 'Welcome message permanently dismissed.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to dismiss welcome message: ' + err.message });
+  }
+});
+
+/**
  * 3. DISMISS MUTATION ENDPOINT (POST /api/notifications/:id/dismiss & /dismiss)
  * Instantly records user dismissal to remove the notice or operational item from active drawers.
  */
@@ -612,7 +664,29 @@ router.post(['/:id/dismiss', '/dismiss'], async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Notification ID is required.' });
     }
 
-    if (cleanIdStr.startsWith('notice-') || itemType === 'NOTICE' || /^\d+$/.test(cleanIdStr)) {
+    if (cleanIdStr.toLowerCase().includes('welcome') || itemType === 'WELCOME') {
+      await pgClient.query(
+        `UPDATE tenants SET welcome_dismissed = true, updated_at = NOW() WHERE id = $1`,
+        [cleanTenantId]
+      ).catch(() => {});
+
+      await pgClient.query(
+        `INSERT INTO pos_notification_dismissals (tenant_id, user_id, item_type, item_id, dismissed_at)
+         VALUES ($1, $2, 'WELCOME', 0, NOW())
+         ON CONFLICT (tenant_id, user_id, item_type, item_id) DO UPDATE SET dismissed_at = NOW()`,
+        [cleanTenantId, userId]
+      ).catch(() => {});
+
+      await pgClient.query(
+        `INSERT INTO platform_notification_reads (notification_id, tenant_id, user_id, read_at)
+         SELECT pn.id, $1, $2, NOW()
+         FROM platform_notifications pn
+         WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+           AND (pn.title ILIKE '%welcome%' OR pn.message ILIKE '%welcome%' OR pn.message ILIKE '%thank you for choosing%')
+         ON CONFLICT (notification_id, tenant_id, user_id) DO UPDATE SET read_at = NOW()`,
+        [cleanTenantId, userId]
+      ).catch(() => {});
+    } else if (cleanIdStr.startsWith('notice-') || itemType === 'NOTICE' || /^\d+$/.test(cleanIdStr)) {
       const numericId = parseInt(cleanIdStr.replace(/^notice-/, ''), 10);
       if (Number.isInteger(numericId) && numericId > 0) {
         await pgClient.query(

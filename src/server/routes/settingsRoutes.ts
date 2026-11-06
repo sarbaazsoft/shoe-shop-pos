@@ -232,6 +232,8 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     isOnboarded: tenantRow ? Boolean(tenantRow.onboarding_completed) : true,
     onboardingCompleted: isSetupLocked,
     initialSetupLocked: isSetupLocked,
+    welcomeDismissed: Boolean(tenantRow?.welcome_dismissed),
+    welcome_dismissed: Boolean(tenantRow?.welcome_dismissed),
     name: storeName,
     companyName: storeName,
     phone: s.phone || '',

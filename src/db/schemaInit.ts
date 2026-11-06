@@ -339,6 +339,7 @@ const DATABASE_TABLE_DDL: string[] = [
     subscription_end_date TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
     subscription_status subscription_status_enum NOT NULL DEFAULT 'ACTIVE',
     onboarding_completed BOOLEAN NOT NULL DEFAULT true,
+    welcome_dismissed BOOLEAN NOT NULL DEFAULT false,
     deleted_product_ids INTEGER[] NOT NULL DEFAULT '{}',
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -1230,6 +1231,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS subscription_end_date TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '30 days');
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'ACTIVE';
             ALTER TABLE tenants ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE tenants ADD COLUMN IF NOT EXISTS welcome_dismissed BOOLEAN NOT NULL DEFAULT false;
             ALTER TABLE tenants ALTER COLUMN onboarding_completed SET DEFAULT true;
             UPDATE tenants SET onboarding_completed = true WHERE onboarding_completed = false;
           EXCEPTION WHEN OTHERS THEN NULL;
@@ -1738,6 +1740,7 @@ export async function ensureSaasControlPlane(): Promise<void> {
         parseInt(fastCheck.rows[0]?.count || '0', 10) > 0
       ) {
         await pgClient.query(`UPDATE tenants SET onboarding_completed = true WHERE onboarding_completed = false`).catch(() => {});
+        await pgClient.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS welcome_dismissed BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
         await syncExpiredTenantSubscriptions();
         saasControlPlaneInitialized = true;
         return;

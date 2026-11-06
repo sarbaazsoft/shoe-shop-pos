@@ -55,6 +55,7 @@ const mockStore: Record<string, any[]> = {
       tax_id: 'STRN-100200300',
       currency: 'PKR',
       onboarding_completed: true,
+      welcome_dismissed: false,
       deleted_product_ids: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -73,6 +74,7 @@ const mockStore: Record<string, any[]> = {
       tax_id: 'STRN-200300400',
       currency: 'PKR',
       onboarding_completed: true,
+      welcome_dismissed: false,
       deleted_product_ids: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1258,6 +1260,12 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     const targetId = Number(params[params.length - 1]);
     const tenant = mockStore.tenants.find((t) => Number(t.id) === targetId);
     if (!tenant) return { rows: [], rowCount: 0 };
+
+    if (upper.includes('WELCOME_DISMISSED = TRUE')) {
+      tenant.welcome_dismissed = true;
+      tenant.updated_at = new Date().toISOString();
+      return { rows: [tenant as unknown as T], rowCount: 1 };
+    }
 
     if (upper.includes('ARRAY_REMOVE') && upper.includes('DELETED_PRODUCT_IDS')) {
       const usedNo = Number(params[0]);
