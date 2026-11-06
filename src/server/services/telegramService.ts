@@ -90,9 +90,10 @@ export async function getStoreTelegramConfig(tenantId: number): Promise<Telegram
       telegram_bot_token: string | null;
       telegram_chat_id: string | null;
       telegram_alerts_enabled: boolean | null;
+      active_alert_provider: string | null;
       store_name: string | null;
     }>(
-      `SELECT cs.telegram_bot_token, cs.telegram_chat_id, cs.telegram_alerts_enabled,
+      `SELECT cs.telegram_bot_token, cs.telegram_chat_id, cs.telegram_alerts_enabled, cs.active_alert_provider,
               COALESCE(cs.company_name, t.name) AS store_name
        FROM company_settings cs
        LEFT JOIN tenants t ON t.id = cs.tenant_id
@@ -105,7 +106,9 @@ export async function getStoreTelegramConfig(tenantId: number): Promise<Telegram
       const row = res.rows[0];
       storeBotToken = String(row.telegram_bot_token || '').trim();
       storeChatId = String(row.telegram_chat_id || '').trim();
-      storeAlertsEnabled = Boolean(row.telegram_alerts_enabled);
+      const provider = String(row.active_alert_provider || 'both').toLowerCase();
+      const isProviderActive = provider === 'both' || provider === 'telegram';
+      storeAlertsEnabled = Boolean(row.telegram_alerts_enabled) && isProviderActive;
       if (row.store_name) storeName = row.store_name;
     }
   } catch (err) {

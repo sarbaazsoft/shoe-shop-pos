@@ -214,6 +214,22 @@ export interface CompanySettings {
   min_selling_quantity?: number;
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
+  telegram_bot_token?: string;
+  telegramBotToken?: string;
+  telegram_chat_id?: string;
+  telegramChatId?: string;
+  telegram_alerts_enabled?: boolean;
+  telegramAlertsEnabled?: boolean;
+  email_alerts_enabled?: boolean;
+  emailAlertsEnabled?: boolean;
+  gmail_user?: string;
+  gmailUser?: string;
+  gmail_app_password?: string;
+  gmailAppPassword?: string;
+  gmail_from_name?: string;
+  gmailFromName?: string;
+  active_alert_provider?: 'both' | 'telegram' | 'gmail' | 'none' | string;
+  activeAlertProvider?: 'both' | 'telegram' | 'gmail' | 'none' | string;
   updatedAt: string;
   updated_at?: string;
 }

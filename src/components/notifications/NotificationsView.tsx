@@ -21,10 +21,12 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Sliders,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import type { HistoricalNotificationItem } from '../../types.ts';
 import { ClickableMessage } from '../common/ClickableMessage.tsx';
+import { NotificationAlertProvidersSettings } from '../settings/NotificationAlertProvidersSettings.tsx';
 
 interface NotificationsViewProps {
   currentUser?: any;
@@ -59,6 +61,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   });
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [showProviderSettings, setShowProviderSettings] = useState(false);
   const searchTimeoutRef = useRef<any>(null);
 
   const fetchHistory = async () => {
@@ -319,7 +322,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         </div>
 
         {/* Global Actions */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowProviderSettings((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer ${
+              showProviderSettings
+                ? 'bg-purple-600 text-white shadow-purple-600/30'
+                : 'bg-white dark:bg-[#120726] border border-slate-200/90 dark:border-purple-800/40 text-slate-700 dark:text-purple-200 hover:text-purple-600 dark:hover:text-white'
+            }`}
+            title="Configure Telegram and Gmail Alert Channels"
+          >
+            <Sliders className="w-3.5 h-3.5 text-purple-500" />
+            <span>{showProviderSettings ? 'Close Channel Settings' : 'Telegram & Gmail Settings'}</span>
+          </button>
+
           {totalUnreadCount > 0 && (
             <button
               type="button"
@@ -343,6 +360,15 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ALERT PROVIDER CONFIGURATION PANEL */}
+      {showProviderSettings && (
+        <div className="transition-all duration-200 animate-in fade-in">
+          <NotificationAlertProvidersSettings
+            onClose={() => setShowProviderSettings(false)}
+          />
+        </div>
+      )}
 
       {/* STATS OVERVIEW CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

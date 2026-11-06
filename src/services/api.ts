@@ -1074,6 +1074,8 @@ export const api = {
       }>('/settings/test-email', { method: 'POST', body: { recipientEmail } }),
     testTelegram: (data?: { botToken?: string; chatId?: string }) =>
       apiFetch<{ success: boolean; message: string; error?: string }>('/settings/test-telegram', { method: 'POST', body: data || {} }),
+    testGmail: (data?: { gmailUser?: string; gmailAppPassword?: string; fromName?: string; recipientEmail?: string }) =>
+      apiFetch<{ success: boolean; delivered: boolean; message: string; error?: string }>('/settings/test-gmail', { method: 'POST', body: data || {} }),
     post: (data: any) => apiFetch('/settings', { method: 'POST', body: data }),
     getSubscription: () => apiFetch('/settings/subscription'),
     requestSubscriptionRenewal: (data: { plan: '6_MONTHS' | 'YEARLY' | string; notes?: string }) =>

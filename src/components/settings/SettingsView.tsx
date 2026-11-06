@@ -12,6 +12,7 @@ import { calculateDaysLeft, normalizeSubscriptionPlan, normalizeSubscriptionType
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
+import { NotificationAlertProvidersSettings } from './NotificationAlertProvidersSettings.tsx';
 
 interface SettingsViewProps {
   currentUser: any;
@@ -351,6 +352,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     telegram_chat_id: companySettings?.telegram_chat_id || companySettings?.telegramChatId || '',
     telegram_alerts_enabled: Boolean(companySettings?.telegram_alerts_enabled ?? companySettings?.telegramAlertsEnabled ?? false),
     email_alerts_enabled: companySettings?.email_alerts_enabled !== false,
+    gmail_user: companySettings?.gmail_user || companySettings?.gmailUser || '',
+    gmail_app_password: companySettings?.gmail_app_password || companySettings?.gmailAppPassword || '',
+    gmail_from_name: companySettings?.gmail_from_name || companySettings?.gmailFromName || 'SarbaazSoft Store Alerts',
+    active_alert_provider: (companySettings?.active_alert_provider || companySettings?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
   });
 
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
@@ -419,6 +424,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           telegram_chat_id: s?.telegram_chat_id || s?.telegramChatId || '',
           telegram_alerts_enabled: Boolean(s?.telegram_alerts_enabled ?? s?.telegramAlertsEnabled ?? false),
           email_alerts_enabled: s?.email_alerts_enabled !== false,
+          gmail_user: s?.gmail_user || s?.gmailUser || '',
+          gmail_app_password: s?.gmail_app_password || s?.gmailAppPassword || '',
+          gmail_from_name: s?.gmail_from_name || s?.gmailFromName || 'SarbaazSoft Store Alerts',
+          active_alert_provider: (s?.active_alert_provider || s?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
         });
       }
     });
@@ -479,6 +488,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         telegram_chat_id: companySettings?.telegram_chat_id || companySettings?.telegramChatId || '',
         telegram_alerts_enabled: Boolean(companySettings?.telegram_alerts_enabled ?? companySettings?.telegramAlertsEnabled ?? false),
         email_alerts_enabled: companySettings?.email_alerts_enabled !== false,
+        gmail_user: companySettings?.gmail_user || companySettings?.gmailUser || '',
+        gmail_app_password: companySettings?.gmail_app_password || companySettings?.gmailAppPassword || '',
+        gmail_from_name: companySettings?.gmail_from_name || companySettings?.gmailFromName || 'SarbaazSoft Store Alerts',
+        active_alert_provider: (companySettings?.active_alert_provider || companySettings?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
       });
     }
   }, [companySettings]);
@@ -2454,244 +2467,12 @@ setFormErrors(errors);
             )}
           </div>
 
-          {/* CARD 4: TELEGRAM INSTANT MOBILE PUSH ALERTS (Delivers even when app/browser is completely closed) */}
-          <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm transition-colors space-y-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-purple-900/40 gap-3">
-              <div className="flex items-center space-x-3.5">
-                <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/20 border border-sky-100 dark:border-sky-400/30 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Send className="w-5 h-5 -rotate-12 translate-x-0.5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                    <span>Telegram Instant Mobile Alerts</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${
-                      formData.telegram_alerts_enabled
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${formData.telegram_alerts_enabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                      {formData.telegram_alerts_enabled ? '24/7 Mobile Push Active' : 'Alerts Disabled'}
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-0.5 font-normal">
-                    Receive instant lock-screen alerts on Android, iPhone, Windows, and Mac whenever a cashier completes a sale, return, or exchange — <strong>even when your phone is locked and the POS app or browser is completely closed</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {/* Master Toggle */}
-              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {formData.telegram_alerts_enabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.telegram_alerts_enabled}
-                  onClick={() => setFormData({ ...formData, telegram_alerts_enabled: !formData.telegram_alerts_enabled })}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    formData.telegram_alerts_enabled ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      formData.telegram_alerts_enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Quick 3-step Instructions Banner */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-sky-50 via-blue-50/50 to-indigo-50/40 dark:from-sky-950/30 dark:via-blue-950/20 dark:to-indigo-950/20 border border-sky-200 dark:border-sky-800/60 text-xs space-y-2">
-              <span className="font-bold text-sky-950 dark:text-sky-200 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                Quick 2-Minute Setup Instructions:
-              </span>
-              <ol className="list-decimal list-inside space-y-1.5 text-slate-700 dark:text-slate-300 leading-relaxed pl-1">
-                <li>
-                  In Telegram, search for <strong className="font-mono text-sky-700 dark:text-sky-300">@userinfobot</strong> and tap <strong>Start</strong> to get your numeric <strong>Chat ID</strong>.
-                </li>
-                <li>
-                  <em>(Optional)</em> Create your own private bot by messaging <strong className="font-mono text-sky-700 dark:text-sky-300">@BotFather</strong> with <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">/newbot</code>, or leave the Bot Token empty to use SarbaazSoft's default bot.
-                </li>
-                <li>
-                  Open your bot in Telegram and tap <strong>Start</strong> once, then click <strong>"Send Test Alert"</strong> below to verify your phone rings!
-                </li>
-              </ol>
-            </div>
-
-            {/* Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  <span>Store Owner / Group Chat ID</span>
-                  <span className="text-rose-500 ml-1 font-bold">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formData.telegram_chat_id}
-                    onChange={(e) => setFormData({ ...formData, telegram_chat_id: e.target.value.trim() })}
-                    placeholder="e.g. 987654321 (or -100123456789 for groups)"
-                    className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Obtained from <code>@userinfobot</code> in Telegram. All sales alerts are pushed to this ID.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  <span>Custom Telegram Bot Token</span>
-                  <span className="text-[10px] text-slate-400 font-normal ml-1.5">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={revealedTelegramToken ? 'text' : 'password'}
-                    value={formData.telegram_bot_token}
-                    onChange={(e) => setFormData({ ...formData, telegram_bot_token: e.target.value.trim() })}
-                    placeholder="Leave blank to use platform default bot"
-                    className="w-full h-10 pl-3 pr-9 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setRevealedTelegramToken(!revealedTelegramToken)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
-                    title={revealedTelegramToken ? 'Hide token' : 'Show token'}
-                  >
-                    {revealedTelegramToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  From <code>@BotFather</code>. If empty, the system automatically uses the platform's default bot.
-                </p>
-              </div>
-            </div>
-
-            {/* Test Verification Dispatcher & Result Banner */}
-            <div className="pt-2 border-t border-slate-100 dark:border-purple-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="text-xs text-slate-600 dark:text-slate-400">
-                <span>Want to confirm it works right now? Click to send a test ping to your phone.</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleTestTelegramAlert()}
-                disabled={isTestingTelegram || !formData.telegram_chat_id.trim()}
-                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shrink-0 shadow-xs active:scale-95"
-              >
-                <Send className={`w-3.5 h-3.5 ${isTestingTelegram ? 'animate-spin' : ''}`} />
-                <span>{isTestingTelegram ? 'Sending Ping...' : 'Send Test Alert to Telegram'}</span>
-              </button>
-            </div>
-
-            {telegramTestResult && (
-              <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 border ${
-                telegramTestResult.success
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-              }`}>
-                {telegramTestResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1">
-                  <span>{telegramTestResult.message}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Instant Email Transaction Alerts (Gmail / Phone Mail App) */}
-          <div className="bg-slate-50/80 dark:bg-purple-950/20 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-purple-900/60 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 flex items-center justify-center shrink-0">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5 flex-wrap">
-                    Instant Email Transaction Alerts (Gmail / Mail App)
-                    <span className="text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
-                      No App Install Required
-                    </span>
-                  </h4>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                    Receive formatted HTML receipts for sales, customer returns, and exchanges directly to your Gmail inbox even if your POS browser or computer is closed.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
-                  formData.email_alerts_enabled
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                }`}>
-                  {formData.email_alerts_enabled ? 'Email Alerts: Active' : 'Email Alerts: Disabled'}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.email_alerts_enabled}
-                  onClick={() => setFormData((prev) => ({ ...prev, email_alerts_enabled: !prev.email_alerts_enabled }))}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    formData.email_alerts_enabled ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      formData.email_alerts_enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3.5 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-purple-900/40 space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="text-xs text-slate-700 dark:text-slate-300">
-                  <span className="font-semibold text-slate-500 dark:text-slate-400">Destination Store Email: </span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    {formData.company_email || '(No company email entered yet)'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSendStoreTestEmail}
-                  disabled={isSendingStoreTestEmail || !formData.company_email?.trim()}
-                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-xs shrink-0 self-start sm:self-auto"
-                >
-                  <Mail className={`w-3.5 h-3.5 ${isSendingStoreTestEmail ? 'animate-spin' : ''}`} />
-                  <span>{isSendingStoreTestEmail ? 'Sending Test...' : 'Send Test Email to this Address'}</span>
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                POS transactional emails are sent to your store's <strong>Company Email Address</strong> above. Because the Gmail app is already installed on Android and iOS phones, you will receive real-time push notifications without installing any new applications.
-              </p>
-            </div>
-
-            {storeTestEmailResult && (
-              <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 border ${
-                storeTestEmailResult.success
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-              }`}>
-                {storeTestEmailResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1">
-                  <span>{storeTestEmailResult.message}</span>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* NOTIFICATION ALERT PROVIDERS (TELEGRAM & GMAIL / EMAIL) */}
+          <NotificationAlertProvidersSettings
+            formData={formData}
+            setFormData={setFormData}
+            isEmbeddedInForm={true}
+          />
 
           {/* Action Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">

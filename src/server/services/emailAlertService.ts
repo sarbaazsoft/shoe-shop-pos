@@ -32,8 +32,13 @@ export async function dispatchPosEmailAlert(
         company_name: string | null;
         email: string | null;
         email_alerts_enabled: boolean | null;
+        gmail_user: string | null;
+        gmail_app_password: string | null;
+        gmail_from_name: string | null;
+        active_alert_provider: string | null;
       }>(
-        `SELECT cs.company_name, cs.email, cs.email_alerts_enabled
+        `SELECT cs.company_name, cs.email, cs.email_alerts_enabled,
+                cs.gmail_user, cs.gmail_app_password, cs.gmail_from_name, cs.active_alert_provider
          FROM company_settings cs
          WHERE cs.tenant_id = $1 LIMIT 1`,
         [cleanTenantId]
@@ -46,14 +51,21 @@ export async function dispatchPosEmailAlert(
     ]);
 
     const cs = csRes.rows[0];
-    if (cs && cs.email_alerts_enabled === false) {
-      return false; // Owner disabled email alerts for this store
+    if (cs) {
+      if (cs.email_alerts_enabled === false) return false;
+      const provider = String(cs.active_alert_provider || 'both').toLowerCase();
+      if (provider === 'telegram' || provider === 'none') {
+        return false; // Email alerts silenced per provider toggle
+      }
     }
 
     const recipients = new Set<string>();
 
     if (cs?.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cs.email.trim())) {
       recipients.add(cs.email.trim().toLowerCase());
+    }
+    if (cs?.gmail_user && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cs.gmail_user.trim())) {
+      recipients.add(cs.gmail_user.trim().toLowerCase());
     }
 
     for (const u of usersRes.rows) {

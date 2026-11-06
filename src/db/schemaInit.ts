@@ -1982,6 +1982,10 @@ export async function ensureTelegramSettingsSchema(): Promise<void> {
             ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT '';
             ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false;
             ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS email_alerts_enabled BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_user TEXT DEFAULT '';
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_app_password TEXT DEFAULT '';
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_from_name TEXT DEFAULT '';
+            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS active_alert_provider TEXT DEFAULT 'both';
           END IF;
         END $$;
       `);
