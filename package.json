@@ -15,7 +15,9 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/adm-zip": "^0.5.8",
     "@vitejs/plugin-react": "^6.1.1",
+    "adm-zip": "^0.6.1",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",

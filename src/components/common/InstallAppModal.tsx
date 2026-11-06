@@ -14,13 +14,20 @@ type PlatformTab = 'android' | 'apple' | 'desktop';
 
 // Only show the native-APK download when a REAL, signed APK is configured (e.g. built with PWABuilder/Bubblewrap).
 // Set VITE_ANDROID_APK_URL=/assets/SarbaazSoft-POS.apk in your env once you drop a real APK at that path.
-const ANDROID_APK_URL: string = (import.meta as any).env?.VITE_ANDROID_APK_URL || '';
-
 export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, storeName }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [activeTab, setActiveTab] = useState<PlatformTab>('android');
   const effectiveStoreName = storeName || localStorage.getItem('cached_store_name') || 'Shoe POS';
   const pwaAppName = effectiveStoreName;
+
+  const cleanStoreFileName = effectiveStoreName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const apkDownloadFileName = `${cleanStoreFileName}-POS.apk`;
+  const exeDownloadFileName = `${cleanStoreFileName}-POS-Desktop-Setup.exe`;
+  const configuredApkUrl: string = (import.meta as any).env?.VITE_ANDROID_APK_URL || '/api/download/apk';
+  const apkDownloadUrl = configuredApkUrl.startsWith('/api')
+    ? `${configuredApkUrl}?store=${encodeURIComponent(effectiveStoreName)}`
+    : configuredApkUrl;
+  const exeDownloadUrl = `/api/download/desktop-setup?store=${encodeURIComponent(effectiveStoreName)}`;
 
   const { containerRef: installTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeTab, {
     padding: 16,
@@ -200,8 +207,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
               </p>
             </div>
 
-            {/* Android APK Download Card (only when a real APK is configured) */}
-            {ANDROID_APK_URL && (
+            {/* Android APK Download Card */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#070B14] border border-slate-200/80 dark:border-slate-800 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -209,14 +215,14 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                   Direct Android Package (.APK)
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold">
-                  SarbaazSoft-POS.apk
+                  {apkDownloadFileName}
                 </span>
               </div>
 
               {/* Direct A tag download button - bypasses any browser synthetic click blockers */}
               <a
-                href={ANDROID_APK_URL}
-                download="SarbaazSoft-POS.apk"
+                href={apkDownloadUrl}
+                download={apkDownloadFileName}
                 onClick={() => {
                   setDownloadingApk(true);
                   setTimeout(() => {
@@ -232,12 +238,12 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 ) : downloadApkSuccess ? (
                   <>
                     <Check className="w-4 h-4" />
-                    <span>Downloaded: SarbaazSoft-POS.apk</span>
+                    <span>Downloaded: {apkDownloadFileName}</span>
                   </>
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    <span>Download Android APK (.apk)</span>
+                    <span>Download {pwaAppName} APK (.apk)</span>
                   </>
                 )}
               </a>
@@ -245,18 +251,17 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400 pt-0.5">
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  Asset file: <code>{ANDROID_APK_URL}</code>
+                  Asset file: <code>/assets/SarbaazSoft-POS.apk</code>
                 </span>
                 <a
-                  href={ANDROID_APK_URL}
-                  download="SarbaazSoft-POS.apk"
+                  href="/assets/SarbaazSoft-POS.apk"
+                  download={apkDownloadFileName}
                   className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
                 >
                   Direct File Mirror
                 </a>
               </div>
             </div>
-            )}
 
             {/* Android WebAPK / Browser Option (Secondary) */}
             <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-[#070B14]/80 border border-slate-200/60 dark:border-slate-800/80 space-y-2">
@@ -306,7 +311,6 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
             )}
 
             {/* Step-by-Step Android APK Installation Instructions */}
-            {ANDROID_APK_URL && (
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#070B14] border border-slate-200/80 dark:border-slate-800 space-y-2">
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -314,10 +318,10 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
               </div>
               <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal list-inside">
                 <li className="leading-relaxed">
-                  Tap the green <strong className="text-slate-800 dark:text-slate-200">"Download Android APK (.apk)"</strong> button above.
+                  Tap the green <strong className="text-slate-800 dark:text-slate-200">"Download {pwaAppName} APK (.apk)"</strong> button above.
                 </li>
                 <li className="leading-relaxed">
-                  When the download finishes, open your notification shade or <strong className="text-slate-800 dark:text-slate-200">Downloads</strong> folder and tap <strong className="text-slate-800 dark:text-slate-200">SarbaazSoft-POS.apk</strong>.
+                  When the download finishes, open your notification shade or <strong className="text-slate-800 dark:text-slate-200">Downloads</strong> folder and tap <strong className="text-slate-800 dark:text-slate-200">{apkDownloadFileName}</strong>.
                 </li>
                 <li className="leading-relaxed">
                   If prompted with <em>"Install unknown apps"</em>, tap <strong className="text-slate-800 dark:text-slate-200">Settings</strong> and toggle <strong className="text-slate-800 dark:text-slate-200">"Allow from this source"</strong>.
@@ -327,7 +331,6 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 </li>
               </ol>
             </div>
-            )}
           </div>
         )}
 
@@ -457,12 +460,12 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                Genuine compiled Windows x64 binary. Automatically launches the POS terminal in borderless app window mode and creates a Desktop shortcut.
+                Genuine compiled Windows x64 binary. Automatically launches the {pwaAppName} retail terminal in borderless app window mode and creates a Desktop shortcut.
               </p>
 
               <a
-                href="/assets/SarbaazSoft-POS-Desktop-Setup.exe"
-                download="SarbaazSoft-POS-Desktop-Setup.exe"
+                href={exeDownloadUrl}
+                download={exeDownloadFileName}
                 onClick={() => {
                   setDownloadingExe(true);
                   setTimeout(() => {
@@ -478,12 +481,12 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 ) : downloadSuccess ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
-                    <span>Downloaded: SarbaazSoft-POS-Desktop-Setup.exe</span>
+                    <span>Downloaded: {exeDownloadFileName}</span>
                   </>
                 ) : (
                   <>
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download Windows Executable (.EXE)</span>
+                    <span>Download {pwaAppName} Windows Executable (.EXE)</span>
                   </>
                 )}
               </a>
@@ -495,7 +498,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 </span>
                 <a
                   href="/assets/SarbaazSoft-POS-Desktop-Setup.exe"
-                  download="SarbaazSoft-POS-Desktop-Setup.exe"
+                  download={exeDownloadFileName}
                   className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                 >
                   Direct Mirror

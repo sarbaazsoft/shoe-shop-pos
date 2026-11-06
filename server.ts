@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
+import AdmZip from 'adm-zip';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -139,34 +140,140 @@ app.use((req, _res, next) => {
 });
 
 // Dedicated Store & SuperAdmin PWA Manifests (`/manifest.webmanifest`, `/manifest.json`, `/admin/manifest.*`)
-app.get(['/manifest.webmanifest', '/manifest.json'], (_req, res) => {
+app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
+
   const manifestPath = path.join(rootDir, 'public', 'manifest.json');
+  let manifestData: any = null;
   if (fs.existsSync(manifestPath)) {
-    return res.sendFile(manifestPath);
+    try {
+      manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch {}
   }
-  res.json({
-    id: '/',
-    name: 'Shoe POS',
-    short_name: 'ShoePOS',
-    description: 'Multi-tenant dual-engine wholesale & retail shoe shop POS and inventory management system',
-    theme_color: '#4F46E5',
-    background_color: '#4F46E5',
-    display: 'standalone',
-    display_override: ['standalone', 'minimal-ui'],
-    orientation: 'any',
-    start_url: '/',
-    scope: '/',
-    categories: ['business', 'productivity', 'shopping'],
-    icons: [
-      { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-      { src: '/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-      { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
-    ],
-  });
+  if (!manifestData) {
+    manifestData = {
+      id: '/',
+      name: 'Shoe POS',
+      short_name: 'ShoePOS',
+      description: 'Multi-tenant dual-engine wholesale & retail shoe shop POS and inventory management system',
+      theme_color: '#4F46E5',
+      background_color: '#4F46E5',
+      display: 'standalone',
+      display_override: ['standalone', 'minimal-ui'],
+      orientation: 'any',
+      start_url: '/',
+      scope: '/',
+      categories: ['business', 'productivity', 'shopping'],
+      icons: [
+        { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
+      ],
+    };
+  }
+
+  // Align dynamically with active store/app title
+  if (storeQuery) {
+    const short = storeQuery.length > 12 ? storeQuery.slice(0, 12).trim() : storeQuery;
+    manifestData.name = storeQuery;
+    manifestData.short_name = short;
+    manifestData.description = `Dedicated Point of Sale & Retail Inventory Management for ${storeQuery}`;
+  }
+
+  return res.json(manifestData);
+});
+
+// Dynamic Desktop Setup Installer (.EXE) Download Endpoint
+app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.exe'], (req, res) => {
+  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
+  const exePath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS-Desktop-Setup.exe');
+  if (!fs.existsSync(exePath)) {
+    return res.status(404).send('Desktop installer binary not found');
+  }
+
+  const cleanStore = storeQuery ? storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Shoe-POS';
+  const downloadFileName = `${cleanStore}-Desktop-Setup.exe`;
+  const originalBuf = fs.readFileSync(exePath);
+  const buf = Buffer.from(originalBuf);
+
+  // If a store name was provided, dynamically align desktop shortcut name in the binary buffer
+  if (storeQuery) {
+    // Binary offset 31997 is the start of the shortcut file name (22 bytes available before next string)
+    const targetOffset = 31997;
+    const maxLen = 22;
+    const shortcutName = `${storeQuery.slice(0, 15).trim()}.url\0`;
+    const shortcutBuf = Buffer.from(shortcutName, 'utf8');
+    if (shortcutBuf.length <= maxLen) {
+      buf.fill(0, targetOffset, targetOffset + maxLen);
+      shortcutBuf.copy(buf, targetOffset);
+    }
+  }
+
+  res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+  res.setHeader('Content-Length', buf.length);
+  res.end(buf);
+});
+
+// Dynamic Android APK Wrapper (.APK) Download Endpoint
+app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
+  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
+  const apkPath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS.apk');
+  if (!fs.existsSync(apkPath)) {
+    return res.status(404).send('Android package APK not found');
+  }
+
+  const cleanStore = storeQuery ? storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Shoe-POS';
+  const downloadFileName = `${cleanStore}.apk`;
+
+  try {
+    const zip = new AdmZip(apkPath);
+
+    if (storeQuery) {
+      const shortName = storeQuery.length > 12 ? storeQuery.slice(0, 12).trim() : storeQuery;
+      let appManifest: any = {};
+      try {
+        appManifest = JSON.parse(zip.readAsText('assets/app-manifest.json'));
+      } catch {}
+
+      appManifest.id = '/';
+      appManifest.name = storeQuery;
+      appManifest.short_name = shortName;
+      appManifest.description = `Dedicated Point of Sale & Retail Inventory Management for ${storeQuery}`;
+      appManifest.theme_color = '#4F46E5';
+      appManifest.background_color = '#4F46E5';
+      appManifest.display = 'standalone';
+
+      // Ensure proper standard and maskable app icons
+      appManifest.icons = [
+        { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: '/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
+      ];
+
+      zip.updateFile('assets/app-manifest.json', Buffer.from(JSON.stringify(appManifest, null, 2)));
+
+      // Align title in launcher splash page inside APK
+      const indexHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${storeQuery}</title><script>window.location.href = "/";</script></head><body style="background:#0F172A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>Launching ${storeQuery}...</h2><p>Connecting to retail terminal</p></div></body></html>`;
+      zip.updateFile('assets/www/index.html', Buffer.from(indexHtml));
+    }
+
+    const apkBuf = zip.toBuffer();
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+    res.setHeader('Content-Length', apkBuf.length);
+    return res.end(apkBuf);
+  } catch (_err) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+    return res.sendFile(apkPath);
+  }
 });
 
 app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => {
@@ -380,6 +487,9 @@ async function startServer() {
           } else if (filePath.endsWith('.apk')) {
             res.setHeader('Content-Type', 'application/vnd.android.package-archive');
             res.setHeader('Content-Disposition', 'attachment; filename="SarbaazSoft-POS.apk"');
+          } else if (filePath.endsWith('.exe')) {
+            res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+            res.setHeader('Content-Disposition', 'attachment; filename="SarbaazSoft-POS-Desktop-Setup.exe"');
           }
         },
       })
