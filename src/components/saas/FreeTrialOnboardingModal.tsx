@@ -339,18 +339,18 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* MODAL HEADER - Full Dark Mode Support */}
+          {/* MODAL HEADER - Soft Pastel Gradient & Subtle Indigo Divider */}
           <div
-            className={`px-6 py-4 transition-colors duration-200 border-b ${
+            className={`px-6 py-4.5 sm:px-7 sm:py-5 transition-colors duration-200 border-b ${
               isDark
-                ? 'bg-gradient-to-r from-purple-950 via-indigo-950 to-[#0F172A] border-purple-800/80 text-white'
-                : 'bg-slate-50 border-slate-200 text-slate-800'
+                ? 'bg-gradient-to-b from-purple-950/40 via-indigo-950/30 to-[#131B2E] border-purple-800/60 text-white'
+                : 'bg-gradient-to-b from-indigo-50/50 via-purple-50/30 to-white border-indigo-100/60 text-slate-800'
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold shadow-2xs shrink-0 ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center font-bold shadow-2xs shrink-0 ${
                     isDark
                       ? 'bg-purple-500/20 text-purple-300 border-purple-400/30'
                       : 'bg-purple-500/10 text-purple-600 border-purple-500/20'
@@ -362,7 +362,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                   <div className="flex items-center gap-2">
                     <h3
                       id="free-trial-title"
-                      className={`font-bold text-base tracking-tight ${
+                      className={`font-bold text-base sm:text-lg tracking-tight ${
                         isDark ? 'text-white' : 'text-slate-900'
                       }`}
                     >
@@ -380,7 +380,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                   </div>
                   <p
                     className={`text-xs ${
-                      isDark ? 'text-purple-200/80' : 'text-slate-500'
+                      isDark ? 'text-purple-200/90 font-medium' : 'text-slate-600 font-medium'
                     }`}
                   >
                     Instant POS access • No credit card required • Full inventory features
@@ -892,12 +892,12 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
               </div>
             </div>
 
-            {/* MODAL FOOTER ACTION BAR - Aligned with ProductFormModal */}
+            {/* MODAL FOOTER ACTION BAR - Soft Pastel Gradient & Subtle Indigo Divider */}
             <div
-              className={`px-6 py-4 border-t flex items-center justify-between gap-3 transition-colors duration-200 ${
+              className={`px-6 py-4 sm:px-7 sm:py-4.5 border-t flex items-center justify-between gap-3 transition-colors duration-200 ${
                 isDark
-                  ? 'bg-[#0B1020] border-purple-900/60'
-                  : 'bg-slate-50 border-slate-200'
+                  ? 'bg-gradient-to-b from-purple-950/40 via-indigo-950/30 to-[#131B2E] border-purple-800/60'
+                  : 'bg-gradient-to-b from-indigo-50/50 via-purple-50/30 to-white border-indigo-100/60'
               }`}
             >
               <div>
@@ -905,7 +905,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs font-bold"
+                  className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Back</span>

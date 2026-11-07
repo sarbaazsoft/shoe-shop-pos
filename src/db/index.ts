@@ -542,6 +542,32 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: rows as unknown as T[], rowCount: rows.length };
   }
 
+  // Monthly sales series chart query (WITH months AS (... generate_series ...))
+  if (upper.includes('GENERATE_SERIES') && upper.includes('WITH MONTHS AS')) {
+    const tenantFilter = params.length > 0 ? Number(params[0]) : null;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const rows: any[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = monthNames[d.getMonth()];
+      const yearLabel = String(d.getFullYear());
+      const mSales = mockStore.sales.filter(
+        (s) => String(s.sale_date || '').startsWith(monthKey) && (!tenantFilter || Number(s.tenant_id) === tenantFilter)
+      );
+      const amount = mSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+      rows.push({
+        month: monthKey,
+        label,
+        year_label: yearLabel,
+        amount: String(amount),
+        tx_count: String(mSales.length),
+      });
+    }
+    return { rows: rows as unknown as T[], rowCount: rows.length };
+  }
+
   // Push Subscriptions tracking for Web Push API
   if (upper.includes('PUSH_SUBSCRIPTIONS')) {
     if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.PUSH_SUBSCRIPTIONS')) {

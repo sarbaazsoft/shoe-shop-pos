@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, X, ShoppingBag } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { ShoeIcon } from './ShoeIcon.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 
@@ -53,59 +54,31 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
         <div className="flex items-center justify-between h-16 sm:h-18">
           
           {/* ========================================================
-              LEFT: BRANDING & LOGO (Courgette Font + App Colors)
+              LEFT: BRANDING & LOGO (Aligned with PublicHeader)
              ======================================================== */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0">
             <a
               href="/"
               onClick={(e) => {
                 e.preventDefault();
                 handleItemClick('Dashboard');
               }}
-              className="group flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-1"
+              className="group flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-0.5 sm:p-1 min-w-0"
               aria-label="SarbaazSoft Shoe POS Home"
             >
-              <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white shadow-md shadow-purple-600/30 border border-purple-400/40 group-hover:scale-105 transition-all duration-200">
-                <ShoppingBag className="w-5 h-5 text-white" />
+              {/* Brand Emblem matching PublicHeader */}
+              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
 
-              <div className="flex flex-col font-courgette">
-                <div
-                  className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight text-black dark:text-white"
-                  style={{ color: isDark ? '#ffffff' : '#000000' }}
-                >
-                  <span
-                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette text-black dark:text-white ${
-                      isDark ? 'text-white' : 'text-black'
-                    }`}
-                    style={{ color: isDark ? '#ffffff' : '#000000' }}
-                  >
-                    Sarbaaz
-                    <span
-                      className={`not-italic transition-colors duration-200 font-courgette text-black dark:text-white ${
-                        isDark ? 'text-white' : 'text-black'
-                      }`}
-                      style={{ color: isDark ? '#ffffff' : '#000000' }}
-                    >
-                      Soft
-                    </span>
-                  </span>
-                  <span
-                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 text-black dark:text-white ${
-                      isDark ? 'text-white' : 'text-black'
-                    }`}
-                    style={{ color: isDark ? '#ffffff' : '#000000' }}
-                  >
-                    Shoe POS
-                  </span>
-                </div>
-                <span
-                  className={`text-[10px] tracking-wider transition-colors font-courgette text-black dark:text-white ${
-                    isDark ? 'text-white' : 'text-black'
-                  }`}
-                  style={{ color: isDark ? '#ffffff' : '#000000' }}
-                >
-                  Retail &amp; Inventory Suite
+              {/* Brand Typography (Clean, no badge, shortened subtitle) */}
+              <div className="min-w-0">
+                <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
+                  SarbaazSoft Shoe POS
+                </span>
+                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5">
+                  <span className="text-purple-600 dark:text-purple-400">👟</span>
+                  <span>Dual-engine wholesale &amp; retail</span>
                 </span>
               </div>
             </a>

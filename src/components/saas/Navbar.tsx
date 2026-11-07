@@ -12,6 +12,10 @@ export interface NavItem {
 }
 
 export interface NavbarProps {
+  storeName?: string;
+  subtitle?: string;
+  badgeText?: string;
+  badgeVariant?: 'online' | 'wizard' | 'connecting' | 'locked';
   activeNav?: string;
   navItems?: readonly NavItem[] | NavItem[];
   onNavigate?: (section: string, navKey: any) => void;
@@ -30,6 +34,8 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({
+  storeName = 'SarbaazSoft Shoe POS',
+  subtitle = 'Dual-engine wholesale & retail',
   activeNav = 'home',
   navItems = DEFAULT_NAV_ITEMS,
   onNavigate,
@@ -83,25 +89,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full backdrop-blur-md select-none transition-colors duration-200 border-b font-courgette ${
+      className={`sticky top-0 z-50 w-full backdrop-blur-md select-none transition-colors duration-200 border-b ${
         isDark
-          ? 'bg-[#070A24]/95 border-indigo-950/70 text-[#f8fafc] shadow-lg shadow-black/20'
-          : 'bg-white/95 border-slate-200 text-black shadow-xs'
+          ? 'bg-[#070A24]/95 border-indigo-500/20 text-[#f8fafc] shadow-lg shadow-black/20'
+          : 'bg-white/95 border-indigo-500/20 text-slate-900 shadow-xs'
       }`}
-      style={{
-        fontFamily: "'Courgette', cursive, system-ui, -apple-system, sans-serif",
-      }}
       aria-label="Main Navigation"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18 lg:h-20 gap-2 sm:gap-4">
+        <div className="flex items-center justify-between min-h-[3.8rem] py-2 gap-2 sm:gap-4">
           
           {/* ========================================================
-              LEFT: BRANDING & LOGO (Courgette Font + Purple/Indigo)
+              LEFT: BRANDING & LOGO (Clean wordmark + no status badge)
              ======================================================== */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0">
             {/* Mobile Hamburger Button (Screens < md) */}
-            <div className="flex md:hidden mr-1">
+            <div className="flex md:hidden mr-0.5">
               <button
                 type="button"
                 id="landing-mobile-menu-toggle"
@@ -109,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`p-2 rounded-xl transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
                   isDark
                     ? 'bg-slate-800/80 text-slate-200 hover:text-white border-slate-700/60'
-                    : 'bg-slate-100 text-black hover:text-slate-900 border-slate-200'
+                    : 'bg-slate-100 text-slate-800 hover:text-slate-900 border-slate-200'
                 }`}
                 aria-expanded={mobileMenuOpen}
                 aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
@@ -120,74 +123,45 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className={`block h-0.5 w-5 rounded-full transition-all duration-300 ease-out origin-center ${
                       mobileMenuOpen
                         ? 'rotate-45 translate-y-[7px] bg-purple-600 dark:bg-purple-400'
-                        : isDark ? 'bg-slate-200' : 'bg-black'
+                        : isDark ? 'bg-slate-200' : 'bg-slate-800'
                     }`}
                   />
                   <span
                     className={`block h-0.5 w-5 rounded-full transition-all duration-200 ease-out ${
-                      mobileMenuOpen ? 'opacity-0 scale-x-0' : isDark ? 'bg-slate-200' : 'bg-black'
+                      mobileMenuOpen ? 'opacity-0 scale-x-0' : isDark ? 'bg-slate-200' : 'bg-slate-800'
                     }`}
                   />
                   <span
                     className={`block h-0.5 w-5 rounded-full transition-all duration-300 ease-out origin-center ${
                       mobileMenuOpen
                         ? '-rotate-45 -translate-y-[7px] bg-purple-600 dark:bg-purple-400'
-                        : isDark ? 'bg-slate-200' : 'bg-black'
+                        : isDark ? 'bg-slate-200' : 'bg-slate-800'
                     }`}
                   />
                 </div>
               </button>
             </div>
 
+            {/* Brand identity & titles matching PublicHeader without badge */}
             <button
               type="button"
               onClick={() => handleNavClick('top', 'home')}
-              className="group flex items-center gap-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-1 cursor-pointer"
-              aria-label="SarbaazSoft Shoe POS Home"
+              className="group flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-0.5 sm:p-1 cursor-pointer min-w-0"
+              aria-label={`${storeName} Home`}
             >
-              {/* App Brand Emblem (Purple/Indigo Gradient) */}
-              <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white shadow-md shadow-purple-600/30 border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105">
-                <ShoeIcon className="w-5 h-5 text-white stroke-[2.2]" />
+              {/* Brand Emblem matching PublicHeader */}
+              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
 
-              {/* Typography: Courgette brand name */}
-              <div className="flex flex-col min-w-0 font-courgette">
-                <div
-                  className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight text-black dark:text-white"
-                  style={{ color: isDark ? '#ffffff' : '#000000' }}
-                >
-                  <span
-                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette text-black dark:text-white ${
-                      isDark ? 'text-white' : 'text-black'
-                    }`}
-                    style={{ color: isDark ? '#ffffff' : '#000000' }}
-                  >
-                    Sarbaaz
-                    <span
-                      className={`not-italic transition-colors duration-200 font-courgette text-black dark:text-white ${
-                        isDark ? 'text-white' : 'text-black'
-                      }`}
-                      style={{ color: isDark ? '#ffffff' : '#000000' }}
-                    >
-                      Soft
-                    </span>
-                  </span>
-                  <span
-                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 text-black dark:text-white ${
-                      isDark ? 'text-white' : 'text-black'
-                    }`}
-                    style={{ color: isDark ? '#ffffff' : '#000000' }}
-                  >
-                    Shoe POS
-                  </span>
-                </div>
-                <span
-                  className={`hidden sm:inline-block text-[10px] tracking-wider transition-colors duration-200 font-courgette text-black dark:text-white ${
-                    isDark ? 'text-white' : 'text-black'
-                  }`}
-                  style={{ color: isDark ? '#ffffff' : '#000000' }}
-                >
-                  Dual-Engine Wholesale &amp; Retail POS
+              {/* Brand Typography (Clean, no badge, shortened subtitle) */}
+              <div className="min-w-0">
+                <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
+                  {storeName}
+                </span>
+                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5">
+                  <span className="text-purple-600 dark:text-purple-400">👟</span>
+                  <span>{subtitle}</span>
                 </span>
               </div>
             </button>

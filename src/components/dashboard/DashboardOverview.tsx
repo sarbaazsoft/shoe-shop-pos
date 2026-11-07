@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle, TrendingUp, DollarSign } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { api } from '../../services/api.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
 import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
@@ -7,6 +8,142 @@ import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';
 import { LuxuryBadge } from '../common/Badge.tsx';
+
+interface CustomWeeklySalesTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+  currency: string;
+}
+
+const CustomWeeklySalesTooltip: React.FC<CustomWeeklySalesTooltipProps> = ({
+  active,
+  payload,
+  label,
+  currency,
+}) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const dataPoint = payload[0]?.payload || {};
+  const salesVal = Number(dataPoint.amount ?? payload.find((p) => p.dataKey === 'amount')?.value ?? 0);
+  const txVal = Number(dataPoint.txCount ?? payload.find((p) => p.dataKey === 'txCount')?.value ?? 0);
+  const avgTicket = txVal > 0 ? Math.round(salesVal / txVal) : 0;
+
+  return (
+    <div className="bg-slate-900/95 dark:bg-[#0E1526]/95 backdrop-blur-md border border-slate-700/80 dark:border-purple-500/30 shadow-2xl rounded-xl p-3 text-xs min-w-44 select-none z-50">
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 dark:border-slate-800/80 text-[11px]">
+        <span className="font-bold text-white flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+          <span>{label}</span>
+        </span>
+        {dataPoint.date && (
+          <span className="text-slate-400 font-mono text-[10px]">
+            {dataPoint.date}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-slate-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_6px_#6366F1]" />
+            <span>Sales Revenue:</span>
+          </span>
+          <span className="font-bold font-mono text-indigo-300">
+            {formatCurrency(salesVal, currency)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-slate-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#06B6D4]" />
+            <span>Transactions:</span>
+          </span>
+          <span className="font-bold font-mono text-cyan-300">
+            {txVal} {txVal === 1 ? 'order' : 'orders'}
+          </span>
+        </div>
+
+        {txVal > 0 && (
+          <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Avg Order Value:</span>
+            <span className="font-mono text-emerald-400 font-semibold">
+              {formatCurrency(avgTicket, currency)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface CustomMonthlySalesTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+  currency: string;
+}
+
+const CustomMonthlySalesTooltip: React.FC<CustomMonthlySalesTooltipProps> = ({
+  active,
+  payload,
+  label,
+  currency,
+}) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const dataPoint = payload[0]?.payload || {};
+  const salesVal = Number(dataPoint.amount ?? payload.find((p) => p.dataKey === 'amount')?.value ?? 0);
+  const txVal = Number(dataPoint.txCount ?? payload.find((p) => p.dataKey === 'txCount')?.value ?? 0);
+  const avgTicket = txVal > 0 ? Math.round(salesVal / txVal) : 0;
+
+  return (
+    <div className="bg-slate-900/95 dark:bg-[#0E1526]/95 backdrop-blur-md border border-slate-700/80 dark:border-cyan-500/30 shadow-2xl rounded-xl p-3 text-xs min-w-44 select-none z-50">
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 dark:border-slate-800/80 text-[11px]">
+        <span className="font-bold text-white flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+          <span>{label} {dataPoint.yearLabel ? `(${dataPoint.yearLabel})` : ''}</span>
+        </span>
+        {dataPoint.month && (
+          <span className="text-slate-400 font-mono text-[10px]">
+            {dataPoint.month}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-slate-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#06B6D4]" />
+            <span>Monthly Revenue:</span>
+          </span>
+          <span className="font-bold font-mono text-cyan-300">
+            {formatCurrency(salesVal, currency)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-slate-300 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10B981]" />
+            <span>Completed Orders:</span>
+          </span>
+          <span className="font-bold font-mono text-emerald-300">
+            {txVal} {txVal === 1 ? 'order' : 'orders'}
+          </span>
+        </div>
+
+        {txVal > 0 && (
+          <div className="pt-1.5 mt-1 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Avg Order Value:</span>
+            <span className="font-mono text-emerald-400 font-semibold">
+              {formatCurrency(avgTicket, currency)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface DashboardOverviewProps {
   currentUser: any;
@@ -330,7 +467,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'7days' | 'month' | 'year'>('7days');
-  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+  const [activeChartMetric, setActiveChartMetric] = useState<'all' | 'sales' | 'orders'>('all');
+  const [activeMonthlyMetric, setActiveMonthlyMetric] = useState<'all' | 'sales' | 'orders'>('all');
   const dashboardContainerRef = useRef<HTMLDivElement | null>(null);
 
 
@@ -343,6 +481,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     lowStockCount: number;
     totalPurchases: number;
     sevenDaySales: { date: string; label: string; amount: number; txCount: number }[];
+    monthlySales: { month: string; label: string; yearLabel?: string; amount: number; txCount: number }[];
     recentTransactions: {
       type: string;
       reference: string;
@@ -379,6 +518,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     lowStockCount: 0,
     totalPurchases: 0,
     sevenDaySales: [],
+    monthlySales: [],
     recentTransactions: [],
     topSelling: [],
     topBrands: [],
@@ -410,6 +550,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 label: d.label || `Day ${idx + 1}`,
                 amount: Number(d.amount) || 0,
                 txCount: Number(d.count || d.txCount) || 0,
+              }))
+            : [],
+          monthlySales: Array.isArray(res.monthlySales)
+            ? res.monthlySales.map((m: any, idx: number) => ({
+                month: m.month || '',
+                label: m.label || `M${idx + 1}`,
+                yearLabel: m.yearLabel || '',
+                amount: Number(m.amount) || 0,
+                txCount: Number(m.count || m.txCount) || 0,
               }))
             : [],
           recentTransactions: Array.isArray(res.recentTransactions)
@@ -469,63 +618,80 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     year: 'numeric',
   });
 
-  // Calculate coordinates for dual-spline Sales & Transactions chart
-  const chartWidth = 560;
-  const chartHeight = 200;
-  const paddingLeft = 36;
-  const paddingRight = 20;
-  const paddingTop = 20;
-  const paddingBottom = 30;
-
-  const innerWidth = chartWidth - paddingLeft - paddingRight;
-  const innerHeight = chartHeight - paddingTop - paddingBottom;
-
-  const points = dashboardData.sevenDaySales.map((d, index) => {
-    const denom = Math.max(1, dashboardData.sevenDaySales.length - 1);
-    const x = paddingLeft + (index / denom) * innerWidth;
-    // Scale against highest value or min 100
-    const maxVal = Math.max(
-      100,
-      ...dashboardData.sevenDaySales.map((s) => Math.max(s.amount || 0, s.txCount || 0))
-    );
-    const ySales = paddingTop + innerHeight - ((d.amount || 0) / maxVal) * innerHeight;
-    const yTx = paddingTop + innerHeight - ((d.txCount || 0) / maxVal) * innerHeight;
-    return { x, ySales, yTx, ...d };
-  });
-
-  // Helper function to build smooth cubic Bezier splines
-  const buildSplinePath = (pts: { x: number; y: number }[]) => {
-    if (pts.length === 0) return '';
-    if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
-    let d = `M ${pts[0].x},${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i === 0 ? 0 : i - 1];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[i + 2] || p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 5;
-      const cp1y = p1.y + (p2.y - p0.y) / 5;
-      const cp2x = p2.x - (p3.x - p1.x) / 5;
-      const cp2y = p2.y - (p3.y - p1.y) / 5;
-      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
-    }
-    return d;
-  };
-
-  const salesLinePath = buildSplinePath(points.map((p) => ({ x: p.x, y: p.ySales })));
-  const txLinePath = buildSplinePath(points.map((p) => ({ x: p.x, y: p.yTx })));
-
-  const baselineY = paddingTop + innerHeight;
-  const lastX = points.length > 0 ? points[points.length - 1].x : innerWidth;
-  const firstX = points.length > 0 ? points[0].x : paddingLeft;
-
-  const salesAreaPath = points.length > 0 && salesLinePath ? `${salesLinePath} L ${lastX},${baselineY} L ${firstX},${baselineY} Z` : '';
-  const txAreaPath = points.length > 0 && txLinePath ? `${txLinePath} L ${lastX},${baselineY} L ${firstX},${baselineY} Z` : '';
-
+  // Derived 7-Day Performance Metrics for Immediate Store Owner Insights
   const sevenDaySalesTotal = dashboardData.sevenDaySales.reduce(
     (sum, d) => sum + (Number(d.amount) || 0),
     0
   );
+  const sevenDayTxTotal = dashboardData.sevenDaySales.reduce(
+    (sum, d) => sum + (Number(d.txCount) || 0),
+    0
+  );
+  const averageDailySales = Math.round(
+    sevenDaySalesTotal / Math.max(1, dashboardData.sevenDaySales.length)
+  );
+  const peakSalesDay = dashboardData.sevenDaySales.reduce(
+    (max, d) => ((Number(d.amount) || 0) > (Number(max?.amount) || 0) ? d : max),
+    dashboardData.sevenDaySales[0] || { label: 'None', amount: 0, txCount: 0 }
+  );
+
+  // Derived 6-Month Monthly Performance Metrics
+  const monthlySalesTotal = dashboardData.monthlySales.reduce(
+    (sum, m) => sum + (Number(m.amount) || 0),
+    0
+  );
+  const monthlyTxTotal = dashboardData.monthlySales.reduce(
+    (sum, m) => sum + (Number(m.txCount) || 0),
+    0
+  );
+  const averageMonthlySales = Math.round(
+    monthlySalesTotal / Math.max(1, dashboardData.monthlySales.length)
+  );
+  const peakMonth = dashboardData.monthlySales.reduce(
+    (max, m) => ((Number(m.amount) || 0) > (Number(max?.amount) || 0) ? m : max),
+    dashboardData.monthlySales[0] || { label: 'None', amount: 0, txCount: 0, yearLabel: '' }
+  );
+
+  // Month-over-Month (MoM) calculation
+  const momGrowth = (() => {
+    const len = dashboardData.monthlySales.length;
+    if (len < 2) return 0;
+    const current = Number(dashboardData.monthlySales[len - 1]?.amount) || 0;
+    const prev = Number(dashboardData.monthlySales[len - 2]?.amount) || 0;
+    if (prev === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - prev) / prev) * 100);
+  })();
+
+  // Fallback 7-day data formatted for Recharts
+  const chartData =
+    dashboardData.sevenDaySales.length > 0
+      ? dashboardData.sevenDaySales
+      : Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return {
+            date: d.toISOString().split('T')[0],
+            label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+            amount: 0,
+            txCount: 0,
+          };
+        });
+
+  // Fallback monthly data formatted for Recharts
+  const monthlyChartData =
+    dashboardData.monthlySales.length > 0
+      ? dashboardData.monthlySales
+      : Array.from({ length: 6 }, (_, i) => {
+          const d = new Date();
+          d.setMonth(d.getMonth() - (5 - i));
+          return {
+            month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+            label: d.toLocaleDateString('en-US', { month: 'short' }),
+            yearLabel: String(d.getFullYear()),
+            amount: 0,
+            txCount: 0,
+          };
+        });
 
   useDataPerIntersectionObserver(dashboardContainerRef, [loading, dashboardData]);
 
@@ -855,194 +1021,358 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         variant="dashboard"
       />
 
-      {/* ROW 2: 3 CARDS (Sales Overview + Best Selling Brands + Best Selling Products) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-        {/* Card 1: Sales Overview (Full on md/lg, span 5 on xl) */}
-        <div className="md:col-span-2 lg:col-span-12 xl:col-span-5 app-card p-5 flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Sales Overview
-            </h2>
-
-            <div className="flex items-center gap-3">
-              {/* Chart Legend */}
-              <div className="flex items-center gap-2.5 text-[11px]">
-                <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-[#3B82F6] dark:shadow-[0_0_6px_#3B82F6]" />
-                  <span>Sales Amount</span>
+      {/* ROW 2: DUAL SALES TRENDS CHARTS (Weekly Sales Trends + Monthly Sales Trends) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Chart 1: Weekly Sales Trends (Recharts AreaChart Integration) */}
+        <div className="app-card p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-300 flex items-center justify-center font-bold">
+                  <TrendingUp className="w-4 h-4" />
                 </div>
-                <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-[#06B6D4] dark:shadow-[0_0_6px_#06B6D4]" />
-                  <span>Transactions</span>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    Weekly Sales Trends
+                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
+                      7-Day Velocity
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Live daily revenue &amp; checkout volume trends
+                  </p>
                 </div>
               </div>
 
-              {/* Timeframe selector */}
-              <div className="relative">
-                <select
-                  value={timeframe}
-                  onChange={(e: any) => setTimeframe(e.target.value)}
-                  className="appearance-none bg-slate-50 dark:bg-purple-500/20 border border-slate-200 dark:border-purple-400/40 text-[11px] font-medium text-slate-700 dark:text-purple-200 py-1 pl-2.5 pr-6 rounded-lg outline-none cursor-pointer hover:border-blue-400 dark:hover:bg-purple-500/30 dark:hover:text-white dark:hover:border-purple-400/60 dark:shadow-[0_0_14px_rgba(147,51,234,0.2)] transition"
+              {/* View / Metric Toggles */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-purple-900/40 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveChartMetric('all')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] ${
+                    activeChartMetric === 'all'
+                      ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
                 >
-                  <option value="7days" className="dark:bg-[#120726] dark:text-purple-100">Last 7 Days</option>
-                  <option value="month" className="dark:bg-[#120726] dark:text-purple-100">This Month</option>
-                  <option value="year" className="dark:bg-[#120726] dark:text-purple-100">This Year</option>
-                </select>
-                <ChevronDown className="w-3 h-3 text-slate-400 dark:text-purple-300 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  Both
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChartMetric('sales')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                    activeChartMetric === 'sales'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                  <span>Sales</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChartMetric('orders')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                    activeChartMetric === 'orders'
+                      ? 'bg-cyan-600 text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-300" />
+                  <span>Orders</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Performance Insights Strip */}
+            <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  7-Day Revenue
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
+                  {formatCurrency(sevenDaySalesTotal, currency)}
+                </span>
+              </div>
+              <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Daily Average
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-indigo-600 dark:text-indigo-300 block truncate">
+                  {formatCurrency(averageDailySales, currency)}
+                </span>
+              </div>
+              <div className="space-y-0.5 pl-1">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Peak Day
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
+                  {peakSalesDay?.label || '—'} {peakSalesDay?.amount > 0 ? `(${formatCurrency(peakSalesDay.amount, currency)})` : ''}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Dual Spline Chart Canvas */}
-          <div className="relative w-full overflow-hidden">
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="w-full h-48 overflow-visible"
-            >
-              <defs>
-                {/* Sales Area Gradient */}
-                <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
-                </linearGradient>
-
-                {/* Transactions Area Gradient */}
-                <linearGradient id="txGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.32" />
-                  <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Dotted Horizontal Grid lines */}
-              {[100, 80, 60, 40, 20, 0].map((val) => {
-                const y = paddingTop + innerHeight - (val / 100) * innerHeight;
-                return (
-                  <g key={val}>
-                    <line
-                      x1={paddingLeft}
-                      y1={y}
-                      x2={paddingLeft + innerWidth}
-                      y2={y}
-                      stroke="currentColor"
-                      className="text-slate-100 dark:text-[#1A263D] stroke-1"
-                      strokeDasharray="3 3"
-                    />
-                    <text
-                      x={paddingLeft - 8}
-                      y={y + 3}
-                      textAnchor="end"
-                      className="text-[9.5px] font-mono fill-slate-400 dark:fill-slate-500"
-                    >
-                      {val}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Sales Area Fill */}
-              <path d={salesAreaPath} fill="url(#salesGrad)" />
-
-              {/* Transactions Area Fill */}
-              <path d={txAreaPath} fill="url(#txGrad)" />
-
-              {/* Sales Spline Curve */}
-              <path
-                d={salesLinePath}
-                fill="none"
-                stroke="#3B82F6"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="neon-glow-blue"
-              />
-
-              {/* Transactions Spline Curve */}
-              <path
-                d={txLinePath}
-                fill="none"
-                stroke="#06B6D4"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="neon-glow-cyan"
-              />
-
-              {/* Point Markers and Tooltips */}
-              {points.map((p, i) => {
-                const isHovered = hoveredPoint === i;
-                return (
-                  <g
-                    key={`point-${p.label}`}
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredPoint(i)}
-                    onMouseLeave={() => setHoveredPoint(null)}
-                  >
-                    {/* Sales Node Circle */}
-                    <circle
-                      cx={p.x}
-                      cy={p.ySales}
-                      r={isHovered ? 5.5 : 3.5}
-                      className="fill-white dark:fill-[#0A0E1A] stroke-[#3B82F6] transition-all"
-                      strokeWidth="2.5"
-                    />
-
-                    {/* Tx Node Circle */}
-                    <circle
-                      cx={p.x}
-                      cy={p.yTx}
-                      r={isHovered ? 5 : 3}
-                      className="fill-white dark:fill-[#0A0E1A] stroke-[#06B6D4] transition-all"
-                      strokeWidth="2"
-                    />
-
-                    {/* X-Axis Day Labels */}
-                    <text
-                      x={p.x}
-                      y={chartHeight - 8}
-                      textAnchor="middle"
-                      className="text-[10px] font-medium fill-slate-500 dark:fill-slate-400"
-                    >
-                      {p.label}
-                    </text>
-
-                    {/* Interactive Tooltip Bubble on Hover */}
-                    {isHovered && (
-                      <g className="pointer-events-none">
-                        <rect
-                          x={Math.max(paddingLeft, Math.min(p.x - 55, chartWidth - 120))}
-                          y={Math.min(p.ySales, p.yTx) - 44}
-                          width="110"
-                          height="36"
-                          rx="8"
-                          className="fill-slate-900 dark:fill-[#131F37] stroke stroke-slate-700 dark:stroke-[#1E2D4A] shadow-xl"
-                        />
-                        <text
-                          x={Math.max(paddingLeft + 55, Math.min(p.x, chartWidth - 65))}
-                          y={Math.min(p.ySales, p.yTx) - 28}
-                          textAnchor="middle"
-                          className="text-[9.5px] font-bold fill-white font-mono"
-                        >
-                          Sales: {p.amount}
-                        </text>
-                        <text
-                          x={Math.max(paddingLeft + 55, Math.min(p.x, chartWidth - 65))}
-                          y={Math.min(p.ySales, p.yTx) - 15}
-                          textAnchor="middle"
-                          className="text-[9px] font-medium fill-cyan-400 font-mono"
-                        >
-                          {p.txCount} Transactions
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+          {/* Recharts Canvas */}
+          <div className="w-full h-48 sm:h-52 pt-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={chartData}
+                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="dashboardSalesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="dashboardTxGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.38} />
+                    <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="currentColor"
+                  className="text-slate-200 dark:text-slate-800/80"
+                />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: 'currentColor' }}
+                  className="text-slate-500 dark:text-slate-400 font-medium"
+                  dy={4}
+                />
+                <YAxis
+                  yAxisId="sales"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-slate-400 dark:text-slate-500 font-mono"
+                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                />
+                <YAxis
+                  yAxisId="tx"
+                  orientation="right"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-cyan-600/70 dark:text-cyan-400/70 font-mono"
+                  hide={activeChartMetric === 'sales'}
+                  tickFormatter={(v) => `${v}`}
+                />
+                <Tooltip content={<CustomWeeklySalesTooltip currency={currency} />} />
+                {(activeChartMetric === 'all' || activeChartMetric === 'sales') && (
+                  <Area
+                    yAxisId="sales"
+                    type="monotone"
+                    dataKey="amount"
+                    name="Sales Revenue"
+                    stroke="#6366F1"
+                    strokeWidth={2.6}
+                    fillOpacity={1}
+                    fill="url(#dashboardSalesGrad)"
+                    activeDot={{ r: 6, stroke: '#6366F1', strokeWidth: 2, fill: '#ffffff' }}
+                  />
+                )}
+                {(activeChartMetric === 'all' || activeChartMetric === 'orders') && (
+                  <Area
+                    yAxisId="tx"
+                    type="monotone"
+                    dataKey="txCount"
+                    name="Orders / Invoices"
+                    stroke="#06B6D4"
+                    strokeWidth={2.2}
+                    fillOpacity={1}
+                    fill="url(#dashboardTxGrad)"
+                    activeDot={{ r: 5, stroke: '#06B6D4', strokeWidth: 2, fill: '#ffffff' }}
+                  />
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Card 2: Best Selling Brands (Span 1 on md, 6 on lg, 4 on xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-4 app-card p-5 flex flex-col justify-between min-w-0">
+        {/* Chart 2: Monthly Sales Trends (Recharts BarChart Integration) */}
+        <div className="app-card p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 flex items-center justify-center font-bold">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    Monthly Sales Trends
+                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/50">
+                      6-Mo Rolling
+                    </span>
+                    {momGrowth !== 0 && (
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                        momGrowth >= 0
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50'
+                          : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50'
+                      }`}>
+                        {momGrowth >= 0 ? '+' : ''}{momGrowth}% MoM
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Macro store trajectory &amp; volume expansion
+                  </p>
+                </div>
+              </div>
+
+              {/* View / Metric Toggles */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-cyan-900/40 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveMonthlyMetric('all')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] ${
+                    activeMonthlyMetric === 'all'
+                      ? 'bg-white dark:bg-cyan-600 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Both
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMonthlyMetric('sales')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                    activeMonthlyMetric === 'sales'
+                      ? 'bg-cyan-600 text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <span>Sales</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMonthlyMetric('orders')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                    activeMonthlyMetric === 'orders'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span>Orders</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Performance Insights Strip */}
+            <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  6-Mo Revenue
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
+                  {formatCurrency(monthlySalesTotal, currency)}
+                </span>
+              </div>
+              <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Monthly Average
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-cyan-600 dark:text-cyan-300 block truncate">
+                  {formatCurrency(averageMonthlySales, currency)}
+                </span>
+              </div>
+              <div className="space-y-0.5 pl-1">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                  Peak Month
+                </span>
+                <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
+                  {peakMonth?.label || '—'} {peakMonth?.amount > 0 ? `(${formatCurrency(peakMonth.amount, currency)})` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Recharts Canvas */}
+          <div className="w-full h-48 sm:h-52 pt-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={monthlyChartData}
+                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="dashboardMonthlySalesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#06B6D4" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#0284C7" stopOpacity={0.3} />
+                  </linearGradient>
+                  <linearGradient id="dashboardMonthlyTxGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="currentColor"
+                  className="text-slate-200 dark:text-slate-800/80"
+                />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: 'currentColor' }}
+                  className="text-slate-500 dark:text-slate-400 font-medium"
+                  dy={4}
+                />
+                <YAxis
+                  yAxisId="sales"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-slate-400 dark:text-slate-500 font-mono"
+                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                />
+                <YAxis
+                  yAxisId="tx"
+                  orientation="right"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-emerald-600/70 dark:text-emerald-400/70 font-mono"
+                  hide={activeMonthlyMetric === 'sales'}
+                  tickFormatter={(v) => `${v}`}
+                />
+                <Tooltip content={<CustomMonthlySalesTooltip currency={currency} />} />
+                {(activeMonthlyMetric === 'all' || activeMonthlyMetric === 'sales') && (
+                  <Bar
+                    yAxisId="sales"
+                    dataKey="amount"
+                    name="Monthly Revenue"
+                    fill="url(#dashboardMonthlySalesGrad)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={36}
+                  />
+                )}
+                {(activeMonthlyMetric === 'all' || activeMonthlyMetric === 'orders') && (
+                  <Bar
+                    yAxisId="tx"
+                    dataKey="txCount"
+                    name="Completed Invoices"
+                    fill="url(#dashboardMonthlyTxGrad)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={28}
+                  />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 3: BEST SELLING BRANDS & PRODUCTS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+        {/* Card 1: Best Selling Brands (Span 6 on md/lg/xl) */}
+        <div className="md:col-span-1 lg:col-span-6 xl:col-span-6 app-card p-5 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               Best Selling Brands
@@ -1124,8 +1454,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
         </div>
 
-        {/* Card 3: Best Selling Products (Span 1 on md, 6 on lg, 3 on xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-3 app-card p-5 flex flex-col justify-between min-w-0">
+        {/* Card 2: Best Selling Products (Span 6 on md/lg/xl) */}
+        <div className="md:col-span-1 lg:col-span-6 xl:col-span-6 app-card p-5 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               Best Selling Products
@@ -1199,7 +1529,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* ROW 3: LATEST TRANSACTIONS & QUICK ACTIONS */}
+      {/* ROW 4: LATEST TRANSACTIONS & QUICK ACTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Latest Transactions (Span 7) */}
         <div className="lg:col-span-7 app-card p-5">

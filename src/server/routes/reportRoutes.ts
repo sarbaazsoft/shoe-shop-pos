@@ -78,6 +78,7 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
       date: string;
       label: string;
       amount: string;
+      tx_count: string;
     }>(
       `WITH days AS (
          SELECT (CURRENT_DATE - i)::text as d,
@@ -87,11 +88,45 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
        )
        SELECT days.d as date,
               days.label,
-              COALESCE(SUM(s.total_amount), 0) as amount
+              COALESCE(SUM(s.total_amount), 0) as amount,
+              COUNT(s.id)::int as tx_count
        FROM days
        LEFT JOIN sales s ON s.sale_date = days.d AND s.tenant_id = $1
        GROUP BY days.d, days.label, days.idx
        ORDER BY days.idx DESC`,
+      [tenantId]
+    );
+
+    // Monthly Sales Chart (Rolling 6 Months)
+    const monthlySalesRes = await pgClient.query<{
+      month: string;
+      label: string;
+      year_label: string;
+      amount: string;
+      tx_count: string;
+    }>(
+      `WITH months AS (
+         SELECT 
+           TO_CHAR(d, 'YYYY-MM') as month_key,
+           TO_CHAR(d, 'Mon') as label,
+           TO_CHAR(d, 'YYYY') as year_label,
+           d as month_date
+         FROM generate_series(
+           DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months',
+           DATE_TRUNC('month', CURRENT_DATE),
+           '1 month'::interval
+         ) as d
+       )
+       SELECT 
+         months.month_key as month,
+         months.label,
+         months.year_label,
+         COALESCE(SUM(s.total_amount), 0) as amount,
+         COUNT(s.id)::int as tx_count
+       FROM months
+       LEFT JOIN sales s ON s.tenant_id = $1 AND s.sale_date LIKE (months.month_key || '%')
+       GROUP BY months.month_key, months.label, months.year_label, months.month_date
+       ORDER BY months.month_date ASC`,
       [tenantId]
     );
 
@@ -563,6 +598,14 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
         date: r.date,
         label: r.label,
         amount: parseFloat(r.amount) || 0,
+        txCount: parseInt(r.tx_count, 10) || 0,
+      })),
+      monthlySales: monthlySalesRes.rows.map((r) => ({
+        month: r.month,
+        label: r.label,
+        yearLabel: r.year_label,
+        amount: parseFloat(r.amount) || 0,
+        txCount: parseInt(r.tx_count, 10) || 0,
       })),
       recentTransactions: recentTxRes.rows.map((r) => ({
         type: r.type,
