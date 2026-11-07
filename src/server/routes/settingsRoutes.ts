@@ -714,10 +714,14 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const finalCurrencyCode = req.body.currency ? String(req.body.currency).trim() : (currentRow?.currency || 'PKR');
     const finalCurrencyName = currencyName || currentRow?.currency_name || 'Pakistani Rupee';
     const finalCurrencySymbol = currencySymbol || currentRow?.currency_symbol || 'Rs.';
-    if (!companyName) {
+
+    const effectiveCompanyName = companyName || tenantRes.rows[0]?.name || (currentRow as any)?.company_name || 'SarbaazSoft Store';
+    const effectiveCompanyPhone = companyPhone || (currentRow as any)?.phone || '+92 300 1234567';
+
+    if (!effectiveCompanyName) {
       return res.status(400).json({ error: 'company_name is required.' });
     }
-    if (!companyPhone) {
+    if (!effectiveCompanyPhone) {
       return res.status(400).json({ error: 'company_phone is required.' });
     }
     if (companyEmail) {
@@ -754,29 +758,32 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       }
     }
 
-    // Persist Telegram and Email notification preferences
-    const finalTelegramBotToken = req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined
+    // System Alert Notification Providers are exclusive to SuperAdmin (isPlatformOwner).
+    // Store owners and cashiers cannot mutate Telegram or Gmail provider credentials.
+    const finalTelegramBotToken = isPlatformOwner && (req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined)
       ? telegramBotToken
       : (currentRow?.telegram_bot_token || '');
-    const finalTelegramChatId = req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined
+    const finalTelegramChatId = isPlatformOwner && (req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined)
       ? telegramChatId
       : (currentRow?.telegram_chat_id || '');
-    const finalTelegramAlertsEnabled = req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined
+    const finalTelegramAlertsEnabled = isPlatformOwner && (req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined)
       ? telegramAlertsEnabled
       : Boolean(currentRow?.telegram_alerts_enabled);
-    const finalEmailAlertsEnabled = req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined
+    const finalEmailAlertsEnabled = isPlatformOwner && (req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined)
       ? Boolean(req.body.email_alerts_enabled ?? req.body.emailAlertsEnabled)
       : (currentRow?.email_alerts_enabled !== undefined ? Boolean(currentRow?.email_alerts_enabled) : true);
-    const finalGmailUser = req.body.gmail_user !== undefined || req.body.gmailUser !== undefined
+    const finalGmailUser = isPlatformOwner && (req.body.gmail_user !== undefined || req.body.gmailUser !== undefined)
       ? gmailUser
       : (currentRow?.gmail_user || '');
-    const finalGmailAppPassword = req.body.gmail_app_password !== undefined || req.body.gmailAppPassword !== undefined
+    const finalGmailAppPassword = isPlatformOwner && (req.body.gmail_app_password !== undefined || req.body.gmailAppPassword !== undefined)
       ? gmailAppPassword
       : (currentRow?.gmail_app_password || '');
-    const finalGmailFromName = req.body.gmail_from_name !== undefined || req.body.gmailFromName !== undefined
+    const finalGmailFromName = isPlatformOwner && (req.body.gmail_from_name !== undefined || req.body.gmailFromName !== undefined)
       ? gmailFromName
       : (currentRow?.gmail_from_name || '');
-    const finalActiveAlertProvider = activeAlertProvider || currentRow?.active_alert_provider || 'both';
+    const finalActiveAlertProvider = isPlatformOwner && activeAlertProvider
+      ? activeAlertProvider
+      : (currentRow?.active_alert_provider || 'both');
 
     let updateRes;
     if (currentRow) {
@@ -797,7 +804,7 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
          WHERE id = $17 AND tenant_id = $18
          RETURNING *`,
         [
-          companyPhone,
+          effectiveCompanyPhone,
           companyEmail,
           companyAddress,
           strn,
@@ -840,7 +847,7 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
          RETURNING *`,
         [
           tenantId,
-          companyPhone,
+          effectiveCompanyPhone,
           companyEmail,
           companyAddress,
           strn,
@@ -875,13 +882,45 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     await pgClient
       .query(
         'UPDATE tenants SET name = $1, updated_at = NOW() WHERE id = $2',
-        [companyName, tenantId]
+        [effectiveCompanyName, tenantId]
       )
       .catch(() => {});
 
     // For wholesale stores that globally disallow half cartons, set allow_half_carton = false across the entire product catalog
     if (finalBusinessType === 'WHOLESALE' && (!finalAllowHalfCarton || finalMinSellingQuantity > 0.5)) {
       await pgClient.query('UPDATE products SET allow_half_carton = false WHERE COALESCE(tenant_id, 1) = $1', [tenantId]).catch(() => {});
+    }
+
+    // Synchronize root platform app_settings table when SuperAdmin modifies alert providers
+    if (isPlatformOwner) {
+      const appUpdates: Record<string, any> = {};
+      if (req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined) {
+        appUpdates.TELEGRAM_BOT_TOKEN = finalTelegramBotToken;
+      }
+      if (req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined) {
+        appUpdates.TELEGRAM_SUPERADMIN_CHAT_ID = finalTelegramChatId;
+      }
+      if (req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined) {
+        appUpdates.TELEGRAM_ALERTS_ENABLED = String(finalTelegramAlertsEnabled);
+      }
+      if (req.body.gmail_user !== undefined || req.body.gmailUser !== undefined) {
+        appUpdates.GMAIL_USER = finalGmailUser;
+      }
+      if (req.body.gmail_app_password !== undefined || req.body.gmailAppPassword !== undefined) {
+        appUpdates.GMAIL_APP_PASSWORD = finalGmailAppPassword;
+      }
+      if (req.body.gmail_from_name !== undefined || req.body.gmailFromName !== undefined) {
+        appUpdates.GMAIL_FROM_NAME = finalGmailFromName;
+      }
+      if (req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined) {
+        appUpdates.EMAIL_POS_ALERTS_ENABLED = String(finalEmailAlertsEnabled);
+      }
+      if (req.body.active_alert_provider !== undefined || req.body.activeAlertProvider !== undefined) {
+        appUpdates.ACTIVE_ALERT_PROVIDER = finalActiveAlertProvider;
+      }
+      if (Object.keys(appUpdates).length > 0) {
+        await updateAppSettings(appUpdates, 'SUPERADMIN', { allowInternal: true }).catch(() => {});
+      }
     }
 
     const populatedTenantRow = await ensureTenantSubscriptionPopulated(tenantId);
@@ -908,8 +947,78 @@ router.post('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.put('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 router.patch('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
 
-// POST /api/settings/test-telegram - Verification endpoint to test Telegram bot notifications
-router.post('/test-telegram', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/settings/alert-providers - Exclusively SuperAdmin configuration for System Alert Notification Providers
+router.post('/alert-providers', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await ensureTelegramSettingsSchema();
+    const tenantId = await resolvePublicOrAuthTenantId(req);
+
+    const telegramBotToken = req.body.telegram_bot_token !== undefined ? String(req.body.telegram_bot_token).trim() : undefined;
+    const telegramChatId = req.body.telegram_chat_id !== undefined ? String(req.body.telegram_chat_id).trim() : undefined;
+    const telegramAlertsEnabled = req.body.telegram_alerts_enabled !== undefined ? Boolean(req.body.telegram_alerts_enabled) : undefined;
+    const emailAlertsEnabled = req.body.email_alerts_enabled !== undefined ? Boolean(req.body.email_alerts_enabled) : undefined;
+    const gmailUser = req.body.gmail_user !== undefined ? String(req.body.gmail_user).trim() : undefined;
+    const gmailAppPassword = req.body.gmail_app_password !== undefined ? String(req.body.gmail_app_password).trim() : undefined;
+    const gmailFromName = req.body.gmail_from_name !== undefined ? String(req.body.gmail_from_name).trim() : undefined;
+    const activeAlertProvider = req.body.active_alert_provider !== undefined ? String(req.body.active_alert_provider).trim().toLowerCase() : undefined;
+
+    // 1. Update company_settings for current/primary tenant
+    await pgClient.query(
+      `UPDATE company_settings
+       SET telegram_bot_token = COALESCE($1, telegram_bot_token),
+           telegram_chat_id = COALESCE($2, telegram_chat_id),
+           telegram_alerts_enabled = COALESCE($3, telegram_alerts_enabled),
+           email_alerts_enabled = COALESCE($4, email_alerts_enabled),
+           gmail_user = COALESCE($5, gmail_user),
+           gmail_app_password = COALESCE($6, gmail_app_password),
+           gmail_from_name = COALESCE($7, gmail_from_name),
+           active_alert_provider = COALESCE($8, active_alert_provider),
+           updated_at = NOW()
+       WHERE tenant_id = $9`,
+      [
+        telegramBotToken,
+        telegramChatId,
+        telegramAlertsEnabled,
+        emailAlertsEnabled,
+        gmailUser,
+        gmailAppPassword,
+        gmailFromName,
+        activeAlertProvider,
+        tenantId,
+      ]
+    );
+
+    // 2. Synchronize root app_settings table
+    const appUpdates: Record<string, any> = {};
+    if (telegramBotToken !== undefined) appUpdates.TELEGRAM_BOT_TOKEN = telegramBotToken;
+    if (telegramChatId !== undefined) appUpdates.TELEGRAM_SUPERADMIN_CHAT_ID = telegramChatId;
+    if (telegramAlertsEnabled !== undefined) appUpdates.TELEGRAM_ALERTS_ENABLED = String(telegramAlertsEnabled);
+    if (gmailUser !== undefined) appUpdates.GMAIL_USER = gmailUser;
+    if (gmailAppPassword !== undefined) appUpdates.GMAIL_APP_PASSWORD = gmailAppPassword;
+    if (gmailFromName !== undefined) appUpdates.GMAIL_FROM_NAME = gmailFromName;
+    if (activeAlertProvider !== undefined) appUpdates.ACTIVE_ALERT_PROVIDER = activeAlertProvider;
+    if (emailAlertsEnabled !== undefined) appUpdates.EMAIL_POS_ALERTS_ENABLED = String(emailAlertsEnabled);
+
+    if (Object.keys(appUpdates).length > 0) {
+      await updateAppSettings(appUpdates, 'SUPERADMIN', { allowInternal: true });
+    }
+
+    const csRes = await pgClient.query('SELECT * FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenantId]);
+    return res.json({
+      success: true,
+      message: 'System alert notification providers updated successfully.',
+      settings: csRes.rows[0] || {},
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update alert providers: ' + (err?.message || 'Unknown error'),
+    });
+  }
+});
+
+// POST /api/settings/test-telegram - SuperAdmin verification endpoint to test Telegram bot notifications
+router.post('/test-telegram', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     await ensureTelegramSettingsSchema();
     const tenantId = await resolvePublicOrAuthTenantId(req);
@@ -955,8 +1064,8 @@ router.post('/test-telegram', requireAuth, async (req: AuthenticatedRequest, res
   }
 });
 
-// POST /api/settings/test-gmail - Verification endpoint to test Gmail SMTP connection & alert delivery
-router.post('/test-gmail', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/settings/test-gmail - SuperAdmin verification endpoint to test Gmail SMTP connection & alert delivery
+router.post('/test-gmail', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = await resolvePublicOrAuthTenantId(req);
     const customUser = String(req.body?.gmailUser || req.body?.gmail_user || '').trim();

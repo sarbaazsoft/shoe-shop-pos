@@ -210,7 +210,9 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
         active_alert_provider: data.active_alert_provider || 'both',
       };
 
-      const res = await api.settings.post(payload);
+      const res = await (api.settings.saveAlertProviders
+        ? api.settings.saveAlertProviders(payload)
+        : api.settings.post(payload));
       setSaveMessage({
         type: 'success',
         text: '✓ Notification alert providers successfully updated and active.',
@@ -251,6 +253,9 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
               <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                 System Alert Notification Providers
               </h3>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                SuperAdmin Exclusive
+              </span>
               <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${
                 currentMode === 'both'
                   ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
@@ -265,7 +270,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-1">
-              Configure real-time push alerts for sales, returns, customer exchanges, and inventory updates delivered to your phone and inbox even when POS is closed.
+              Configure real-time push alerts for sales, returns, customer exchanges, and inventory updates delivered to phone and inbox even when POS is closed.
             </p>
           </div>
         </div>
@@ -750,7 +755,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-            <span>Credentials are securely encrypted in your store's private isolated tenant database.</span>
+            <span>Platform alert credentials and bot tokens are securely encrypted and managed exclusively by SuperAdmin.</span>
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">

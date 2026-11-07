@@ -37,8 +37,11 @@ interface NotificationsViewProps {
 type TabCategory = 'all' | 'notices' | 'operational' | 'sales' | 'returns' | 'urgent';
 
 export const NotificationsView: React.FC<NotificationsViewProps> = ({
+  currentUser,
+  companySettings: _companySettings,
   onNavigateTab,
 }) => {
+  const isSuperAdmin = String(currentUser?.role || '').toUpperCase() === 'SUPERADMIN';
   const [items, setItems] = useState<HistoricalNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabCategory>('all');
@@ -323,19 +326,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
         {/* Global Actions */}
         <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
-          <button
-            type="button"
-            onClick={() => setShowProviderSettings((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer ${
-              showProviderSettings
-                ? 'bg-purple-600 text-white shadow-purple-600/30'
-                : 'bg-white dark:bg-[#120726] border border-slate-200/90 dark:border-purple-800/40 text-slate-700 dark:text-purple-200 hover:text-purple-600 dark:hover:text-white'
-            }`}
-            title="Configure Telegram and Gmail Alert Channels"
-          >
-            <Sliders className="w-3.5 h-3.5 text-purple-500" />
-            <span>{showProviderSettings ? 'Close Channel Settings' : 'Telegram & Gmail Settings'}</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowProviderSettings((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer ${
+                showProviderSettings
+                  ? 'bg-purple-600 text-white shadow-purple-600/30'
+                  : 'bg-white dark:bg-[#120726] border border-slate-200/90 dark:border-purple-800/40 text-slate-700 dark:text-purple-200 hover:text-purple-600 dark:hover:text-white'
+              }`}
+              title="Configure Telegram and Gmail Alert Channels (SuperAdmin Only)"
+            >
+              <Sliders className="w-3.5 h-3.5 text-purple-500" />
+              <span>{showProviderSettings ? 'Close Channel Settings' : 'Telegram & Gmail Settings'}</span>
+            </button>
+          )}
 
           {totalUnreadCount > 0 && (
             <button
@@ -361,8 +366,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         </div>
       </div>
 
-      {/* ALERT PROVIDER CONFIGURATION PANEL */}
-      {showProviderSettings && (
+      {/* ALERT PROVIDER CONFIGURATION PANEL - SUPERADMIN EXCLUSIVE */}
+      {isSuperAdmin && showProviderSettings && (
         <div className="transition-all duration-200 animate-in fade-in">
           <NotificationAlertProvidersSettings
             onClose={() => setShowProviderSettings(false)}

@@ -181,10 +181,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* ========================================================
-              CENTER: NAVIGATION LINKS (Courgette Font, Desktop >= md)
+              CENTER: NAVIGATION LINKS (Courgette / Courgate Font, Desktop >= md)
               Clean, medium-weight links with app purple/indigo accent
              ======================================================== */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-3 shrink-0 font-courgette nav-link-courgette">
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-3 shrink-0 font-courgette font-courgate nav-link-courgette">
             {navItems.map((item) => {
               const isActive = activeNav === item.key;
               return (
@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   onClick={() => handleNavClick(item.section, item.key)}
                   style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
-                  className={`relative px-3.5 py-2 text-base lg:text-lg font-normal tracking-wide transition-colors duration-200 rounded-lg cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 font-courgette nav-link-courgette ${
+                  className={`nav-link relative px-3.5 py-2 text-base lg:text-lg font-normal tracking-wide transition-colors duration-200 rounded-lg cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 font-courgette font-courgate nav-link-courgette ${
                     isActive
                       ? isDark
                         ? 'text-white font-bold'
@@ -206,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <span
                     style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
-                    className="relative z-10 transition-colors duration-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 font-courgette nav-link-courgette"
+                    className="nav-link relative z-10 transition-colors duration-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 font-courgette font-courgate nav-link-courgette"
                   >
                     {item.label}
                   </span>
@@ -306,9 +306,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               {/* Navigation links */}
-              <nav className="flex flex-col space-y-1 font-courgette">
+              <nav className="flex flex-col space-y-1 font-courgette font-courgate nav-link-courgette">
                 <div
-                  className={`px-2 pb-1.5 text-xs font-semibold tracking-wider uppercase font-courgette ${
+                  className={`px-2 pb-1.5 text-xs font-semibold tracking-wider uppercase font-courgette font-courgate ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}
                 >
@@ -322,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       type="button"
                       onClick={() => handleNavClick(item.section, item.key)}
                       style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-lg font-normal transition-all cursor-pointer font-courgette nav-link-courgette ${
+                      className={`nav-link w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-lg font-normal transition-all cursor-pointer font-courgette font-courgate nav-link-courgette ${
                         isActive
                           ? isDark
                             ? 'bg-slate-800/90 text-white font-bold border-l-4 border-purple-500'
@@ -334,12 +334,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <span
                         style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
-                        className="flex items-center gap-2 font-courgette nav-link-courgette"
+                        className="nav-link flex items-center gap-2 font-courgette font-courgate nav-link-courgette"
                       >
                         {isActive && (
                           <span className="w-1.5 h-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
                         )}
-                        <span style={{ fontFamily: "'Courgette', cursive, sans-serif" }} className="font-courgette nav-link-courgette">
+                        <span style={{ fontFamily: "'Courgette', cursive, sans-serif" }} className="nav-link font-courgette font-courgate nav-link-courgette">
                           {item.label}
                         </span>
                       </span>

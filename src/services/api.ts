@@ -1076,6 +1076,10 @@ export const api = {
       apiFetch<{ success: boolean; message: string; error?: string }>('/settings/test-telegram', { method: 'POST', body: data || {} }),
     testGmail: (data?: { gmailUser?: string; gmailAppPassword?: string; fromName?: string; recipientEmail?: string }) =>
       apiFetch<{ success: boolean; delivered: boolean; message: string; error?: string }>('/settings/test-gmail', { method: 'POST', body: data || {} }),
+    saveAlertProviders: (data: any) =>
+      apiFetch<{ success: boolean; message: string; settings?: any }>('/settings/alert-providers', { method: 'POST', body: data }).catch(() =>
+        apiFetch('/settings', { method: 'POST', body: data })
+      ),
     post: (data: any) => apiFetch('/settings', { method: 'POST', body: data }),
     getSubscription: () => apiFetch('/settings/subscription'),
     requestSubscriptionRenewal: (data: { plan: '6_MONTHS' | 'YEARLY' | string; notes?: string }) =>

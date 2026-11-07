@@ -26,6 +26,7 @@
   --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-montserrat: 'Montserrat', sans-serif;
   --font-courgette: 'Courgette', cursive, sans-serif;
+  --font-courgate: 'Courgette', cursive, sans-serif;
 }
 
 @theme {
@@ -34,6 +35,7 @@
   --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-montserrat: 'Montserrat', sans-serif;
   --font-courgette: 'Courgette', cursive, sans-serif;
+  --font-courgate: 'Courgette', cursive, sans-serif;
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-light: var(--primary-light);
@@ -44,6 +46,18 @@
 
 .font-courgette,
 .font-courgette *,
+.font-courgate,
+.font-courgate *,
+nav.link,
+nav.link *,
+nav .link,
+nav .link *,
+.nav-link,
+.nav-link *,
+nav a,
+nav a *,
+nav button,
+nav button *,
 nav.font-courgette,
 nav.font-courgette *,
 nav.font-courgette button,
@@ -126,17 +140,11 @@ a:visited,
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* 4. Montserrat font family for all navigation menus, tabs, and sidebar links */
-nav,
-nav a,
-nav button,
+/* 4. Montserrat font family for general tabs, menus, and sidebar links */
 nav li,
-nav span:not(.font-mono):not(kbd):not(.badge),
-[role="navigation"],
-[role="navigation"] a,
-[role="navigation"] button,
+nav span:not(.font-mono):not(kbd):not(.badge):not(.nav-link):not(.font-courgette):not(.font-courgate),
 [role="navigation"] li,
-[role="navigation"] span:not(.font-mono):not(kbd):not(.badge),
+[role="navigation"] span:not(.font-mono):not(kbd):not(.badge):not(.nav-link):not(.font-courgette):not(.font-courgate),
 [role="tablist"],
 [role="tablist"] button,
 [role="tablist"] a,
@@ -147,11 +155,8 @@ aside button span:not(.font-mono):not(kbd),
 [id^="sidebar-nav-"],
 [id^="sidebar-nav-"] span:not(.font-mono):not(kbd),
 .navbar,
-.navbar a,
-.navbar button,
 .nav-menu,
 .nav-item,
-.nav-link,
 [data-nav],
 [id*="mobile-menu"] button,
 [id*="mobile-menu"] a,
@@ -160,9 +165,32 @@ aside button span:not(.font-mono):not(kbd),
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* 4b. Courgette font override for SarbaazSoft branding and navigation links */
+/* 4b. Courgette / Courgate font override for nav.link, .nav-link, and navigation links */
 .font-courgette,
 .font-courgette *,
+.font-courgate,
+.font-courgate *,
+nav.link,
+nav.link *,
+nav .link,
+nav .link *,
+.nav-link,
+.nav-link *,
+nav a,
+nav a *,
+nav button,
+nav button *,
+.navbar a,
+.navbar a *,
+.navbar button,
+.navbar button *,
+.navbar-nav .nav-link,
+.navbar-nav .nav-link *,
+.nav-item .nav-link,
+.nav-item .nav-link *,
+[role="navigation"] a,
+[role="navigation"] button,
+[role="navigation"] .nav-link,
 nav.font-courgette,
 nav.font-courgette *,
 nav.font-courgette a,
