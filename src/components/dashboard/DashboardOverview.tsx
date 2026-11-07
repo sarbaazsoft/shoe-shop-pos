@@ -6,6 +6,7 @@ import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailable
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';
+import { LuxuryBadge } from '../common/Badge.tsx';
 
 interface DashboardOverviewProps {
   currentUser: any;
@@ -688,10 +689,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 border border-purple-300 dark:border-purple-700/60 text-purple-800 dark:text-purple-300">
-                  <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
+                <LuxuryBadge
+                  tone="purple"
+                  size="xs"
+                  icon={<Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />}
+                >
                   {bannerBadge}
-                </span>
+                </LuxuryBadge>
                 <span className="text-xs font-mono text-purple-700 dark:text-purple-300/80">• {storeName}</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-snug">

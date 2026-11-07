@@ -12,6 +12,7 @@ import {
 import { api } from '../../services/api.ts';
 import type { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { ClickableMessage } from '../common/ClickableMessage.tsx';
+import { LuxuryBadge } from '../common/Badge.tsx';
 import { connectRealtimeNotificationStream } from '../../services/pushNotificationClient.ts';
 
 export interface PosNotificationBannerProps {
@@ -436,12 +437,22 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
             <div className="flex-1 min-w-0 pr-1">
               <div className="flex flex-wrap items-center gap-2 mb-0.5">
                 {/* Notice Origin Badge */}
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${badgeConfig.badgeClass}`}
+                <LuxuryBadge
+                  tone={
+                    currentNotice.isWelcome
+                      ? 'emerald'
+                      : isUrgent
+                      ? 'rose'
+                      : isWarning
+                      ? 'amber'
+                      : 'purple'
+                  }
+                  size="xs"
+                  pulse={isUrgent}
+                  icon={<BadgeIcon className="w-3 h-3" />}
                 >
-                  <BadgeIcon className="w-3 h-3" />
-                  <span>{badgeConfig.label}</span>
-                </span>
+                  {badgeConfig.label}
+                </LuxuryBadge>
 
                 {/* Multiple Notices Indicator */}
                 {activeNotices.length > 1 && (

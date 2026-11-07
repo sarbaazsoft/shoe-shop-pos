@@ -4,6 +4,8 @@ import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut,
 import { UserAvatar } from './UserAvatar.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
+import { LuxuryBadge } from './Badge.tsx';
+import { getLuxuryBadgeClass, getLuxuryBadgeStyle } from '../../utils/badgeStyles.ts';
 import { ClickableMessage } from './ClickableMessage.tsx';
 import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
@@ -869,10 +871,9 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
             </span>
-            <span className="font-extrabold uppercase tracking-wider text-[9px] bg-black/30 px-2 py-0.5 rounded-full border border-white/30 shrink-0 flex items-center gap-1">
-              <Flame className="w-3 h-3 text-amber-300" />
-              <span>URGENT NOTICE</span>
-            </span>
+            <LuxuryBadge tone="rose" size="xs" icon={<Flame className="w-3 h-3 text-amber-300" />}>
+              URGENT NOTICE
+            </LuxuryBadge>
             <span className="font-bold truncate">{activeUrgentNotice.title}:</span>
             <span className="text-white/90 truncate hidden md:inline">{activeUrgentNotice.message}</span>
           </div>
@@ -1060,18 +1061,16 @@ export const Header: React.FC<HeaderProps> = ({
                               </div>
 
                               <div className="shrink-0 text-right flex flex-col items-end gap-1">
-                                <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  (prod.totalStock ?? prod.total_stock ?? 0) > 0 
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40'
-                                    : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40'
-                                }`}>
+                                <LuxuryBadge
+                                  tone={(prod.totalStock ?? prod.total_stock ?? 0) > 0 ? 'emerald' : 'rose'}
+                                  size="xs"
+                                >
                                   {prod.totalStock ?? prod.total_stock ?? 0} in stock
-                                </span>
+                                </LuxuryBadge>
                                 {(prod.isOfflineCached || !navigator.onLine) && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 inline-flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  <LuxuryBadge tone="amber" size="xs" pulse={true}>
                                     Offline Cache
-                                  </span>
+                                  </LuxuryBadge>
                                 )}
                               </div>
                             </div>
@@ -1940,9 +1939,9 @@ export const Header: React.FC<HeaderProps> = ({
                       )}
                       <span className="capitalize truncate text-xs">Theme: {themeMode}</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-200 group-hover:text-white group-hover:bg-white/20 group-hover:border-white/30 bg-purple-50 dark:bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-400/40 transition-colors shrink-0">
+                    <LuxuryBadge tone="purple" size="xs">
                       Change
-                    </span>
+                    </LuxuryBadge>
                   </button>
 
                   {/* Settings Item - Available for Store Owner (ADMIN) and Platform Owner (SUPERADMIN) */}

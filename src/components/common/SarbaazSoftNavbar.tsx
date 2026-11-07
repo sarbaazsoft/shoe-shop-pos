@@ -67,30 +67,43 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
             >
               <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white shadow-md shadow-purple-600/30 border border-purple-400/40 group-hover:scale-105 transition-all duration-200">
                 <ShoppingBag className="w-5 h-5 text-white" />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
               </div>
 
               <div className="flex flex-col font-courgette">
-                <div className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight">
+                <div
+                  className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight text-black dark:text-white"
+                  style={{ color: isDark ? '#ffffff' : '#000000' }}
+                >
                   <span
-                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette ${
+                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette text-black dark:text-white ${
                       isDark ? 'text-white' : 'text-black'
                     }`}
+                    style={{ color: isDark ? '#ffffff' : '#000000' }}
                   >
-                    Sarbaaz<span className="text-purple-600 dark:text-purple-400 not-italic">Soft</span>
+                    Sarbaaz
+                    <span
+                      className={`not-italic transition-colors duration-200 font-courgette text-black dark:text-white ${
+                        isDark ? 'text-white' : 'text-black'
+                      }`}
+                      style={{ color: isDark ? '#ffffff' : '#000000' }}
+                    >
+                      Soft
+                    </span>
                   </span>
                   <span
-                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette ${
-                      isDark ? 'text-indigo-200/80' : 'text-slate-800'
+                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 text-black dark:text-white ${
+                      isDark ? 'text-white' : 'text-black'
                     }`}
+                    style={{ color: isDark ? '#ffffff' : '#000000' }}
                   >
                     Shoe POS
                   </span>
                 </div>
                 <span
-                  className={`text-[10px] tracking-wider transition-colors font-courgette ${
-                    isDark ? 'text-slate-400' : 'text-slate-600'
+                  className={`text-[10px] tracking-wider transition-colors font-courgette text-black dark:text-white ${
+                    isDark ? 'text-white' : 'text-black'
                   }`}
+                  style={{ color: isDark ? '#ffffff' : '#000000' }}
                 >
                   Retail &amp; Inventory Suite
                 </span>

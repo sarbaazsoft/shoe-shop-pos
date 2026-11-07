@@ -152,26 +152,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Typography: Courgette brand name */}
               <div className="flex flex-col min-w-0 font-courgette">
-                <div className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight">
+                <div
+                  className="flex items-baseline gap-1 text-base sm:text-lg tracking-tight text-black dark:text-white"
+                  style={{ color: isDark ? '#ffffff' : '#000000' }}
+                >
                   <span
-                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette ${
+                    className={`font-extrabold italic tracking-wide transition-colors duration-200 font-courgette text-black dark:text-white ${
                       isDark ? 'text-white' : 'text-black'
                     }`}
+                    style={{ color: isDark ? '#ffffff' : '#000000' }}
                   >
-                    Sarbaaz<span className="text-purple-600 dark:text-purple-400 not-italic">Soft</span>
+                    Sarbaaz
+                    <span
+                      className={`not-italic transition-colors duration-200 font-courgette text-black dark:text-white ${
+                        isDark ? 'text-white' : 'text-black'
+                      }`}
+                      style={{ color: isDark ? '#ffffff' : '#000000' }}
+                    >
+                      Soft
+                    </span>
                   </span>
                   <span
-                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 ${
+                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 text-black dark:text-white ${
                       isDark ? 'text-white' : 'text-black'
                     }`}
+                    style={{ color: isDark ? '#ffffff' : '#000000' }}
                   >
                     Shoe POS
                   </span>
                 </div>
                 <span
-                  className={`hidden sm:inline-block text-[10px] tracking-wider transition-colors duration-200 font-courgette ${
+                  className={`hidden sm:inline-block text-[10px] tracking-wider transition-colors duration-200 font-courgette text-black dark:text-white ${
                     isDark ? 'text-white' : 'text-black'
                   }`}
+                  style={{ color: isDark ? '#ffffff' : '#000000' }}
                 >
                   Dual-Engine Wholesale &amp; Retail POS
                 </span>

@@ -71,6 +71,36 @@ nav button.font-courgette *,
 }
 
 /* ========================================================================= */
+/* LUXURY BADGE VARIANT: Courgette Cursive Font + Subtle Gradient Border     */
+/* ========================================================================= */
+.badge-luxury,
+.badge-luxury * {
+  font-family: 'Courgette', cursive, sans-serif !important;
+}
+
+.badge-luxury {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(99, 102, 241, 0.08) 50%, rgba(168, 85, 247, 0.14) 100%);
+  border: 1px solid rgba(192, 132, 252, 0.45);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.16);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #7e22ce;
+  transition: all 0.2s ease-in-out;
+}
+
+.dark .badge-luxury {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(99, 102, 241, 0.16) 50%, rgba(168, 85, 247, 0.26) 100%);
+  border: 1px solid rgba(192, 132, 252, 0.55);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);
+  color: #e9d5ff;
+}
+
+
+/* ========================================================================= */
 /* TYPOGRAPHY: MONTSERRAT (HEADINGS, TITLES, LINKS, NAV) & INTER (BODY, COPY)*/
 /* ========================================================================= */
 
