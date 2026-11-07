@@ -651,8 +651,8 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               </div>
               <h1 className="mt-5 text-[40px] sm:text-5xl lg:text-[54px] font-extrabold tracking-tight leading-[1.05] text-white lt:text-slate-900">
                 Grow your shoe<br />
-                business <span className="text-[#8B7CFF] lt:text-[#5B4BFF]">smarter</span> &amp;<br />
-                <span className="bg-gradient-to-r from-[#8B7CFF] lt:from-[#5B4BFF] to-[#B9A9FF] lt:to-[#8B7CFF] bg-clip-text text-transparent">faster</span>
+                business <span className="font-courgette font-normal tracking-normal text-[#8B7CFF] lt:text-[#5B4BFF]" style={{ fontFamily: "'Courgette', cursive, sans-serif" }}>smarter</span> &amp;<br />
+                <span className="font-courgette font-normal tracking-normal bg-gradient-to-r from-[#8B7CFF] lt:from-[#5B4BFF] to-[#B9A9FF] lt:to-[#8B7CFF] bg-clip-text text-transparent" style={{ fontFamily: "'Courgette', cursive, sans-serif" }}>faster</span>
               </h1>
               <p className="mt-6 max-w-md text-[15px] leading-relaxed text-slate-200 lt:text-slate-700">
                 SarbaazSoft POS gives you everything you need to manage sales, track inventory, and grow your footwear business — all in one powerful, easy-to-use platform.

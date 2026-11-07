@@ -148,7 +148,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* App Brand Emblem (Purple/Indigo Gradient) */}
               <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white shadow-md shadow-purple-600/30 border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105">
                 <ShoeIcon className="w-5 h-5 text-white stroke-[2.2]" />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
               </div>
 
               {/* Typography: Courgette brand name */}
@@ -162,16 +161,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Sarbaaz<span className="text-purple-600 dark:text-purple-400 not-italic">Soft</span>
                   </span>
                   <span
-                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette ${
-                      isDark ? 'text-indigo-200' : 'text-slate-800'
+                    className={`font-semibold text-xs sm:text-sm tracking-normal font-courgette transition-colors duration-200 ${
+                      isDark ? 'text-white' : 'text-black'
                     }`}
                   >
                     Shoe POS
                   </span>
                 </div>
                 <span
-                  className={`hidden sm:inline-block text-[10px] tracking-wider transition-colors font-courgette ${
-                    isDark ? 'text-slate-300' : 'text-slate-600'
+                  className={`hidden sm:inline-block text-[10px] tracking-wider transition-colors duration-200 font-courgette ${
+                    isDark ? 'text-white' : 'text-black'
                   }`}
                 >
                   Dual-Engine Wholesale &amp; Retail POS
