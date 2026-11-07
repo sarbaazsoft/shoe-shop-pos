@@ -1152,7 +1152,10 @@ router.get('/fcm-config', async (_req: Request, res: Response) => {
     const messagingSenderId = (await getAppSetting('FCM_MESSAGING_SENDER_ID', '')) || process.env.FCM_MESSAGING_SENDER_ID || '';
     const appId = (await getAppSetting('FCM_APP_ID', '')) || process.env.FCM_APP_ID || '';
     const measurementId = (await getAppSetting('FCM_MEASUREMENT_ID', '')) || process.env.FCM_MEASUREMENT_ID || '';
-    const vapidKey = (await getAppSetting('FCM_VAPID_KEY', '')) || process.env.FCM_VAPID_KEY || '';
+    let vapidKey = (await getAppSetting('FCM_VAPID_KEY', '')) || process.env.FCM_VAPID_KEY || '';
+    if (vapidKey.includes('@')) {
+      vapidKey = '';
+    }
 
     const isConfigured = Boolean(projectId && apiKey);
     res.json({

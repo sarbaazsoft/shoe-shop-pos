@@ -161,11 +161,13 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
 
     // 4. Get FCM Token using optional VAPID certificate key
     const config = await fetchFcmConfig();
-    const vapidKey = config?.vapidKey || undefined;
+    const rawVapid = config?.vapidKey?.trim();
+    // VAPID keys are Base64URL strings (typically ~87 chars, no '@'). Ignore if an email was accidentally entered.
+    const vapidKey = rawVapid && !rawVapid.includes('@') && rawVapid.length > 30 ? rawVapid : undefined;
 
     const token = await getToken(messaging, {
       serviceWorkerRegistration: swReg,
-      vapidKey: vapidKey || undefined,
+      vapidKey,
     });
 
     if (!token) {

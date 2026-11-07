@@ -474,9 +474,14 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                 type="text"
                 value={fcmSettings.FCM_VAPID_KEY}
                 onChange={(e) => handleChange('FCM_VAPID_KEY', e.target.value.trim())}
-                placeholder="BEl62iUYgUivxIkv..."
+                placeholder="e.g. BEl62iUY... (Leave blank or generate in Cloud Messaging tab)"
                 className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
               />
+              {fcmSettings.FCM_VAPID_KEY.includes('@') && (
+                <p className="text-[10px] text-amber-500 font-semibold mt-1">
+                  ⚠️ Note: This field is for a Web Push Key Pair (starts with B... from Project Settings &gt; Cloud Messaging), not an email address. Leave blank if not generated.
+                </p>
+              )}
             </div>
 
             <div>

@@ -11,7 +11,7 @@ import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
 import { lookupCachedProductOffline, searchCachedProductsOffline } from '../../utils/offlineDb.ts';
-import { connectRealtimeNotificationStream } from '../../services/pushNotificationClient.ts';
+import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream, initNativeNotificationPrompt } from '../../services/pushNotificationClient.ts';
 
 interface HeaderProps {
   currentTab: string;
@@ -341,7 +341,10 @@ export const Header: React.FC<HeaderProps> = ({
   const [isDismissingAnnouncement, setIsDismissingAnnouncement] = useState<number | null>(null);
   const [notifDropdownTab, setNotifDropdownTab] = useState<'notices' | 'notifications'>('notices');
 
-  // Notification Server & Real-time Live Toast State
+  // Web Push API & Live POS Push Notification State
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isTogglingPush, setIsTogglingPush] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => getNotificationPermissionState());
   const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
   const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
   const [livePushToast, setLivePushToast] = useState<{
@@ -367,8 +370,22 @@ export const Header: React.FC<HeaderProps> = ({
     currentRoleRef.current = currentRole;
   }, [currentRole]);
 
-  // Connect to real-time event stream for active sessions with strict role isolation
+  // Check push subscription on mount, setup real-time SSE stream, and trigger native platform permission directly
   useEffect(() => {
+    // Directly invoke official native notification permission prompt if permission is 'default' (zero custom HTML popups/banners)
+    const cleanupNativePrompt = initNativeNotificationPrompt(currentRole);
+
+    if (isWebPushSupported()) {
+      resyncPushSubscriptionIfEnabled()
+        .catch(() => {})
+        .then(() => isDeviceSubscribedToPush())
+        .then((subbed) => {
+          setIsPushSubscribed(subbed);
+          setPushPermission(getNotificationPermissionState());
+        });
+    }
+
+    // Connect to real-time event stream for active sessions with strict role isolation
     const cleanupStream = connectRealtimeNotificationStream((payload) => {
       const userRole = currentRoleRef.current;
       const targetRole = payload.targetRole ? String(payload.targetRole).toUpperCase() : undefined;
@@ -450,16 +467,48 @@ export const Header: React.FC<HeaderProps> = ({
     });
 
     return () => {
+      cleanupNativePrompt();
       cleanupStream();
     };
   }, []);
+
+  const handleTogglePushNotifications = async () => {
+    if (isTogglingPush) return;
+    setIsTogglingPush(true);
+    setPushStatusMessage(null);
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeDeviceFromWebPush();
+        setIsPushSubscribed(false);
+        setPushStatusMessage('Push notifications disabled on this device.');
+        setTimeout(() => setPushStatusMessage(null), 4000);
+      } else {
+        const res = await subscribeDeviceToWebPush(currentRole || 'ADMIN');
+        if (res.success) {
+          setIsPushSubscribed(true);
+          setPushPermission('granted');
+          setPushStatusMessage('✅ Push alerts active! Real-time alerts enabled on this device.');
+          setTimeout(() => setPushStatusMessage(null), 5000);
+        } else if (res.error) {
+          setPushStatusMessage(res.error);
+          setTimeout(() => setPushStatusMessage(null), 7000);
+        }
+      }
+    } catch (err: any) {
+      setPushStatusMessage('Error updating push notification settings: ' + (err?.message || err));
+      setTimeout(() => setPushStatusMessage(null), 6000);
+    } finally {
+      setIsTogglingPush(false);
+      setPushPermission(getNotificationPermissionState());
+    }
+  };
 
   const handleSendTestPush = async () => {
     try {
       setTestPushStatus('sending');
       const res = await api.notifications.testPush();
       setTestPushStatus(res.success ? 'success' : 'error');
-      setPushStatusMessage('🔔 Test alert dispatched to active Notification Server (Telegram / Gmail).');
+      setPushStatusMessage('🔔 Test alert sent to your registered devices.');
       setTimeout(() => {
         setTestPushStatus(null);
         setPushStatusMessage(null);
@@ -1373,50 +1422,47 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
 
-                {/* Notification Server Integration Card */}
+                {/* Real-Time Push Notification Device Activation Card */}
                 <div className="p-2 mb-2 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/50">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <Radio className={`w-3.5 h-3.5 shrink-0 ${String(companySettings?.active_alert_provider || 'both').toLowerCase() !== 'none' ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+                      <Radio className={`w-3.5 h-3.5 shrink-0 ${isPushSubscribed ? 'text-emerald-500 animate-pulse' : 'text-purple-600 dark:text-purple-300'}`} />
                       <span className="text-[11px] font-bold text-slate-800 dark:text-purple-100 truncate">
-                        Notification Server (Telegram / Gmail)
+                        POS Push Alerts (Web & Mobile)
                       </span>
                     </div>
                     <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
-                      String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'both'
+                      isPushSubscribed
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-                        : String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'telegram'
-                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 border border-sky-300 dark:border-sky-700'
-                        : String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'gmail'
-                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
                         : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}>
-                      {String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'both'
-                        ? 'Both Active'
-                        : String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'telegram'
-                        ? 'Telegram Bot'
-                        : String(companySettings?.active_alert_provider || 'both').toLowerCase() === 'gmail'
-                        ? 'Gmail SMTP'
-                        : 'Disabled'}
+                      {isPushSubscribed ? 'Active' : pushPermission === 'denied' ? 'Blocked' : 'Off'}
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-600 dark:text-purple-200/80 leading-snug mb-1.5">
-                    Real-time transaction alerts for Sales, Returns &amp; Exchanges dispatched to mobile &amp; email.
+                    Real-time alerts for Sales, Returns & Exchanges sent to your phone and browser.
                   </p>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setShowNotifications(false);
-                        if (onTabChange) {
-                          onTabChange('settings');
-                        }
+                        handleTogglePushNotifications();
                       }}
-                      className="flex-1 py-1 px-2 rounded-md font-semibold text-[10.5px] transition cursor-pointer flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                      disabled={isTogglingPush}
+                      className={`flex-1 py-1 px-2 rounded-md font-semibold text-[10.5px] transition cursor-pointer flex items-center justify-center gap-1 ${
+                        isPushSubscribed
+                          ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
+                      }`}
                     >
-                      <Settings className="w-3 h-3" />
-                      <span>Configure Server</span>
+                      {isTogglingPush ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : isPushSubscribed ? (
+                        'Disable Push'
+                      ) : (
+                        'Enable Push'
+                      )}
                     </button>
                     <button
                       type="button"
@@ -1426,7 +1472,7 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       disabled={testPushStatus === 'sending'}
                       className="py-1 px-2 rounded-md bg-white dark:bg-purple-900/40 hover:bg-slate-100 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-700 font-semibold text-[10.5px] transition cursor-pointer flex items-center gap-1 shrink-0"
-                      title="Dispatch test alert to active notification server"
+                      title="Test push notification delivery on this device"
                     >
                       <BellRing className={`w-3 h-3 ${testPushStatus === 'sending' ? 'animate-bounce' : ''}`} />
                       <span>{testPushStatus === 'success' ? 'Sent!' : 'Test Alert'}</span>

@@ -3,7 +3,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensureFcmTokensSchema } from '../db/schemaInit.ts';
-import { getCachedAppSetting, getAppSetting, registerSettingsUpdateListener } from './services/appSettingsService.ts';
+import { getCachedAppSetting, getAppSetting, loadAppSettingsCache, registerSettingsUpdateListener } from './services/appSettingsService.ts';
 
 // ============================================================================
 // FIREBASE ADMIN SDK SINGLETON & DYNAMIC INITIALIZATION
@@ -174,8 +174,9 @@ export async function getFcmStats(): Promise<{
 }> {
   try {
     await ensureFcmTokensSchema();
+    await loadAppSettingsCache();
     const app = getFirebaseAdmin();
-    const projectId = getCachedAppSetting('FCM_PROJECT_ID', '') || process.env.FCM_PROJECT_ID || '';
+    const projectId = (await getAppSetting('FCM_PROJECT_ID', '')) || process.env.FCM_PROJECT_ID || '';
 
     const countRes = await pgClient.query<{ count: string; user_role: string }>(`
       SELECT user_role, COUNT(*) as count 
@@ -252,6 +253,7 @@ export async function sendFcmPushToTokens(
     data?: Record<string, string>;
   }
 ): Promise<FcmDispatchResult> {
+  await loadAppSettingsCache();
   const app = getFirebaseAdmin();
   if (!app) {
     return {
@@ -575,6 +577,7 @@ export async function testFcmPush(
   customTitle?: string,
   customMessage?: string
 ): Promise<{ success: boolean; message: string; sentCount: number; failureCount: number; error?: string }> {
+  await loadAppSettingsCache();
   const app = getFirebaseAdmin();
   if (!app) {
     return {
