@@ -289,7 +289,7 @@ const StoreSliderCard: React.FC<{
           {tenant.name}
         </div>
         <div className="mt-1 flex items-center justify-center gap-1.5 text-xs font-medium">
-          <div className="flex items-center gap-1.5 text-emerald-400 lt:text-emerald-600">
+          <div className="font-courgette flex items-center gap-1.5 text-emerald-400 lt:text-emerald-600" style={{ fontFamily: "'Courgette', cursive, sans-serif" }}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-semibold">Registered Store</span>
           </div>
@@ -645,7 +645,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24 lg:pt-14 lg:pb-28">
           <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-16 lg:gap-6 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700">
+              <div
+                className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700"
+                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+              >
                 <Zap className="w-3.5 h-3.5 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" />
                 Dual-Engine Wholesale & Retail POS Solution for Shoe Stores
               </div>
@@ -692,7 +695,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       <section id="features" className="bg-[#080A2A] lt:bg-[#F1F3FF] py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700">
+            <div
+              className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
               <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Features
             </div>
             <h2 className="mt-5 text-3xl sm:text-4xl font-extrabold tracking-tight leading-[1.15] text-white lt:text-slate-900">
@@ -788,7 +794,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       <section id="stores" ref={statsSectionRef} className="bg-gradient-to-b from-[#0B0D38] lt:from-[#EEF0FF] to-[#080A2A] lt:to-[#F7F8FF] py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700">
+            <div
+              className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
               <Store className="w-3.5 h-3.5" aria-hidden="true" /> Trusted by shoe businesses
             </div>
             <h2 className="mt-5 text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white lt:text-slate-900">
@@ -823,7 +832,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-7 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3 py-1 text-xs text-violet-200 lt:text-indigo-700 font-semibold mb-2">
+              <div
+                className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3 py-1 text-xs text-violet-200 lt:text-indigo-700 font-semibold mb-2"
+                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+              >
                 <Store className="w-3.5 h-3.5" aria-hidden="true" /> Live Wholesale & Retail Network
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white lt:text-slate-900">
@@ -927,7 +939,12 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       <section id="pricing" className="bg-[#080A2A] lt:bg-[#F1F3FF] py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="inline-flex rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700">Simple, transparent pricing</div>
+            <div
+              className="font-courgette inline-flex rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-200 lt:text-indigo-700"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
+              Simple, transparent pricing
+            </div>
             <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-white lt:text-slate-900">Choose the plan that fits your business</h2>
             <p className="mt-2 text-sm sm:text-base text-slate-300 lt:text-slate-600">No hidden fees. Full access to every feature on both plans.</p>
           </div>
@@ -945,7 +962,12 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                   : 'border border-indigo-400/25 lt:border-indigo-200 bg-gradient-to-b from-[#12154A]/60 lt:from-white to-[#0A0C2E] lt:to-white'}`}
               >
                 {p.popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-md bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-3 py-0.5 text-[11px] font-bold text-white shadow-xs border border-purple-400/30">Free 30-Day Access</span>
+                  <span
+                    className="font-courgette absolute -top-3 left-1/2 -translate-x-1/2 rounded-md bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-3 py-0.5 text-[11px] font-bold text-white shadow-xs border border-purple-400/30"
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                  >
+                    Free 30-Day Access
+                  </span>
                 )}
                 <h3 className="flex items-center gap-2 text-lg font-bold text-white lt:text-slate-900">
                   <Calendar className="w-5 h-5 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" /> {p.name}
@@ -996,7 +1018,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left">
-            <h2 className="text-xl sm:text-2xl lg:text-[28px] font-extrabold tracking-tight text-white lt:text-slate-900 [text-shadow:0_1px_14px_rgba(8,10,42,0.9)] lt:[text-shadow:none]">
+            <h2
+              className="font-courgette text-xl sm:text-2xl lg:text-[28px] font-extrabold tracking-tight text-white lt:text-slate-900 [text-shadow:0_1px_14px_rgba(8,10,42,0.9)] lt:[text-shadow:none]"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
               Ready to Take Your Shoe Business to the Next Level?
             </h2>
             <p className="mt-1.5 text-xs sm:text-sm font-medium text-slate-200 lt:text-slate-600 [text-shadow:0_1px_10px_rgba(8,10,42,0.9)] lt:[text-shadow:none]">
@@ -1030,7 +1055,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
             <span className="text-slate-400 lt:text-slate-500">Multi-Tenant Retail Shoe Shop POS &amp; Inventory Management SaaS</span>
           </div>
             <div className="flex items-center gap-3 font-medium">
-              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400 lt:text-emerald-600">
+              <span
+                className="font-courgette inline-flex items-center gap-1.5 font-bold text-emerald-400 lt:text-emerald-600"
+                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+              >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 lt:bg-emerald-500" aria-hidden="true" />
                 System Online
               </span>
