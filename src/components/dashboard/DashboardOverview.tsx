@@ -468,7 +468,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'7days' | 'month' | 'year'>('7days');
   const [activeChartMetric, setActiveChartMetric] = useState<'all' | 'sales' | 'orders'>('all');
-  const [activeMonthlyMetric, setActiveMonthlyMetric] = useState<'all' | 'sales' | 'orders'>('all');
+  const [activeTrendTab, setActiveTrendTab] = useState<'weekly' | 'monthly'>('weekly');
   const dashboardContainerRef = useRef<HTMLDivElement | null>(null);
 
 
@@ -1021,194 +1021,35 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         variant="dashboard"
       />
 
-      {/* ROW 2: DUAL SALES TRENDS CHARTS (Weekly Sales Trends + Monthly Sales Trends) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Chart 1: Weekly Sales Trends (Recharts AreaChart Integration) */}
-        <div className="app-card p-5 flex flex-col justify-between">
+      {/* ROW 2: 3 CARDS (Sales Trends + Best Selling Brands + Best Selling Products) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+        {/* Card 1: Sales Trends with Weekly / Monthly Tab Switcher (Full on md/lg, span 5 on xl) */}
+        <div className="md:col-span-2 lg:col-span-12 xl:col-span-5 app-card p-5 flex flex-col justify-between">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-300 flex items-center justify-center font-bold">
-                  <TrendingUp className="w-4 h-4" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold transition-colors ${
+                  activeTrendTab === 'weekly'
+                    ? 'bg-indigo-500/10 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-300'
+                    : 'bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300'
+                }`}>
+                  {activeTrendTab === 'weekly' ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <BarChart3 className="w-4 h-4" />
+                  )}
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    Weekly Sales Trends
-                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
-                      7-Day Velocity
+                    {activeTrendTab === 'weekly' ? 'Weekly Sales Trends' : 'Monthly Sales Trends'}
+                    <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border ${
+                      activeTrendTab === 'weekly'
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/50'
+                    }`}>
+                      {activeTrendTab === 'weekly' ? '7-Day Velocity' : '6-Mo Rolling'}
                     </span>
-                  </h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Live daily revenue &amp; checkout volume trends
-                  </p>
-                </div>
-              </div>
-
-              {/* View / Metric Toggles */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-purple-900/40 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setActiveChartMetric('all')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] ${
-                    activeChartMetric === 'all'
-                      ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  Both
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveChartMetric('sales')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
-                    activeChartMetric === 'sales'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                  <span>Sales</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveChartMetric('orders')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
-                    activeChartMetric === 'orders'
-                      ? 'bg-cyan-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-300" />
-                  <span>Orders</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Performance Insights Strip */}
-            <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
-              <div className="space-y-0.5">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  7-Day Revenue
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
-                  {formatCurrency(sevenDaySalesTotal, currency)}
-                </span>
-              </div>
-              <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  Daily Average
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-indigo-600 dark:text-indigo-300 block truncate">
-                  {formatCurrency(averageDailySales, currency)}
-                </span>
-              </div>
-              <div className="space-y-0.5 pl-1">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  Peak Day
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
-                  {peakSalesDay?.label || '—'} {peakSalesDay?.amount > 0 ? `(${formatCurrency(peakSalesDay.amount, currency)})` : ''}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recharts Canvas */}
-          <div className="w-full h-48 sm:h-52 pt-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="dashboardSalesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
-                  </linearGradient>
-                  <linearGradient id="dashboardTxGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.38} />
-                    <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800/80"
-                />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  className="text-slate-500 dark:text-slate-400 font-medium"
-                  dy={4}
-                />
-                <YAxis
-                  yAxisId="sales"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'currentColor' }}
-                  className="text-slate-400 dark:text-slate-500 font-mono"
-                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
-                />
-                <YAxis
-                  yAxisId="tx"
-                  orientation="right"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'currentColor' }}
-                  className="text-cyan-600/70 dark:text-cyan-400/70 font-mono"
-                  hide={activeChartMetric === 'sales'}
-                  tickFormatter={(v) => `${v}`}
-                />
-                <Tooltip content={<CustomWeeklySalesTooltip currency={currency} />} />
-                {(activeChartMetric === 'all' || activeChartMetric === 'sales') && (
-                  <Area
-                    yAxisId="sales"
-                    type="monotone"
-                    dataKey="amount"
-                    name="Sales Revenue"
-                    stroke="#6366F1"
-                    strokeWidth={2.6}
-                    fillOpacity={1}
-                    fill="url(#dashboardSalesGrad)"
-                    activeDot={{ r: 6, stroke: '#6366F1', strokeWidth: 2, fill: '#ffffff' }}
-                  />
-                )}
-                {(activeChartMetric === 'all' || activeChartMetric === 'orders') && (
-                  <Area
-                    yAxisId="tx"
-                    type="monotone"
-                    dataKey="txCount"
-                    name="Orders / Invoices"
-                    stroke="#06B6D4"
-                    strokeWidth={2.2}
-                    fillOpacity={1}
-                    fill="url(#dashboardTxGrad)"
-                    activeDot={{ r: 5, stroke: '#06B6D4', strokeWidth: 2, fill: '#ffffff' }}
-                  />
-                )}
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Chart 2: Monthly Sales Trends (Recharts BarChart Integration) */}
-        <div className="app-card p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 flex items-center justify-center font-bold">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    Monthly Sales Trends
-                    <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/50">
-                      6-Mo Rolling
-                    </span>
-                    {momGrowth !== 0 && (
+                    {activeTrendTab === 'monthly' && momGrowth !== 0 && (
                       <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
                         momGrowth >= 0
                           ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50'
@@ -1219,160 +1060,296 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     )}
                   </h2>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Macro store trajectory &amp; volume expansion
+                    {activeTrendTab === 'weekly'
+                      ? 'Live daily revenue & checkout volume trends'
+                      : 'Macro store trajectory & volume expansion'}
                   </p>
                 </div>
               </div>
 
-              {/* View / Metric Toggles */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-cyan-900/40 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setActiveMonthlyMetric('all')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] ${
-                    activeMonthlyMetric === 'all'
-                      ? 'bg-white dark:bg-cyan-600 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  Both
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveMonthlyMetric('sales')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
-                    activeMonthlyMetric === 'sales'
-                      ? 'bg-cyan-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                  <span>Sales</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveMonthlyMetric('orders')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
-                    activeMonthlyMetric === 'orders'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span>Orders</span>
-                </button>
+              {/* Controls: Trend Tab Switcher + Metric Filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Trend View Tab Button Switcher */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-purple-900/40 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTrendTab('weekly')}
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1.5 ${
+                      activeTrendTab === 'weekly'
+                        ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Calendar className="w-3 h-3 text-indigo-500 dark:text-purple-300" />
+                    <span>Weekly</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTrendTab('monthly')}
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1.5 ${
+                      activeTrendTab === 'monthly'
+                        ? 'bg-white dark:bg-cyan-600 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <BarChart3 className="w-3 h-3 text-cyan-500 dark:text-cyan-300" />
+                    <span>Monthly</span>
+                  </button>
+                </div>
+
+                {/* View / Metric Toggles */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-purple-900/40 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartMetric('all')}
+                    className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] ${
+                      activeChartMetric === 'all'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    Both
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartMetric('sales')}
+                    className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                      activeChartMetric === 'sales'
+                        ? activeTrendTab === 'weekly' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-cyan-600 text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${activeTrendTab === 'weekly' ? 'bg-indigo-400' : 'bg-cyan-400'}`} />
+                    <span>Sales</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChartMetric('orders')}
+                    className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                      activeChartMetric === 'orders'
+                        ? activeTrendTab === 'weekly' ? 'bg-cyan-600 text-white shadow-xs' : 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${activeTrendTab === 'weekly' ? 'bg-cyan-300' : 'bg-emerald-400'}`} />
+                    <span>Orders</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Quick Performance Insights Strip */}
-            <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
-              <div className="space-y-0.5">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  6-Mo Revenue
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
-                  {formatCurrency(monthlySalesTotal, currency)}
-                </span>
+            {/* Quick Performance Insights Strip (Dynamic based on Tab) */}
+            {activeTrendTab === 'weekly' ? (
+              <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    7-Day Revenue
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
+                    {formatCurrency(sevenDaySalesTotal, currency)}
+                  </span>
+                </div>
+                <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    Daily Average
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-indigo-600 dark:text-indigo-300 block truncate">
+                    {formatCurrency(averageDailySales, currency)}
+                  </span>
+                </div>
+                <div className="space-y-0.5 pl-1">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    Peak Day
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
+                    {peakSalesDay?.label || '—'} {peakSalesDay?.amount > 0 ? `(${formatCurrency(peakSalesDay.amount, currency)})` : ''}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  Monthly Average
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-cyan-600 dark:text-cyan-300 block truncate">
-                  {formatCurrency(averageMonthlySales, currency)}
-                </span>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5 my-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    6-Mo Revenue
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 dark:text-white block truncate">
+                    {formatCurrency(monthlySalesTotal, currency)}
+                  </span>
+                </div>
+                <div className="space-y-0.5 border-x border-slate-200 dark:border-slate-800 px-2.5">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    Monthly Average
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-cyan-600 dark:text-cyan-300 block truncate">
+                    {formatCurrency(averageMonthlySales, currency)}
+                  </span>
+                </div>
+                <div className="space-y-0.5 pl-1">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                    Peak Month
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
+                    {peakMonth?.label || '—'} {peakMonth?.amount > 0 ? `(${formatCurrency(peakMonth.amount, currency)})` : ''}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-0.5 pl-1">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                  Peak Month
-                </span>
-                <span className="text-xs sm:text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 block truncate">
-                  {peakMonth?.label || '—'} {peakMonth?.amount > 0 ? `(${formatCurrency(peakMonth.amount, currency)})` : ''}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Recharts Canvas */}
           <div className="w-full h-48 sm:h-52 pt-1">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={monthlyChartData}
-                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="dashboardMonthlySalesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#06B6D4" stopOpacity={0.9} />
-                    <stop offset="100%" stopColor="#0284C7" stopOpacity={0.3} />
-                  </linearGradient>
-                  <linearGradient id="dashboardMonthlyTxGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.9} />
-                    <stop offset="100%" stopColor="#059669" stopOpacity={0.3} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800/80"
-                />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  className="text-slate-500 dark:text-slate-400 font-medium"
-                  dy={4}
-                />
-                <YAxis
-                  yAxisId="sales"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'currentColor' }}
-                  className="text-slate-400 dark:text-slate-500 font-mono"
-                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
-                />
-                <YAxis
-                  yAxisId="tx"
-                  orientation="right"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'currentColor' }}
-                  className="text-emerald-600/70 dark:text-emerald-400/70 font-mono"
-                  hide={activeMonthlyMetric === 'sales'}
-                  tickFormatter={(v) => `${v}`}
-                />
-                <Tooltip content={<CustomMonthlySalesTooltip currency={currency} />} />
-                {(activeMonthlyMetric === 'all' || activeMonthlyMetric === 'sales') && (
-                  <Bar
+              {activeTrendTab === 'weekly' ? (
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="dashboardSalesGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="dashboardTxGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.38} />
+                      <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="currentColor"
+                    className="text-slate-200 dark:text-slate-800/80"
+                  />
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'currentColor' }}
+                    className="text-slate-500 dark:text-slate-400 font-medium"
+                    dy={4}
+                  />
+                  <YAxis
                     yAxisId="sales"
-                    dataKey="amount"
-                    name="Monthly Revenue"
-                    fill="url(#dashboardMonthlySalesGrad)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={36}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'currentColor' }}
+                    className="text-slate-400 dark:text-slate-500 font-mono"
+                    tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
                   />
-                )}
-                {(activeMonthlyMetric === 'all' || activeMonthlyMetric === 'orders') && (
-                  <Bar
+                  <YAxis
                     yAxisId="tx"
-                    dataKey="txCount"
-                    name="Completed Invoices"
-                    fill="url(#dashboardMonthlyTxGrad)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={28}
+                    orientation="right"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'currentColor' }}
+                    className="text-cyan-600/70 dark:text-cyan-400/70 font-mono"
+                    hide={activeChartMetric === 'sales'}
+                    tickFormatter={(v) => `${v}`}
                   />
-                )}
-              </BarChart>
+                  <Tooltip content={<CustomWeeklySalesTooltip currency={currency} />} />
+                  {(activeChartMetric === 'all' || activeChartMetric === 'sales') && (
+                    <Area
+                      yAxisId="sales"
+                      type="monotone"
+                      dataKey="amount"
+                      name="Sales Revenue"
+                      stroke="#6366F1"
+                      strokeWidth={2.6}
+                      fillOpacity={1}
+                      fill="url(#dashboardSalesGrad)"
+                      activeDot={{ r: 6, stroke: '#6366F1', strokeWidth: 2, fill: '#ffffff' }}
+                    />
+                  )}
+                  {(activeChartMetric === 'all' || activeChartMetric === 'orders') && (
+                    <Area
+                      yAxisId="tx"
+                      type="monotone"
+                      dataKey="txCount"
+                      name="Orders / Invoices"
+                      stroke="#06B6D4"
+                      strokeWidth={2.2}
+                      fillOpacity={1}
+                      fill="url(#dashboardTxGrad)"
+                      activeDot={{ r: 5, stroke: '#06B6D4', strokeWidth: 2, fill: '#ffffff' }}
+                    />
+                  )}
+                </AreaChart>
+              ) : (
+                <BarChart
+                  data={monthlyChartData}
+                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="dashboardMonthlySalesGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#06B6D4" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#0284C7" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="dashboardMonthlyTxGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="currentColor"
+                    className="text-slate-200 dark:text-slate-800/80"
+                  />
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'currentColor' }}
+                    className="text-slate-500 dark:text-slate-400 font-medium"
+                    dy={4}
+                  />
+                  <YAxis
+                    yAxisId="sales"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'currentColor' }}
+                    className="text-slate-400 dark:text-slate-500 font-mono"
+                    tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                  />
+                  <YAxis
+                    yAxisId="tx"
+                    orientation="right"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'currentColor' }}
+                    className="text-emerald-600/70 dark:text-emerald-400/70 font-mono"
+                    hide={activeChartMetric === 'sales'}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip content={<CustomMonthlySalesTooltip currency={currency} />} />
+                  {(activeChartMetric === 'all' || activeChartMetric === 'sales') && (
+                    <Bar
+                      yAxisId="sales"
+                      dataKey="amount"
+                      name="Monthly Revenue"
+                      fill="url(#dashboardMonthlySalesGrad)"
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={36}
+                    />
+                  )}
+                  {(activeChartMetric === 'all' || activeChartMetric === 'orders') && (
+                    <Bar
+                      yAxisId="tx"
+                      dataKey="txCount"
+                      name="Completed Invoices"
+                      fill="url(#dashboardMonthlyTxGrad)"
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={28}
+                    />
+                  )}
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {/* ROW 3: BEST SELLING BRANDS & PRODUCTS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-        {/* Card 1: Best Selling Brands (Span 6 on md/lg/xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-6 app-card p-5 flex flex-col justify-between min-w-0">
+        {/* Card 2: Best Selling Brands (Span 1 on md, 6 on lg, 4 on xl) */}
+        <div className="md:col-span-1 lg:col-span-6 xl:col-span-4 app-card p-5 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               Best Selling Brands
@@ -1454,8 +1431,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
         </div>
 
-        {/* Card 2: Best Selling Products (Span 6 on md/lg/xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-6 app-card p-5 flex flex-col justify-between min-w-0">
+        {/* Card 3: Best Selling Products (Span 1 on md, 6 on lg, 3 on xl) */}
+        <div className="md:col-span-1 lg:col-span-6 xl:col-span-3 app-card p-5 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               Best Selling Products
@@ -1529,7 +1506,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* ROW 4: LATEST TRANSACTIONS & QUICK ACTIONS */}
+      {/* ROW 3: LATEST TRANSACTIONS & QUICK ACTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Latest Transactions (Span 7) */}
         <div className="lg:col-span-7 app-card p-5">
