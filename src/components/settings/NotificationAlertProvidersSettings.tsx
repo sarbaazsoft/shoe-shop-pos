@@ -1,880 +1,505 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Send,
-  Mail,
+  Flame,
   Key,
   Eye,
   EyeOff,
   CheckCircle2,
   AlertCircle,
   Sparkles,
-  Sliders,
-  Radio,
-  ExternalLink,
-  ShieldCheck,
   Smartphone,
   Save,
   Check,
   RefreshCw,
-  Info,
+  ExternalLink,
+  ShieldCheck,
+  Send,
   X,
+  BellRing,
+  Laptop,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
-
-export type AlertProviderMode = 'both' | 'telegram' | 'gmail' | 'none';
+import { requestFcmDeviceToken, getStoredFcmToken } from '../../services/firebaseConfig.ts';
 
 interface NotificationAlertProvidersSettingsProps {
   formData?: any;
   setFormData?: React.Dispatch<React.SetStateAction<any>>;
   isEmbeddedInForm?: boolean;
-  onSaveSuccess?: (updated: any) => void;
+  onSaveSuccess?: (updated?: any) => void;
   onClose?: () => void;
 }
 
 export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvidersSettingsProps> = ({
-  formData: externalFormData,
-  setFormData: externalSetFormData,
-  isEmbeddedInForm = false,
   onSaveSuccess,
   onClose,
 }) => {
-  // Local state for standalone mode (e.g., when launched from NotificationsView)
-  const [internalFormData, setInternalFormData] = useState({
-    telegram_bot_token: '',
-    telegram_chat_id: '',
-    telegram_alerts_enabled: false,
-    email_alerts_enabled: true,
-    gmail_user: '',
-    gmail_app_password: '',
-    gmail_from_name: 'SarbaazSoft Store Alerts',
-    active_alert_provider: 'both' as AlertProviderMode,
-    company_email: '',
+  const [fcmSettings, setFcmSettings] = useState({
+    FCM_PROJECT_ID: '',
+    FCM_CLIENT_EMAIL: '',
+    FCM_PRIVATE_KEY: '',
+    FCM_API_KEY: '',
+    FCM_MESSAGING_SENDER_ID: '',
+    FCM_APP_ID: '',
+    FCM_MEASUREMENT_ID: '',
+    FCM_VAPID_KEY: '',
   });
 
-  const [loading, setLoading] = useState(!externalFormData);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Active Provider Tab inside panel
-  const [activeTab, setActiveTab] = useState<'both' | 'telegram' | 'gmail'>('both');
+  // Password / Private Key visibility
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
 
-  // Secrets visibility toggles
-  const [showTelegramToken, setShowTelegramToken] = useState(false);
-  const [showGmailPassword, setShowGmailPassword] = useState(false);
+  // Test push state
+  const [isTestingPush, setIsTestingPush] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Test states
-  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
-  const [telegramTestResult, setTelegramTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Device registration state
+  const [isSubscribingThisDevice, setIsSubscribingThisDevice] = useState(false);
+  const [thisDeviceSubscribed, setThisDeviceSubscribed] = useState(false);
+  const [deviceStats, setDeviceStats] = useState<{
+    configured: boolean;
+    projectId: string;
+    totalTokens: number;
+    tokensByRole: Record<string, number>;
+  }>({
+    configured: false,
+    projectId: '',
+    totalTokens: 0,
+    tokensByRole: {},
+  });
 
-  const [isTestingGmail, setIsTestingGmail] = useState(false);
-  const [gmailTestRecipient, setGmailTestRecipient] = useState('');
-  const [gmailTestResult, setGmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Load app settings from server
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const [appSettingsRes, statsRes] = await Promise.all([
+        api.settings.getAppSettings().catch(() => null),
+        api.notifications.getFcmStats().catch(() => null),
+      ]);
 
-  // Use external formData when provided, otherwise internal state
-  const data = externalFormData || internalFormData;
-  const updateData = (updater: (prev: any) => any) => {
-    if (externalSetFormData) {
-      externalSetFormData(updater);
-    } else {
-      setInternalFormData(updater);
-    }
-  };
-
-  // Fetch initial settings if running in standalone mode
-  useEffect(() => {
-    if (!externalFormData) {
-      let isMounted = true;
-      api.settings.get()
-        .then((res: any) => {
-          if (!isMounted) return;
-          const s = res?.settings || res || {};
-          setInternalFormData({
-            telegram_bot_token: s.telegram_bot_token || s.telegramBotToken || '',
-            telegram_chat_id: s.telegram_chat_id || s.telegramChatId || '',
-            telegram_alerts_enabled: Boolean(s.telegram_alerts_enabled ?? s.telegramAlertsEnabled ?? false),
-            email_alerts_enabled: s.email_alerts_enabled !== false,
-            gmail_user: s.gmail_user || s.gmailUser || s.email || '',
-            gmail_app_password: s.gmail_app_password || s.gmailAppPassword || '',
-            gmail_from_name: s.gmail_from_name || s.gmailFromName || s.name || 'SarbaazSoft Store Alerts',
-            active_alert_provider: (s.active_alert_provider || s.activeAlertProvider || 'both') as AlertProviderMode,
-            company_email: s.company_email || s.companyEmail || s.email || '',
-          });
-          setGmailTestRecipient(s.gmail_user || s.email || '');
-        })
-        .catch((err) => {
-          console.warn('Notice loading notification settings:', err);
-        })
-        .finally(() => {
-          if (isMounted) setLoading(false);
+      if (appSettingsRes?.appSettings) {
+        const s = appSettingsRes.appSettings;
+        setFcmSettings({
+          FCM_PROJECT_ID: s.FCM_PROJECT_ID || '',
+          FCM_CLIENT_EMAIL: s.FCM_CLIENT_EMAIL || '',
+          FCM_PRIVATE_KEY: s.FCM_PRIVATE_KEY || '',
+          FCM_API_KEY: s.FCM_API_KEY || '',
+          FCM_MESSAGING_SENDER_ID: s.FCM_MESSAGING_SENDER_ID || '',
+          FCM_APP_ID: s.FCM_APP_ID || '',
+          FCM_MEASUREMENT_ID: s.FCM_MEASUREMENT_ID || '',
+          FCM_VAPID_KEY: s.FCM_VAPID_KEY || '',
         });
-
-      return () => {
-        isMounted = false;
-      };
-    } else {
-      setGmailTestRecipient(externalFormData.gmail_user || externalFormData.company_email || '');
-    }
-  }, [externalFormData]);
-
-  // Handle master mode selection (both, telegram, gmail, none)
-  const handleSelectMode = (mode: AlertProviderMode) => {
-    if (mode === 'telegram') setActiveTab('telegram');
-    else if (mode === 'gmail') setActiveTab('gmail');
-    else if (mode === 'both') setActiveTab('both');
-
-    updateData((prev: any) => {
-      let nextTelegram = prev.telegram_alerts_enabled;
-      let nextEmail = prev.email_alerts_enabled;
-
-      if (mode === 'both') {
-        nextTelegram = true;
-        nextEmail = true;
-      } else if (mode === 'telegram') {
-        nextTelegram = true;
-        nextEmail = false;
-      } else if (mode === 'gmail') {
-        nextTelegram = false;
-        nextEmail = true;
-      } else if (mode === 'none') {
-        nextTelegram = false;
-        nextEmail = false;
       }
 
-      return {
-        ...prev,
-        active_alert_provider: mode,
-        telegram_alerts_enabled: nextTelegram,
-        email_alerts_enabled: nextEmail,
-      };
-    });
-  };
+      if (statsRes) {
+        setDeviceStats(statsRes);
+      }
 
-  // Test Telegram Bot
-  const handleTestTelegram = async () => {
-    setIsTestingTelegram(true);
-    setTelegramTestResult(null);
-    try {
-      const res = await api.settings.testTelegram({
-        botToken: data.telegram_bot_token,
-        chatId: data.telegram_chat_id,
-      });
-      setTelegramTestResult({
-        success: Boolean(res.success),
-        message: res.message || (res.success ? '✓ Telegram connection verified! Test alert received.' : 'Telegram test failed.'),
-      });
+      setThisDeviceSubscribed(Boolean(getStoredFcmToken()));
     } catch (err: any) {
-      setTelegramTestResult({
-        success: false,
-        message: err.message || 'Failed to dispatch Telegram test alert.',
-      });
+      console.warn('Could not load FCM settings:', err);
     } finally {
-      setIsTestingTelegram(false);
+      setLoading(false);
     }
   };
 
-  // Test Gmail SMTP
-  const handleTestGmail = async () => {
-    setIsTestingGmail(true);
-    setGmailTestResult(null);
-    try {
-      const target = gmailTestRecipient.trim() || data.gmail_user || data.company_email;
-      const res = await api.settings.testGmail({
-        gmailUser: data.gmail_user,
-        gmailAppPassword: data.gmail_app_password,
-        fromName: data.gmail_from_name,
-        recipientEmail: target,
-      });
-      setGmailTestResult({
-        success: Boolean(res.success),
-        message: res.message || (res.delivered ? `✓ Test alert delivered successfully to ${target}!` : 'Gmail delivery failed.'),
-      });
-    } catch (err: any) {
-      setGmailTestResult({
-        success: false,
-        message: err.message || 'Gmail SMTP test failed. Please verify your email and 16-character App Password.',
-      });
-    } finally {
-      setIsTestingGmail(false);
-    }
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const handleChange = (key: keyof typeof fcmSettings, value: string) => {
+    setFcmSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Save changes directly (standalone mode or quick save)
-  const handleSaveSettings = async () => {
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsSaving(true);
     setSaveMessage(null);
-    try {
-      const payload = {
-        telegram_bot_token: data.telegram_bot_token,
-        telegram_chat_id: data.telegram_chat_id,
-        telegram_alerts_enabled: data.telegram_alerts_enabled,
-        email_alerts_enabled: data.email_alerts_enabled,
-        gmail_user: data.gmail_user,
-        gmail_app_password: data.gmail_app_password,
-        gmail_from_name: data.gmail_from_name,
-        active_alert_provider: data.active_alert_provider || 'both',
-      };
 
-      const res = await (api.settings.saveAlertProviders
-        ? api.settings.saveAlertProviders(payload)
-        : api.settings.post(payload));
+    try {
+      await api.settings.saveAppSettings({
+        FCM_PROJECT_ID: fcmSettings.FCM_PROJECT_ID.trim(),
+        FCM_CLIENT_EMAIL: fcmSettings.FCM_CLIENT_EMAIL.trim(),
+        FCM_PRIVATE_KEY: fcmSettings.FCM_PRIVATE_KEY.trim(),
+        FCM_API_KEY: fcmSettings.FCM_API_KEY.trim(),
+        FCM_MESSAGING_SENDER_ID: fcmSettings.FCM_MESSAGING_SENDER_ID.trim(),
+        FCM_APP_ID: fcmSettings.FCM_APP_ID.trim(),
+        FCM_MEASUREMENT_ID: fcmSettings.FCM_MEASUREMENT_ID.trim(),
+        FCM_VAPID_KEY: fcmSettings.FCM_VAPID_KEY.trim(),
+      });
+
       setSaveMessage({
         type: 'success',
-        text: '✓ Notification alert providers successfully updated and active.',
+        text: 'Firebase Cloud Messaging credentials saved and initialized successfully!',
       });
-      onSaveSuccess?.(res?.settings || payload);
+
+      await loadSettings();
+      if (onSaveSuccess) onSaveSuccess();
       setTimeout(() => setSaveMessage(null), 4000);
     } catch (err: any) {
       setSaveMessage({
         type: 'error',
-        text: err?.message || 'Failed to save notification settings.',
+        text: err?.message || 'Failed to save Firebase configuration.',
       });
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleTestPush = async () => {
+    setIsTestingPush(true);
+    setTestResult(null);
+
+    try {
+      const res = await api.notifications.testFcm({
+        title: '🔥 Firebase Cloud Messaging Live Test',
+        message: `FCM push delivery confirmed at ${new Date().toLocaleTimeString()}! Real-time alerts are operational.`,
+      });
+
+      setTestResult({
+        success: res.success,
+        message: res.message || (res.success ? '✓ Test push notification dispatched!' : 'Failed to deliver test alert.'),
+      });
+
+      // Refresh device counts
+      const stats = await api.notifications.getFcmStats().catch(() => null);
+      if (stats) setDeviceStats(stats);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || 'Error triggering test FCM push alert.',
+      });
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
+
+  const handleSubscribeThisDevice = async () => {
+    setIsSubscribingThisDevice(true);
+    try {
+      const res = await requestFcmDeviceToken('ADMIN');
+      if (res.success) {
+        setThisDeviceSubscribed(true);
+        const stats = await api.notifications.getFcmStats().catch(() => null);
+        if (stats) setDeviceStats(stats);
+        setTestResult({
+          success: true,
+          message: '✓ This device is now registered to receive Firebase push notifications!',
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: res.error || 'Failed to subscribe this device.',
+        });
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || 'Failed to request notification permission.',
+      });
+    } finally {
+      setIsSubscribingThisDevice(false);
+    }
+  };
+
+  const isBackendConfigured = Boolean(
+    fcmSettings.FCM_PROJECT_ID && fcmSettings.FCM_CLIENT_EMAIL && fcmSettings.FCM_PRIVATE_KEY
+  );
+
+  const isClientConfigured = Boolean(
+    fcmSettings.FCM_PROJECT_ID && fcmSettings.FCM_API_KEY && fcmSettings.FCM_APP_ID
+  );
+
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center space-x-3 text-slate-500">
-        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-medium">Loading alert provider settings...</span>
+      <div className="p-8 text-center bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm">
+        <RefreshCw className="w-6 h-6 animate-spin text-purple-600 mx-auto mb-2" />
+        <span className="text-xs text-slate-500 dark:text-slate-400">Loading Firebase Cloud Messaging configuration...</span>
       </div>
     );
   }
 
-  const currentMode: AlertProviderMode = (data.active_alert_provider as AlertProviderMode) || 'both';
-
   return (
-    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 shadow-sm transition-all overflow-hidden space-y-5">
-      {/* PANEL HEADER */}
-      <div className="p-5 sm:p-6 pb-4 border-b border-slate-100 dark:border-indigo-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start space-x-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
-            <Sliders className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                System Alert Notification Providers
-              </h3>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                SuperAdmin Exclusive
-              </span>
-              <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${
-                currentMode === 'both'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                  : currentMode === 'telegram'
-                  ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800'
-                  : currentMode === 'gmail'
-                  ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${currentMode !== 'none' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                {currentMode === 'both' ? 'Both Providers Active' : currentMode === 'telegram' ? 'Telegram Only' : currentMode === 'gmail' ? 'Gmail Only' : 'Alerts Disabled'}
-              </span>
+    <div className="bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm overflow-hidden transition-colors">
+      {/* HEADER SECTION */}
+      <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-purple-900/40 bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-purple-500/5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-orange-500/20">
+              <Flame className="w-6 h-6 fill-white stroke-[2.2]" />
             </div>
-            <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-1">
-              Configure real-time push alerts for sales, returns, customer exchanges, and inventory updates delivered to phone and inbox even when POS is closed.
-            </p>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                  Firebase Cloud Messaging (FCM) Push Provider
+                </h3>
+                <span
+                  className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${
+                    isBackendConfigured && isClientConfigured
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                      : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isBackendConfigured && isClientConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`}
+                  />
+                  {isBackendConfigured && isClientConfigured ? 'FCM Push Active' : 'Setup Required'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Exclusive push notification provider for POS sales, customer returns, exchanges, and low-stock alerts across Android, iPhone, Windows, and Mac PWAs.
+              </p>
+            </div>
           </div>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="self-start sm:self-center p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            aria-label="Close settings panel"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-
-      <div className="px-5 sm:px-6 space-y-5 pb-5">
-        {/* 1. NOTIFICATION SERVER SWITCHER (TELEGRAM VS GMAIL) */}
-        <div className="space-y-2.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <Sliders className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Choose Active Notification Server (Telegram vs Gmail)</span>
-            </label>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              Select which server delivers real-time counter alerts (sales, returns, exchanges)
+        {/* STATUS METRICS OVERVIEW */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-200/60 dark:border-purple-900/40">
+          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Push Provider</span>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5 flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 fill-amber-500" /> Firebase FCM
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {/* Mode: Both */}
-            <button
-              type="button"
-              onClick={() => handleSelectMode('both')}
-              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
-                currentMode === 'both'
-                  ? 'bg-purple-50/90 dark:bg-purple-950/50 border-purple-500 ring-2 ring-purple-500/25 text-purple-950 dark:text-purple-100 shadow-sm'
-                  : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Admin SDK Status</span>
+            <span
+              className={`text-xs font-bold font-mono mt-0.5 ${
+                isBackendConfigured ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  Both Active
-                </span>
-                {currentMode === 'both' ? (
-                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-purple-600 text-white">
-                    ACTIVE
-                  </span>
-                ) : (
-                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
-                )}
-              </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                Simultaneous Telegram push + Gmail receipts.
-              </p>
-            </button>
+              {isBackendConfigured ? '✓ Initialized' : 'Keys Needed'}
+            </span>
+          </div>
 
-            {/* Mode: Telegram Only */}
-            <button
-              type="button"
-              onClick={() => handleSelectMode('telegram')}
-              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
-                currentMode === 'telegram'
-                  ? 'bg-sky-50/90 dark:bg-sky-950/50 border-sky-500 ring-2 ring-sky-500/25 text-sky-950 dark:text-sky-100 shadow-sm'
-                  : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Send className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 -rotate-12" />
-                  Telegram Server
-                </span>
-                {currentMode === 'telegram' ? (
-                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-sky-600 text-white">
-                    ACTIVE
-                  </span>
-                ) : (
-                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
-                )}
-              </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                Instant phone sound &amp; lockscreen vibration.
-              </p>
-            </button>
+          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Registered Devices</span>
+            <span className="text-xs font-bold text-purple-600 dark:text-purple-400 font-mono mt-0.5 flex items-center gap-1">
+              <Smartphone className="w-3.5 h-3.5" />
+              {deviceStats.totalTokens} Device(s)
+            </span>
+          </div>
 
-            {/* Mode: Gmail Only */}
-            <button
-              type="button"
-              onClick={() => handleSelectMode('gmail')}
-              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
-                currentMode === 'gmail'
-                  ? 'bg-rose-50/90 dark:bg-rose-950/50 border-rose-500 ring-2 ring-rose-500/25 text-rose-950 dark:text-rose-100 shadow-sm'
-                  : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">This Browser</span>
+            <span
+              className={`text-xs font-bold font-mono mt-0.5 flex items-center gap-1 ${
+                thisDeviceSubscribed ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                  Gmail Server
-                </span>
-                {currentMode === 'gmail' ? (
-                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-rose-600 text-white">
-                    ACTIVE
-                  </span>
-                ) : (
-                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
-                )}
-              </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                HTML receipt alerts via dedicated notification SMTP.
-              </p>
-            </button>
+              <Laptop className="w-3.5 h-3.5" />
+              {thisDeviceSubscribed ? 'Subscribed' : 'Not Subscribed'}
+            </span>
+          </div>
+        </div>
+      </div>
 
-            {/* Mode: None */}
-            <button
-              type="button"
-              onClick={() => handleSelectMode('none')}
-              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
-                currentMode === 'none'
-                  ? 'bg-slate-200/90 dark:bg-slate-800 border-slate-400 ring-2 ring-slate-400/20 text-slate-900 dark:text-white shadow-sm'
-                  : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
-              }`}
+      <div className="p-5 sm:p-6 space-y-6">
+        {/* QUICK SETUP INSTRUCTIONS BANNER */}
+        <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 via-orange-50/50 to-purple-50/40 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-purple-950/20 border border-amber-200 dark:border-amber-800/60 text-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              Quick Firebase Setup Guide:
+            </span>
+            <a
+              href="https://console.firebase.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Radio className="w-3.5 h-3.5 text-slate-400" />
-                  Disable All
-                </span>
-                {currentMode === 'none' ? (
-                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-slate-600 text-white">
-                    PAUSED
-                  </span>
-                ) : (
-                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
-                )}
-              </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                Temporarily pause all external notification alerts.
-              </p>
-            </button>
+              <span>Open Firebase Console</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+          <ol className="list-decimal list-inside space-y-1.5 text-slate-700 dark:text-slate-300 pl-1 leading-relaxed">
+            <li>
+              In <strong>Firebase Console</strong>, create or select your project.
+            </li>
+            <li>
+              Go to <strong>Project Settings &gt; Service accounts</strong>, click <strong>&quot;Generate new private key&quot;</strong>, and copy your <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">project_id</code>, <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">client_email</code>, and <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">private_key</code> below.
+            </li>
+            <li>
+              Under <strong>Project Settings &gt; General &gt; Your apps</strong>, click <strong>Web (&lt;/&gt;)</strong> to create a Web App and copy your <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">apiKey</code>, <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">appId</code>, and <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">messagingSenderId</code>.
+            </li>
+          </ol>
+        </div>
+
+        {/* SECTION 1: BACKEND FIREBASE ADMIN SDK KEYS */}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
+            <Key className="w-4 h-4 text-amber-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              1. Backend Firebase Admin SDK Keys (Server Push Dispatch)
+            </h4>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Firebase Project ID</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PROJECT_ID)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_PROJECT_ID}
+                onChange={(e) => handleChange('FCM_PROJECT_ID', e.target.value.trim())}
+                placeholder="e.g. shoe-pos-app-12345"
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Service Account Client Email</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_CLIENT_EMAIL)</code>
+              </label>
+              <input
+                type="email"
+                value={fcmSettings.FCM_CLIENT_EMAIL}
+                onChange={(e) => handleChange('FCM_CLIENT_EMAIL', e.target.value.trim())}
+                placeholder="e.g. firebase-adminsdk-xyz@shoe-pos-app.iam.gserviceaccount.com"
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                <span>Service Account Private Key (PEM)</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PRIVATE_KEY)</code>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPrivateKey(!showPrivateKey)}
+                className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 flex items-center gap-1 cursor-pointer font-medium"
+              >
+                {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showPrivateKey ? 'Hide Key' : 'Reveal Key'}</span>
+              </button>
+            </div>
+            <textarea
+              rows={4}
+              value={showPrivateKey ? fcmSettings.FCM_PRIVATE_KEY : fcmSettings.FCM_PRIVATE_KEY ? '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••\n[Private Key Stored Securely]' : ''}
+              onChange={(e) => handleChange('FCM_PRIVATE_KEY', e.target.value)}
+              placeholder="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----"
+              className="w-full p-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 leading-relaxed"
+            />
           </div>
         </div>
 
-        {/* 2. SUB-TABS TO CONFIGURE TELEGRAM & GMAIL CREDENTIALS */}
-        <div className="border-b border-slate-200 dark:border-slate-800 flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('both')}
-            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'both'
-                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Overview &amp; Both Providers</span>
-            {currentMode === 'both' && (
-              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold">
-                ACTIVE
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('telegram')}
-            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'telegram'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-          >
-            <Send className="w-3.5 h-3.5 -rotate-12" />
-            <span>Telegram Bot API</span>
-            {currentMode === 'telegram' && (
-              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold">
-                ACTIVE
-              </span>
-            )}
-            {data.telegram_alerts_enabled && currentMode !== 'telegram' && (
-              <span className="w-2 h-2 rounded-full bg-sky-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('gmail')}
-            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'gmail'
-                ? 'border-rose-500 text-rose-600 dark:text-rose-400'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Gmail SMTP Push Alerts</span>
-            {currentMode === 'gmail' && (
-              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-bold">
-                ACTIVE
-              </span>
-            )}
-            {data.email_alerts_enabled && currentMode !== 'gmail' && (
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
-            )}
-          </button>
-        </div>
-
-        {/* 3. TAB CONTENT: TELEGRAM BOT SETTINGS */}
-        {(activeTab === 'both' || activeTab === 'telegram') && (
-          <div className="p-4 sm:p-5 rounded-xl border border-sky-200/80 dark:border-sky-900/50 bg-sky-50/40 dark:bg-sky-950/20 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 rounded-xl bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-sky-500/20">
-                  <Send className="w-4 h-4 -rotate-12 translate-x-0.5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                    Telegram Bot Mobile Push
-                    <span className="text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded border border-sky-200 dark:border-sky-800">
-                      Zero Battery Drain
-                    </span>
-                    {currentMode === 'telegram' && (
-                      <span className="text-[10px] font-mono font-bold bg-sky-600 text-white px-2 py-0.5 rounded shadow-xs">
-                        ACTIVE SERVER
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Pushes sales alerts to your personal Telegram or store staff group.
-                  </p>
-                </div>
-              </div>
-
-              {/* Master Telegram Toggle & Quick Server Switcher */}
-              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center flex-wrap">
-                {currentMode !== 'telegram' && currentMode !== 'both' && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectMode('telegram')}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-200 dark:hover:bg-sky-900/80 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                    title="Switch active alert server to Telegram"
-                  >
-                    <span>⚡ Switch Server to Telegram</span>
-                  </button>
-                )}
-
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {data.telegram_alerts_enabled ? 'Telegram: ON' : 'Telegram: OFF'}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={data.telegram_alerts_enabled}
-                  onClick={() =>
-                    updateData((prev: any) => ({
-                      ...prev,
-                      telegram_alerts_enabled: !prev.telegram_alerts_enabled,
-                    }))
-                  }
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    data.telegram_alerts_enabled ? 'bg-sky-600' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      data.telegram_alerts_enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Telegram Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-              {/* Chat ID */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Telegram Chat ID / Group ID</span>
-                  <span className="text-rose-500 ml-1 font-bold">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={data.telegram_chat_id || ''}
-                  onChange={(e) =>
-                    updateData((prev: any) => ({
-                      ...prev,
-                      telegram_chat_id: e.target.value.trim(),
-                    }))
-                  }
-                  placeholder="e.g. 987654321 or -100123456789"
-                  className="w-full h-9.5 px-3 font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Message <strong>@userinfobot</strong> on Telegram to instantly receive your numeric Chat ID.
-                </p>
-              </div>
-
-              {/* Custom Bot Token */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Custom Telegram Bot Token</span>
-                  <span className="text-[10px] text-slate-400 font-normal ml-1.5">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showTelegramToken ? 'text' : 'password'}
-                    value={data.telegram_bot_token || ''}
-                    onChange={(e) =>
-                      updateData((prev: any) => ({
-                        ...prev,
-                        telegram_bot_token: e.target.value.trim(),
-                      }))
-                    }
-                    placeholder="Leave blank to use platform default bot"
-                    className="w-full h-9.5 pl-3 pr-9 font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowTelegramToken(!showTelegramToken)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
-                    title={showTelegramToken ? 'Hide token' : 'Show token'}
-                  >
-                    {showTelegramToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Create a custom bot with <strong>@BotFather</strong>, or leave empty for SarbaazSoft's standard bot.
-                </p>
-              </div>
-            </div>
-
-            {/* Test Telegram Dispatcher */}
-            <div className="pt-2 border-t border-sky-200/60 dark:border-sky-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs text-slate-600 dark:text-slate-300">
-                Verify phone alert delivery:
-              </span>
-              <button
-                type="button"
-                onClick={handleTestTelegram}
-                disabled={isTestingTelegram || !data.telegram_chat_id?.trim()}
-                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shrink-0 shadow-xs"
-              >
-                <Send className={`w-3.5 h-3.5 ${isTestingTelegram ? 'animate-spin' : ''}`} />
-                <span>{isTestingTelegram ? 'Sending Test...' : 'Send Test Alert to Telegram'}</span>
-              </button>
-            </div>
-
-            {telegramTestResult && (
-              <div
-                className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2 border ${
-                  telegramTestResult.success
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-                }`}
-              >
-                {telegramTestResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-                )}
-                <span>{telegramTestResult.message}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 4. TAB CONTENT: GMAIL SMTP SETTINGS */}
-        {(activeTab === 'both' || activeTab === 'gmail') && (
-          <div className="p-4 sm:p-5 rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/20">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                    Gmail Provider Alerts (Google SMTP)
-                    <span className="text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
-                      Standard Gmail / Workspace
-                    </span>
-                    {currentMode === 'gmail' && (
-                      <span className="text-[10px] font-mono font-bold bg-rose-600 text-white px-2 py-0.5 rounded shadow-xs">
-                        ACTIVE SERVER
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Dispatches formatted transactional receipts and system notices via your Gmail account.
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Server Switcher & Master Toggle */}
-              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center flex-wrap">
-                {currentMode !== 'gmail' && currentMode !== 'both' && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectMode('gmail')}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900/80 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                    title="Switch active alert server to Gmail"
-                  >
-                    <span>⚡ Switch Server to Gmail</span>
-                  </button>
-                )}
-
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {data.email_alerts_enabled ? 'Gmail: ON' : 'Gmail: OFF'}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={data.email_alerts_enabled}
-                  onClick={() =>
-                    updateData((prev: any) => ({
-                      ...prev,
-                      email_alerts_enabled: !prev.email_alerts_enabled,
-                    }))
-                  }
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    data.email_alerts_enabled ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      data.email_alerts_enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Notification Gmail Decoupling Notice */}
-            <div className="p-3 bg-white/80 dark:bg-slate-900/80 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2.5 shadow-2xs">
-              <Mail className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-              <div className="leading-relaxed text-[11px]">
-                <strong className="text-rose-700 dark:text-rose-300 font-bold">Independent Store Alert Credentials</strong>:
-                {' '}This Gmail address and 16-character App Password are used strictly for sending real-time counter sales and return notifications. It is <strong>completely separate</strong> from your Platform Transactional Email (Password Resets / Verification) and updating it will never overwrite your system email password.
-              </div>
-            </div>
-
-            {/* Gmail Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
-              {/* Gmail Username */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Push Alert Gmail Address</span>
-                  <span className="text-rose-500 ml-1 font-bold">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={data.gmail_user || ''}
-                    onChange={(e) =>
-                      updateData((prev: any) => ({
-                        ...prev,
-                        gmail_user: e.target.value.trim(),
-                      }))
-                    }
-                    placeholder="e.g. yourstore@gmail.com"
-                    className="w-full h-9.5 px-3 font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Gmail account used to send POS transaction receipts.
-                </p>
-              </div>
-
-              {/* 16-Character App Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Push Alert 16-Char App Password</span>
-                  <span className="text-rose-500 ml-1 font-bold">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showGmailPassword ? 'text' : 'password'}
-                    value={data.gmail_app_password || ''}
-                    onChange={(e) =>
-                      updateData((prev: any) => ({
-                        ...prev,
-                        gmail_app_password: e.target.value.trim(),
-                      }))
-                    }
-                    placeholder="abcd efgh ijkl mnop"
-                    className="w-full h-9.5 pl-3 pr-9 font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGmailPassword(!showGmailPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
-                    title={showGmailPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showGmailPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Dedicated App Password for this alert sender. Separate from Platform Email.
-                </p>
-              </div>
-
-              {/* Sender Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Sender Display Name</span>
-                </label>
-                <input
-                  type="text"
-                  value={data.gmail_from_name || ''}
-                  onChange={(e) =>
-                    updateData((prev: any) => ({
-                      ...prev,
-                      gmail_from_name: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. SarbaazSoft Store Alerts"
-                  className="w-full h-9.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Shown in customer and owner inboxes.
-                </p>
-              </div>
-            </div>
-
-            {/* Test Gmail Dispatcher */}
-            <div className="pt-2 border-t border-rose-200/60 dark:border-rose-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-1 max-w-sm">
-                <input
-                  type="email"
-                  value={gmailTestRecipient}
-                  onChange={(e) => setGmailTestRecipient(e.target.value.trim())}
-                  placeholder="Send test email to (defaults to Gmail above)"
-                  className="w-full h-8.5 px-3 font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleTestGmail}
-                disabled={isTestingGmail || (!data.gmail_user?.trim() && !gmailTestRecipient.trim())}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shrink-0 shadow-xs"
-              >
-                <Mail className={`w-3.5 h-3.5 ${isTestingGmail ? 'animate-spin' : ''}`} />
-                <span>{isTestingGmail ? 'Dispatching...' : 'Send Test Alert via Gmail'}</span>
-              </button>
-            </div>
-
-            {gmailTestResult && (
-              <div
-                className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2 border ${
-                  gmailTestResult.success
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-                }`}
-              >
-                {gmailTestResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-                )}
-                <span>{gmailTestResult.message}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 5. SAVE BUTTON & FEEDBACK BANNER */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-            <span>Platform alert credentials and bot tokens are securely encrypted and managed exclusively by SuperAdmin.</span>
+        {/* SECTION 2: FRONTEND FIREBASE WEB CLIENT KEYS */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
+            <Smartphone className="w-4 h-4 text-purple-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              2. Frontend Firebase Web Client Keys (Device Token Generation)
+            </h4>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              >
-                Close
-              </button>
-            )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Web API Key</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_API_KEY)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_API_KEY}
+                onChange={(e) => handleChange('FCM_API_KEY', e.target.value.trim())}
+                placeholder="AIzaSy..."
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
 
-            <button
-              type="button"
-              onClick={handleSaveSettings}
-              disabled={isSaving}
-              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
-            >
-              <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
-              <span>{isSaving ? 'Saving Providers...' : 'Save Alert Provider Settings'}</span>
-            </button>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Messaging Sender ID</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MESSAGING_SENDER_ID)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_MESSAGING_SENDER_ID}
+                onChange={(e) => handleChange('FCM_MESSAGING_SENDER_ID', e.target.value.trim())}
+                placeholder="e.g. 104857291039"
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Web App ID</span>
+                <span className="text-rose-500 ml-1 font-bold">*</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_APP_ID)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_APP_ID}
+                onChange={(e) => handleChange('FCM_APP_ID', e.target.value.trim())}
+                placeholder="1:104857291039:web:abcdef"
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Web Push Certificate / VAPID Key</span>
+                <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_VAPID_KEY)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_VAPID_KEY}
+                onChange={(e) => handleChange('FCM_VAPID_KEY', e.target.value.trim())}
+                placeholder="BEl62iUYgUivxIkv..."
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                <span>Analytics Measurement ID</span>
+                <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
+                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MEASUREMENT_ID)</code>
+              </label>
+              <input
+                type="text"
+                value={fcmSettings.FCM_MEASUREMENT_ID}
+                onChange={(e) => handleChange('FCM_MEASUREMENT_ID', e.target.value.trim())}
+                placeholder="G-XXXXXXX"
+                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+              />
+            </div>
           </div>
         </div>
 
+        {/* FEEDBACK BANNERS */}
         {saveMessage && (
           <div
-            className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+            className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
               saveMessage.type === 'success'
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
                 : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
@@ -888,6 +513,63 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             <span>{saveMessage.text}</span>
           </div>
         )}
+
+        {testResult && (
+          <div
+            className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 border ${
+              testResult.success
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+            }`}
+          >
+            {testResult.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1">
+              <span>{testResult.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ACTION BAR */}
+        <div className="pt-4 border-t border-slate-100 dark:border-purple-900/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSubscribeThisDevice}
+              disabled={isSubscribingThisDevice}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+            >
+              <BellRing className={`w-3.5 h-3.5 text-purple-500 ${isSubscribingThisDevice ? 'animate-spin' : ''}`} />
+              <span>{thisDeviceSubscribed ? 'Re-register This Device' : 'Enable Push on This Device'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestPush}
+              disabled={isTestingPush || !isBackendConfigured}
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-xs"
+              title={!isBackendConfigured ? 'Save Firebase credentials first to enable test push' : 'Send test FCM push notification'}
+            >
+              <Send className={`w-3.5 h-3.5 ${isTestingPush ? 'animate-spin' : ''}`} />
+              <span>{isTestingPush ? 'Dispatching...' : 'Test Push Alert (FCM)'}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              disabled={isSaving}
+              className="w-full sm:w-auto px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-purple-600/25 active:scale-95"
+            >
+              <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+              <span>{isSaving ? 'Saving...' : 'Save Firebase Credentials'}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

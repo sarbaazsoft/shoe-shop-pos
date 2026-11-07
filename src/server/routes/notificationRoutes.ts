@@ -1,10 +1,21 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { getVapidPublicKey, registerSseClient, savePushSubscription, removePushSubscription, notifyPosAction } from '../pushNotificationService.ts';
+import {
+  getVapidPublicKey,
+  registerSseClient,
+  savePushSubscription,
+  removePushSubscription,
+  notifyPosAction,
+  saveFcmToken,
+  removeFcmToken,
+  getFcmStats,
+  testFcmPush,
+} from '../pushNotificationService.ts';
+import { getCachedAppSetting, getAppSetting, loadAppSettingsCache } from '../services/appSettingsService.ts';
 import { extractTokenFromRequest } from '../auth.ts';
 import { pgClient } from '../../db/index.ts';
-import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
+import { ensurePlatformNotificationsSchema, ensureFcmTokensSchema } from '../../db/schemaInit.ts';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
@@ -1128,7 +1139,100 @@ router.post('/platform/dismiss-all', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/notifications/vapid-public-key - Return Web Push VAPID public key
+// ============================================================================
+// FIREBASE CLOUD MESSAGING (FCM) ENDPOINTS
+// ============================================================================
+
+// GET /api/notifications/fcm-config - Return public client Firebase config
+router.get('/fcm-config', async (_req: Request, res: Response) => {
+  try {
+    await loadAppSettingsCache();
+    const projectId = (await getAppSetting('FCM_PROJECT_ID', '')) || process.env.FCM_PROJECT_ID || '';
+    const apiKey = (await getAppSetting('FCM_API_KEY', '')) || process.env.FCM_API_KEY || '';
+    const messagingSenderId = (await getAppSetting('FCM_MESSAGING_SENDER_ID', '')) || process.env.FCM_MESSAGING_SENDER_ID || '';
+    const appId = (await getAppSetting('FCM_APP_ID', '')) || process.env.FCM_APP_ID || '';
+    const measurementId = (await getAppSetting('FCM_MEASUREMENT_ID', '')) || process.env.FCM_MEASUREMENT_ID || '';
+    const vapidKey = (await getAppSetting('FCM_VAPID_KEY', '')) || process.env.FCM_VAPID_KEY || '';
+
+    const isConfigured = Boolean(projectId && apiKey);
+    res.json({
+      configured: isConfigured,
+      projectId,
+      apiKey,
+      messagingSenderId,
+      appId,
+      measurementId,
+      vapidKey,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to retrieve FCM configuration' });
+  }
+});
+
+// GET /api/notifications/fcm-stats - Return device registration metrics & SDK status
+router.get('/fcm-stats', async (_req: Request, res: Response) => {
+  try {
+    const stats = await getFcmStats();
+    res.json(stats);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to retrieve FCM stats' });
+  }
+});
+
+// POST /api/notifications/fcm-token - Register or update a device FCM token
+router.post('/fcm-token', async (req: Request, res: Response) => {
+  try {
+    const identity = resolveRequestIdentity(req);
+    const token = String(req.body?.token || req.body?.fcmToken || '').trim();
+
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'FCM device token is required' });
+    }
+
+    const tenantId = Number(req.body?.tenantId || identity.tenantId) || 1;
+    const userId = Number(req.body?.userId || identity.userId) || 0;
+    const rawRole = req.body?.userRole || req.body?.role || identity.role || 'ADMIN';
+    const role = String(rawRole).toUpperCase();
+    const userAgent = String(req.headers['user-agent'] || req.body?.userAgent || '');
+    const deviceName = String(req.body?.deviceName || '');
+
+    const success = await saveFcmToken(tenantId, userId, role, token, userAgent, deviceName);
+    res.json({ success, tenantId, role });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to register FCM token' });
+  }
+});
+
+// POST & DELETE /api/notifications/fcm-token/remove - Unregister a device FCM token
+router.all(['/fcm-token/remove', '/fcm-token/delete'], async (req: Request, res: Response) => {
+  try {
+    const token = req.body?.token || req.query?.token;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Token is required' });
+    }
+    const success = await removeFcmToken(String(token));
+    res.json({ success });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to remove FCM token' });
+  }
+});
+
+// POST /api/notifications/test-fcm and /api/notifications/test-push - Send live FCM test push alert
+router.post(['/test-fcm', '/test-push'], async (req: Request, res: Response) => {
+  try {
+    const identity = resolveRequestIdentity(req);
+    const targetTenantId = identity.role === 'SUPERADMIN' ? 0 : identity.tenantId;
+    const customTitle = req.body?.title;
+    const customMessage = req.body?.message;
+
+    const result = await testFcmPush(targetTenantId, customTitle, customMessage);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to trigger test FCM alert' });
+  }
+});
+
+// Backward-compatible VAPID and Web Push endpoints
 router.get('/vapid-public-key', (_req: Request, res: Response) => {
   try {
     const publicKey = getVapidPublicKey();
@@ -1138,7 +1242,6 @@ router.get('/vapid-public-key', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/notifications/subscribe - Save device push subscription scoped by role
 router.post('/subscribe', async (req: Request, res: Response) => {
   try {
     const identity = resolveRequestIdentity(req);
@@ -1161,39 +1264,16 @@ router.post('/subscribe', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/notifications/unsubscribe - Delete push subscription endpoint
 router.post('/unsubscribe', async (req: Request, res: Response) => {
   try {
     const endpoint = req.body?.endpoint || req.query?.endpoint;
     if (!endpoint) {
       return res.status(400).json({ success: false, error: 'Endpoint is required' });
     }
-
     const success = await removePushSubscription(String(endpoint));
     res.json({ success });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to remove subscription' });
-  }
-});
-
-// POST /api/notifications/test-push - Send test push alert
-router.post('/test-push', async (req: Request, res: Response) => {
-  try {
-    const { tenantId } = resolveRequestIdentity(req);
-    await notifyPosAction(tenantId, {
-      type: 'SALE',
-      title: 'POS Test Alert',
-      message: 'Web Push and real-time alerts are operational on this device.',
-      invoiceNumber: 'TEST-001',
-      totalAmount: 1000,
-      timestamp: new Date().toISOString(),
-      deepLinkUrl: '/pos',
-      targetRole: 'ALL',
-      targetRoles: ['ADMIN', 'CASHIER'],
-    });
-    res.json({ success: true, message: 'Test notification triggered successfully.' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to send test alert' });
   }
 });
 

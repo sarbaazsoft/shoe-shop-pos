@@ -1,5 +1,6 @@
 import { api, getAuthToken, getActiveTenantId } from './api.ts';
 import { playAudioFeedback } from '../utils/audio.ts';
+import { requestFcmDeviceToken } from './firebaseConfig.ts';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -43,19 +44,10 @@ export function getNotificationPermissionState(): NotificationPermission {
 }
 
 export async function isDeviceSubscribedToPush(): Promise<boolean> {
-  if (!isWebPushSupported()) return false;
-  try {
-    if (Notification.permission !== 'granted') return false;
-    // If explicitly disabled by user on this client, respect that setting
-    if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return false;
-
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) return false;
-    const sub = await reg.pushManager.getSubscription();
-    return sub !== null;
-  } catch {
-    return false;
-  }
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return false;
+  return Boolean(localStorage.getItem('pos_fcm_token'));
 }
 
 export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
@@ -75,124 +67,11 @@ export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
     };
   }
 
-  if (!isWebPushSupported()) {
-    return {
-      success: false,
-      error: 'Web Push notifications are not supported on this browser or platform.',
-    };
-  }
-
-  try {
-    // 1. Check or request browser notification permission
-    let permission = Notification.permission;
-    if (permission !== 'granted') {
-      permission = await Notification.requestPermission();
-    }
-
-    if (permission === 'denied') {
-      return {
-        success: false,
-        permission: 'denied',
-        error: 'Notification permission was denied. Please allow notifications in your browser or device settings.',
-      };
-    }
-
-    if (permission !== 'granted') {
-      return {
-        success: false,
-        permission: 'default',
-        error: 'Notification permission request was dismissed.',
-      };
-    }
-
-    // 2. Fetch server VAPID public key
-    const vapidRes = await api.notifications.getVapidPublicKey();
-    const publicKey = vapidRes?.publicKey;
-    if (!publicKey) {
-      return { success: false, error: 'Server did not return a valid VAPID public key.' };
-    }
-
-    // 3. Ensure Service Worker registration is active
-    let reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) {
-      reg = await navigator.serviceWorker.register('/sw-background-sync.js', { scope: '/' });
-    }
-    await navigator.serviceWorker.ready;
-
-    // 4. Ensure push subscription with PushManager
-    const applicationServerKey = urlBase64ToUint8Array(publicKey);
-    let sub = await reg.pushManager.getSubscription();
-
-    // If permission is already granted but no subscription exists, create a new push subscription
-    if (!sub) {
-      try {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey as any,
-        });
-      } catch (subErr: any) {
-        console.warn('[pushNotificationClient] Initial subscribe attempt error:', subErr);
-        // If an existing subscription had mismatched keys, reset and retry once
-        const existing = await reg.pushManager.getSubscription().catch(() => null);
-        if (existing) {
-          await existing.unsubscribe().catch(() => {});
-        }
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey as any,
-        });
-      }
-    }
-
-    if (!sub) {
-      return {
-        success: false,
-        error: 'Could not create a push subscription on this device.',
-      };
-    }
-
-    // 5. Send subscription to server with explicit user, role, and store context
-    const rawSub = sub.toJSON();
-    let currentRole = overrideRole || 'ADMIN';
-    let currentTenantId = getActiveTenantId() || 1;
-    let currentUserId = 0;
-    try {
-      const stored = localStorage.getItem('pos_current_user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (!overrideRole && u.role) currentRole = String(u.role).toUpperCase();
-        if (u.tenantId) currentTenantId = Number(u.tenantId) || currentTenantId;
-        if (u.id) currentUserId = Number(u.id) || 0;
-      }
-    } catch {}
-
-    const saveRes = await api.notifications.subscribe({
-      ...rawSub,
-      userRole: currentRole,
-      role: currentRole,
-      tenantId: currentTenantId,
-      userId: currentUserId,
-    });
-    if (saveRes && saveRes.success === false) {
-      return {
-        success: false,
-        error: saveRes.error || 'Server rejected push notification subscription.',
-      };
-    }
-
-    try {
-      localStorage.setItem('pos_push_notifications_enabled', 'true');
-    } catch {}
-
-    return { success: true, permission: 'granted' };
-  } catch (err: any) {
-    console.error('Failed to subscribe device to Web Push:', err);
-    return {
-      success: false,
-      error: err?.message || 'Failed to complete push notification registration.',
-    };
-  }
+  // Delegate directly to Firebase Cloud Messaging (FCM)
+  return requestFcmDeviceToken(overrideRole);
 }
+
+
 
 /**
  * Silently re-registers this device with the server when notification permission is already granted.

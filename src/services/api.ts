@@ -1072,6 +1072,8 @@ export const api = {
         message: string;
         details?: any;
       }>('/settings/test-email', { method: 'POST', body: { recipientEmail } }),
+    testFcm: (data?: { title?: string; message?: string }) =>
+      apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number; error?: string }>('/settings/test-fcm', { method: 'POST', body: data || {} }),
     testTelegram: (data?: { botToken?: string; chatId?: string }) =>
       apiFetch<{ success: boolean; message: string; error?: string }>('/settings/test-telegram', { method: 'POST', body: data || {} }),
     testGmail: (data?: { gmailUser?: string; gmailAppPassword?: string; fromName?: string; recipientEmail?: string }) =>
@@ -1158,13 +1160,58 @@ export const api = {
       apiFetch<{ success: boolean; message: string }>('/notifications/mark-all-read', {
         method: 'POST',
       }),
+    getFcmConfig: () =>
+      apiFetch<{
+        configured: boolean;
+        projectId: string;
+        apiKey: string;
+        messagingSenderId: string;
+        appId: string;
+        measurementId?: string;
+        vapidKey?: string;
+      }>('/notifications/fcm-config'),
+    getFcmStats: () =>
+      apiFetch<{
+        configured: boolean;
+        projectId: string;
+        totalTokens: number;
+        tokensByRole: Record<string, number>;
+      }>('/notifications/fcm-stats'),
+    registerFcmToken: (data: {
+      token: string;
+      userAgent?: string;
+      deviceName?: string;
+      userRole?: string;
+      tenantId?: number;
+      userId?: number;
+    }) =>
+      apiFetch<{ success: boolean; tenantId: number; role: string }>('/notifications/fcm-token', {
+        method: 'POST',
+        body: data,
+      }),
+    removeFcmToken: (token: string) =>
+      apiFetch<{ success: boolean }>('/notifications/fcm-token/remove', {
+        method: 'POST',
+        body: { token },
+      }),
+    testFcm: (data?: { title?: string; message?: string }) =>
+      apiFetch<{
+        success: boolean;
+        message: string;
+        sentCount: number;
+        failureCount: number;
+        error?: string;
+      }>('/notifications/test-fcm', {
+        method: 'POST',
+        body: data || {},
+      }),
     getVapidPublicKey: () => apiFetch<{ publicKey: string }>('/notifications/vapid-public-key'),
     subscribe: (subscription: any) =>
       apiFetch<{ success: boolean; error?: string }>('/notifications/subscribe', { method: 'POST', body: { subscription } }),
     unsubscribe: (endpoint: string) =>
       apiFetch<{ success: boolean; error?: string }>('/notifications/unsubscribe', { method: 'POST', body: { endpoint } }),
-    testPush: () =>
-      apiFetch<{ success: boolean; message: string }>('/notifications/test-push', { method: 'POST' }),
+    testPush: (data?: { title?: string; message?: string }) =>
+      apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number }>('/notifications/test-push', { method: 'POST', body: data || {} }),
     getPlatformAnnouncements: () =>
       apiFetch<{ announcements: PlatformNotification[]; unreadCount: number }>('/notifications/platform'),
     dismissAnnouncement: (id: number) =>

@@ -142,6 +142,7 @@ export function resetSaasControlPlaneState(): void {
   customerLedgerSchemaPromise = null;
   salesTransactionIdSchemaPromise = null;
   pushSubscriptionsSchemaPromise = null;
+  fcmTokensSchemaPromise = null;
   platformNotificationsSchemaPromise = null;
   productPriceMigrationPromise = null;
   documentPrefixMigrationPromise = null;
@@ -1970,28 +1971,56 @@ export async function dropAllTables(): Promise<void> {
   console.log('🗑️ All database tables successfully dropped with CASCADE.');
 }
 
-let telegramSchemaPromise: Promise<void> | null = null;
-export async function ensureTelegramSettingsSchema(): Promise<void> {
-  if (telegramSchemaPromise) return telegramSchemaPromise;
-  telegramSchemaPromise = (async () => {
+let fcmTokensSchemaPromise: Promise<void> | null = null;
+export async function ensureFcmTokensSchema(): Promise<void> {
+  if (fcmTokensSchemaPromise) return fcmTokensSchemaPromise;
+  fcmTokensSchemaPromise = (async () => {
     try {
+      await pgClient.exec(`
+        CREATE TABLE IF NOT EXISTS public.fcm_tokens (
+          token TEXT PRIMARY KEY,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          user_id INTEGER NOT NULL DEFAULT 0,
+          user_role TEXT NOT NULL DEFAULT 'ADMIN',
+          user_agent TEXT DEFAULT '',
+          device_name TEXT DEFAULT '',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS fcm_tokens_tenant_idx ON public.fcm_tokens(tenant_id);
+        CREATE INDEX IF NOT EXISTS fcm_tokens_user_role_idx ON public.fcm_tokens(user_role);
+        CREATE INDEX IF NOT EXISTS fcm_tokens_user_id_idx ON public.fcm_tokens(user_id);
+      `);
+    } catch (err) {
+      console.warn('Notice ensuring FCM tokens schema:', err);
+    }
+  })();
+  return fcmTokensSchemaPromise;
+}
+
+let legacyCleanupPromise: Promise<void> | null = null;
+export async function ensureTelegramSettingsSchema(): Promise<void> {
+  if (legacyCleanupPromise) return legacyCleanupPromise;
+  legacyCleanupPromise = (async () => {
+    try {
+      await ensureFcmTokensSchema();
       await pgClient.exec(`
         DO $$ BEGIN
           IF to_regclass('public.company_settings') IS NOT NULL THEN
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_bot_token TEXT DEFAULT '';
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT '';
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false;
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS email_alerts_enabled BOOLEAN NOT NULL DEFAULT true;
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_user TEXT DEFAULT '';
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_app_password TEXT DEFAULT '';
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS gmail_from_name TEXT DEFAULT '';
-            ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS active_alert_provider TEXT DEFAULT 'both';
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_bot_token;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_chat_id;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_alerts_enabled;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_user;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_app_password;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_from_name;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS active_alert_provider;
           END IF;
         END $$;
       `);
     } catch (err) {
-      console.warn('Notice ensuring Telegram settings schema:', err);
+      console.warn('Notice cleaning up legacy notification columns:', err);
     }
   })();
-  return telegramSchemaPromise;
+  return legacyCleanupPromise;
 }
+

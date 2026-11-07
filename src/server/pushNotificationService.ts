@@ -1,74 +1,86 @@
-import webpush from 'web-push';
+import { initializeApp, cert, getApps, deleteApp, type App } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
-import { ensurePushSubscriptionsSchema } from '../db/schemaInit.ts';
-import { getCachedAppSetting, getAppSetting, updateAppSettings, registerSettingsUpdateListener } from './services/appSettingsService.ts';
-import { dispatchPosTelegramAlert } from './services/telegramService.ts';
-import { dispatchPosEmailAlert } from './services/emailAlertService.ts';
+import { ensureFcmTokensSchema } from '../db/schemaInit.ts';
+import { getCachedAppSetting, getAppSetting, registerSettingsUpdateListener } from './services/appSettingsService.ts';
 
-// Deterministic or PostgreSQL-configured VAPID Keys for Web Push API
-let vapidPublicKey = getCachedAppSetting('VAPID_PUBLIC_KEY', '');
-let vapidPrivateKey = getCachedAppSetting('VAPID_PRIVATE_KEY', '');
-let vapidSubject = getCachedAppSetting('VAPID_SUBJECT', 'mailto:support@sarbaazsoft.com');
-let fallbackKeysGenerated = false;
+// ============================================================================
+// FIREBASE ADMIN SDK SINGLETON & DYNAMIC INITIALIZATION
+// ============================================================================
 
-export function configureVapidDetails() {
-  const customPub = getCachedAppSetting('VAPID_PUBLIC_KEY', '').trim();
-  const customPriv = getCachedAppSetting('VAPID_PRIVATE_KEY', '').trim();
-  vapidSubject = getCachedAppSetting('VAPID_SUBJECT', 'mailto:support@sarbaazsoft.com').trim() || 'mailto:support@sarbaazsoft.com';
+let firebaseApp: App | null = null;
+let lastCredentialSignature = '';
 
-  if (customPub && customPriv) {
-    vapidPublicKey = customPub;
-    vapidPrivateKey = customPriv;
-  } else if (!fallbackKeysGenerated) {
-    try {
-      const generated = webpush.generateVAPIDKeys();
-      vapidPublicKey = generated.publicKey;
-      vapidPrivateKey = generated.privateKey;
-      fallbackKeysGenerated = true;
-      // Persist generated VAPID keys into app_settings so all client devices stay subscribed across server restarts
-      updateAppSettings({
-        VAPID_PUBLIC_KEY: generated.publicKey,
-        VAPID_PRIVATE_KEY: generated.privateKey,
-      }).catch((err) => console.warn('Could not persist VAPID keys to database:', err));
-    } catch (err) {
-      console.warn('⚠️ Could not generate fallback VAPID keys:', err);
-    }
+/**
+ * Initializes or retrieves the Firebase Admin App instance.
+ * Reads FCM_PROJECT_ID, FCM_CLIENT_EMAIL, and FCM_PRIVATE_KEY from app_settings or process.env.
+ */
+export function getFirebaseAdmin(): App | null {
+  const projectId = (getCachedAppSetting('FCM_PROJECT_ID', '') || process.env.FCM_PROJECT_ID || '').trim();
+  const clientEmail = (getCachedAppSetting('FCM_CLIENT_EMAIL', '') || process.env.FCM_CLIENT_EMAIL || '').trim();
+  let privateKey = (getCachedAppSetting('FCM_PRIVATE_KEY', '') || process.env.FCM_PRIVATE_KEY || '').trim();
+
+  if (privateKey) {
+    // Format PEM newlines properly whether stored as literal \n or escaped \\n
+    privateKey = privateKey.replace(/\\n/g, '\n');
   }
 
-  if (vapidPublicKey && vapidPrivateKey) {
-    try {
-      webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-      console.log('🔔 Web Push VAPID details configured successfully');
-    } catch (err) {
-      console.warn('⚠️ Error setting VAPID details:', err);
+  if (!projectId || !clientEmail || !privateKey) {
+    return null;
+  }
+
+  const sig = `${projectId}:${clientEmail}:${privateKey.slice(0, 32)}`;
+  if (firebaseApp && lastCredentialSignature === sig) {
+    return firebaseApp;
+  }
+
+  try {
+    const existingApps = getApps();
+    if (existingApps.length > 0) {
+      for (const app of existingApps) {
+        if (app) {
+          deleteApp(app).catch(() => {});
+        }
+      }
     }
+
+    firebaseApp = initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+      projectId,
+    });
+    lastCredentialSignature = sig;
+    console.log(`🔥 [FCM] Firebase Admin SDK initialized successfully for project: ${projectId}`);
+    return firebaseApp;
+  } catch (err: any) {
+    console.warn('⚠️ [FCM] Could not initialize Firebase Admin SDK:', err?.message || err);
+    return null;
   }
 }
 
-// Initial configuration
-configureVapidDetails();
+// Initial configuration attempt
+getFirebaseAdmin();
 
-// Asynchronous hydration once PostgreSQL settings cache is ready
-getAppSetting('VAPID_PUBLIC_KEY').then(() => {
-  configureVapidDetails();
-}).catch(() => {});
-
-// Re-configure whenever settings are updated dynamically via API
+// Re-configure whenever FCM credentials are saved dynamically via the settings API
 registerSettingsUpdateListener((key) => {
-  if (key === 'VAPID_PUBLIC_KEY' || key === 'VAPID_PRIVATE_KEY' || key === 'VAPID_SUBJECT') {
-    configureVapidDetails();
+  if (['FCM_PROJECT_ID', 'FCM_CLIENT_EMAIL', 'FCM_PRIVATE_KEY'].includes(key)) {
+    getFirebaseAdmin();
   }
 });
 
-export function getVapidPublicKey(): string {
-  if (!vapidPublicKey) {
-    configureVapidDetails();
-  }
-  return vapidPublicKey;
-}
+// Asynchronously hydrate once PostgreSQL app_settings cache is loaded
+getAppSetting('FCM_PROJECT_ID').then(() => {
+  getFirebaseAdmin();
+}).catch(() => {});
 
-// Active SSE client connections with user ID, tenant ID and role metadata for role isolation
+// ============================================================================
+// ACTIVE SSE BROWSER CLIENTS (REAL-TIME DASHBOARD SYNC)
+// ============================================================================
+
 export interface SseClientRecord {
   res: Response;
   tenantId: number;
@@ -96,12 +108,244 @@ export function registerSseClient(
   };
   sseClients.add(client);
 
-  const cleanup = () => {
+  return () => {
     sseClients.delete(client);
   };
-
-  return cleanup;
 }
+
+// ============================================================================
+// FCM DEVICE TOKEN PERSISTENCE
+// ============================================================================
+
+export async function saveFcmToken(
+  tenantId: number,
+  userId: number,
+  userRole: string,
+  token: string,
+  userAgent: string = '',
+  deviceName: string = ''
+): Promise<boolean> {
+  try {
+    await ensureFcmTokensSchema();
+    const cleanToken = String(token || '').trim();
+    if (!cleanToken) return false;
+
+    const cleanRole = String(userRole || (tenantId === 0 ? 'SUPERADMIN' : 'ADMIN')).trim().toUpperCase();
+    const cleanTenantId = Number(tenantId) || 1;
+    const cleanUserId = Number(userId) || 0;
+
+    await pgClient.query(
+      `INSERT INTO public.fcm_tokens (
+        token, tenant_id, user_id, user_role, user_agent, device_name, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (token) DO UPDATE SET
+        tenant_id = EXCLUDED.tenant_id,
+        user_id = EXCLUDED.user_id,
+        user_role = EXCLUDED.user_role,
+        user_agent = EXCLUDED.user_agent,
+        device_name = EXCLUDED.device_name,
+        updated_at = NOW()`,
+      [cleanToken, cleanTenantId, cleanUserId, cleanRole, userAgent, deviceName]
+    );
+
+    return true;
+  } catch (err) {
+    console.error('Failed to save FCM token:', err);
+    return false;
+  }
+}
+
+export async function removeFcmToken(token: string): Promise<boolean> {
+  try {
+    await ensureFcmTokensSchema();
+    await pgClient.query('DELETE FROM public.fcm_tokens WHERE token = $1', [String(token).trim()]);
+    return true;
+  } catch (err) {
+    console.error('Failed to remove FCM token:', err);
+    return false;
+  }
+}
+
+export async function getFcmStats(): Promise<{
+  configured: boolean;
+  projectId: string;
+  totalTokens: number;
+  tokensByRole: Record<string, number>;
+}> {
+  try {
+    await ensureFcmTokensSchema();
+    const app = getFirebaseAdmin();
+    const projectId = getCachedAppSetting('FCM_PROJECT_ID', '') || process.env.FCM_PROJECT_ID || '';
+
+    const countRes = await pgClient.query<{ count: string; user_role: string }>(`
+      SELECT user_role, COUNT(*) as count 
+      FROM public.fcm_tokens 
+      GROUP BY user_role
+    `);
+
+    const tokensByRole: Record<string, number> = {};
+    let totalTokens = 0;
+    for (const row of countRes.rows) {
+      const c = parseInt(row.count, 10) || 0;
+      tokensByRole[row.user_role] = c;
+      totalTokens += c;
+    }
+
+    return {
+      configured: Boolean(app),
+      projectId,
+      totalTokens,
+      tokensByRole,
+    };
+  } catch {
+    return {
+      configured: false,
+      projectId: '',
+      totalTokens: 0,
+      tokensByRole: {},
+    };
+  }
+}
+
+// Backward-compatible stubs for legacy web-push endpoints if any client probes them
+export function getVapidPublicKey(): string {
+  return getCachedAppSetting('FCM_VAPID_KEY', '') || process.env.FCM_VAPID_KEY || '';
+}
+
+export async function savePushSubscription(
+  tenantId: number,
+  userId: number,
+  userRole: string,
+  subscription: any,
+  userAgent: string = ''
+): Promise<boolean> {
+  // If a client sends an endpoint as a token, save it as an FCM token
+  if (subscription?.endpoint) {
+    return saveFcmToken(tenantId, userId, userRole, subscription.endpoint, userAgent, 'Web Client');
+  }
+  return false;
+}
+
+export async function removePushSubscription(endpoint: string): Promise<boolean> {
+  return removeFcmToken(endpoint);
+}
+
+// ============================================================================
+// FCM MULTICAST DISPATCH ENGINE
+// ============================================================================
+
+export interface FcmDispatchResult {
+  success: boolean;
+  sentCount: number;
+  failureCount: number;
+  error?: string;
+}
+
+export async function sendFcmPushToTokens(
+  tokens: string[],
+  payload: {
+    title: string;
+    body: string;
+    deepLinkUrl?: string;
+    icon?: string;
+    tag?: string;
+    data?: Record<string, string>;
+  }
+): Promise<FcmDispatchResult> {
+  const app = getFirebaseAdmin();
+  if (!app) {
+    return {
+      success: false,
+      sentCount: 0,
+      failureCount: tokens.length,
+      error: 'Firebase Admin SDK credentials (FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY) are not configured in SuperAdmin settings.',
+    };
+  }
+
+  const uniqueTokens = Array.from(new Set(tokens.map((t) => String(t || '').trim()).filter(Boolean)));
+  if (uniqueTokens.length === 0) {
+    return {
+      success: true,
+      sentCount: 0,
+      failureCount: 0,
+    };
+  }
+
+  try {
+    const messaging = getMessaging(app);
+    const linkUrl = payload.deepLinkUrl || '/';
+
+    const stringData: Record<string, string> = {
+      url: linkUrl,
+      title: payload.title,
+      body: payload.body,
+      tag: payload.tag || `pos-${Date.now()}`,
+    };
+    if (payload.data) {
+      for (const [k, v] of Object.entries(payload.data)) {
+        stringData[k] = String(v ?? '');
+      }
+    }
+
+    const response = await messaging.sendEachForMulticast({
+      tokens: uniqueTokens,
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
+      data: stringData,
+      webpush: {
+        notification: {
+          title: payload.title,
+          body: payload.body,
+          icon: payload.icon || '/pwa-192x192.png',
+          badge: '/pwa-192x192.png',
+          tag: payload.tag || `pos-${Date.now()}`,
+          vibrate: [200, 100, 200],
+        },
+        fcmOptions: {
+          link: linkUrl,
+        },
+      },
+    });
+
+    // Cleanup expired or uninstalled tokens automatically
+    const tokensToRemove: string[] = [];
+    response.responses.forEach((resp: any, idx: number) => {
+      if (!resp.success && resp.error) {
+        const errCode = resp.error.code;
+        if (
+          errCode === 'messaging/invalid-registration-token' ||
+          errCode === 'messaging/registration-token-not-registered'
+        ) {
+          tokensToRemove.push(uniqueTokens[idx]);
+        }
+      }
+    });
+
+    if (tokensToRemove.length > 0) {
+      await pgClient.query('DELETE FROM public.fcm_tokens WHERE token = ANY($1::text[])', [tokensToRemove]).catch(() => {});
+    }
+
+    return {
+      success: response.successCount > 0 || response.failureCount === 0,
+      sentCount: response.successCount,
+      failureCount: response.failureCount,
+    };
+  } catch (err: any) {
+    console.error('[FCM] Error dispatching push notification:', err);
+    return {
+      success: false,
+      sentCount: 0,
+      failureCount: uniqueTokens.length,
+      error: err?.message || 'Failed to dispatch FCM push notification',
+    };
+  }
+}
+
+// ============================================================================
+// POS ACTION NOTIFICATION (SALES, RETURNS, EXCHANGES, LOW STOCK)
+// ============================================================================
 
 export interface PosActionNotification {
   type: 'SALE' | 'RETURN' | 'EXCHANGE' | 'STOCK' | 'PURCHASE';
@@ -132,80 +376,14 @@ export interface PosActionNotification {
 }
 
 /**
- * Saves a browser or PWA Web Push subscription scoped to tenant, user, and role.
- */
-export async function savePushSubscription(
-  tenantId: number,
-  userId: number,
-  userRole: string,
-  subscription: {
-    endpoint: string;
-    keys?: {
-      p256dh?: string;
-      auth?: string;
-    };
-  },
-  userAgent: string = ''
-): Promise<boolean> {
-  try {
-    await ensurePushSubscriptionsSchema();
-    const endpoint = String(subscription?.endpoint || '').trim();
-    const p256dh = String(subscription?.keys?.p256dh || '').trim();
-    const auth = String(subscription?.keys?.auth || '').trim();
-    const cleanRole = String(userRole || (tenantId === 0 ? 'SUPERADMIN' : 'ADMIN')).trim().toUpperCase();
-
-    if (!endpoint || !p256dh || !auth) {
-      return false;
-    }
-
-    await pgClient.query(
-      `INSERT INTO public.push_subscriptions (
-        tenant_id, user_id, user_role, endpoint, p256dh, auth, user_agent, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      ON CONFLICT (endpoint) DO UPDATE SET
-        tenant_id = EXCLUDED.tenant_id,
-        user_id = EXCLUDED.user_id,
-        user_role = EXCLUDED.user_role,
-        p256dh = EXCLUDED.p256dh,
-        auth = EXCLUDED.auth,
-        user_agent = EXCLUDED.user_agent,
-        updated_at = NOW()`,
-      [tenantId, userId, cleanRole, endpoint, p256dh, auth, userAgent]
-    );
-
-    return true;
-  } catch (err) {
-    console.error('Failed to save push subscription:', err);
-    return false;
-  }
-}
-
-/**
- * Removes a Web Push subscription by its unique endpoint URL.
- */
-export async function removePushSubscription(endpoint: string): Promise<boolean> {
-  try {
-    await ensurePushSubscriptionsSchema();
-    await pgClient.query(
-      'DELETE FROM public.push_subscriptions WHERE endpoint = $1',
-      [String(endpoint).trim()]
-    );
-    return true;
-  } catch (err) {
-    console.error('Failed to remove push subscription:', err);
-    return false;
-  }
-}
-
-/**
- * Dispatches instant real-time notifications to:
- * 1. Active Web browser sessions via Server-Sent Events (SSE) with strict role isolation
- * 2. Mobile Android/Apple installed PWAs and background web sessions via Web Push API with role filtering
- * 
- * CRITICAL ROUTING RULES:
- * - Store Owners (ADMIN / OWNER) MUST ALWAYS receive transactional sale & invoice alerts across all cashiers.
- * - Cashiers ONLY receive real-time alerts for operations they performed themselves.
- * - SuperAdmin NEVER receives store POS notifications.
+ * Broadcasts real-time POS transactional alerts:
+ * 1. Active Web dashboard sessions via Server-Sent Events (SSE)
+ * 2. Mobile and desktop devices via Firebase Cloud Messaging (FCM)
+ *
+ * Routing rules:
+ * - Store Owners (ADMIN / OWNER) ALWAYS receive all transactional sales, returns, and low stock alerts.
+ * - Cashiers only receive alerts for their own counter transactions.
+ * - SuperAdmin does not receive individual store POS counter alerts.
  */
 export async function notifyPosAction(
   tenantId: number,
@@ -220,7 +398,6 @@ export async function notifyPosAction(
   };
 
   // 1. Deliver to active browser dashboard sessions via Server-Sent Events (SSE)
-  // Store Owner (ADMIN) receives all store counter actions. Cashiers only receive their own.
   const sseMessage = `event: pos_action\ndata: ${JSON.stringify(enrichedPayload)}\n\n`;
   for (const client of sseClients) {
     if (
@@ -239,110 +416,60 @@ export async function notifyPosAction(
     }
   }
 
-  // 2. Deliver via Web Push API to installed PWAs (Android/iOS) and subscribed web browsers
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    configureVapidDetails();
-  }
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    console.warn('⚠️ Web Push cannot dispatch: VAPID keys not configured.');
-    return;
-  }
-
+  // 2. Deliver via Firebase Cloud Messaging (FCM) to all registered mobile and desktop devices
   try {
-    await ensurePushSubscriptionsSchema();
-    const subsRes = await pgClient.query<{
-      endpoint: string;
-      p256dh: string;
-      auth: string;
+    await ensureFcmTokensSchema();
+    const tokensRes = await pgClient.query<{
+      token: string;
       user_role: string;
       user_id: number;
     }>(
-      `SELECT endpoint, p256dh, auth, user_role, user_id
-       FROM public.push_subscriptions
+      `SELECT token, user_role, user_id
+       FROM public.fcm_tokens
        WHERE tenant_id = $1
          AND (UPPER(user_role) IN ('ADMIN', 'OWNER') OR UPPER(user_role) = ANY($2::text[]))
          AND tenant_id != 0`,
       [cleanTenantId, allowedRoles]
     );
 
-    if (subsRes.rows.length === 0) {
+    if (tokensRes.rows.length === 0) {
       return;
     }
 
-    const pushData = JSON.stringify({
-      title: enrichedPayload.title,
-      body: enrichedPayload.message,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      tag: `pos-${enrichedPayload.type.toLowerCase()}-${enrichedPayload.invoiceNumber || Date.now()}`,
-      data: {
-        url: enrichedPayload.deepLinkUrl,
-        type: enrichedPayload.type,
-        invoiceNumber: enrichedPayload.invoiceNumber,
-        orderId: enrichedPayload.orderId,
-        saleId: enrichedPayload.saleId,
-        returnNumber: enrichedPayload.returnNumber,
-        timestamp: enrichedPayload.timestamp,
-        targetRole: enrichedPayload.targetRole,
-        targetRoles: enrichedPayload.targetRoles,
-      },
-      actions: [
-        { action: 'open_receipt', title: 'View Receipt / Details' },
-      ],
-    });
-
-    const sendPromises = subsRes.rows.map(async (row) => {
+    const targetTokens: string[] = [];
+    for (const row of tokensRes.rows) {
       const uRole = String(row.user_role || '').toUpperCase();
-      // Store Owners (ADMIN / OWNER) MUST ALWAYS receive transactional sale & invoice alerts!
-      // Cashiers only receive Web Push notifications for their own transactions.
+      // Store Owners receive all transactional alerts; cashiers only receive their own
       if (uRole === 'CASHIER' && enrichedPayload.cashierId && Number(row.user_id) !== Number(enrichedPayload.cashierId)) {
-        return;
+        continue;
       }
+      targetTokens.push(row.token);
+    }
 
-      const pushSub: webpush.PushSubscription = {
-        endpoint: row.endpoint,
-        keys: {
-          p256dh: row.p256dh,
-          auth: row.auth,
+    if (targetTokens.length > 0) {
+      await sendFcmPushToTokens(targetTokens, {
+        title: enrichedPayload.title,
+        body: enrichedPayload.message,
+        deepLinkUrl: enrichedPayload.deepLinkUrl || '/pos',
+        icon: '/pwa-192x192.png',
+        tag: `pos-${enrichedPayload.type.toLowerCase()}-${enrichedPayload.invoiceNumber || Date.now()}`,
+        data: {
+          type: enrichedPayload.type,
+          invoiceNumber: enrichedPayload.invoiceNumber || '',
+          orderId: String(enrichedPayload.orderId || ''),
+          totalAmount: String(enrichedPayload.totalAmount || ''),
+          timestamp: enrichedPayload.timestamp,
         },
-      };
-
-      try {
-        await webpush.sendNotification(pushSub, pushData, {
-          TTL: 60 * 60 * 24, // 24 hours
-          urgency: 'high',
-        });
-      } catch (pushErr: any) {
-        const code = pushErr?.statusCode;
-        // RFC 8292: ONLY HTTP 404 (Not Found) or 410 (Gone) indicates that subscription is dead.
-        // Never delete subscription on 401/403 (server auth issues).
-        if (code === 404 || code === 410) {
-          await removePushSubscription(row.endpoint).catch(() => {});
-        } else {
-          console.warn(`Web push delivery notice for endpoint: ${pushErr?.message || pushErr}`);
-        }
-      }
-    });
-
-    await Promise.allSettled(sendPromises);
+      });
+    }
   } catch (err) {
-    console.error('Error during Web Push dispatch:', err);
-  }
-
-  // 3. Deliver instant push alert to Store Owner's Telegram (runs even when app/browser is completely closed)
-  try {
-    await dispatchPosTelegramAlert(cleanTenantId, enrichedPayload);
-  } catch (tgErr) {
-    console.warn('⚠️ Telegram dispatch notice:', tgErr);
-  }
-
-  // 4. Deliver instant email notification to Store Owner & SuperAdmin (runs via Gmail SMTP to mobile Mail app)
-  try {
-    await dispatchPosEmailAlert(cleanTenantId, enrichedPayload);
-  } catch (emailErr) {
-    console.warn('⚠️ Email alert dispatch notice:', emailErr);
+    console.error('Error during FCM POS push dispatch:', err);
   }
 }
+
+// ============================================================================
+// PLATFORM ANNOUNCEMENTS (SUPERADMIN TO STORES)
+// ============================================================================
 
 export interface PlatformAnnouncementNotification {
   id?: number;
@@ -356,10 +483,6 @@ export interface PlatformAnnouncementNotification {
   timestamp?: string;
 }
 
-/**
- * Dispatches a custom announcement from SuperAdmin to all stores (global broadcast)
- * or to a targeted store, via real-time SSE stream and background Web Push, with strict role isolation.
- */
 export async function notifyPlatformAnnouncement(
   payload: PlatformAnnouncementNotification
 ): Promise<void> {
@@ -379,21 +502,16 @@ export async function notifyPlatformAnnouncement(
     timestamp: payload.timestamp || new Date().toISOString(),
   };
 
+  // 1. Deliver to active browser sessions via SSE
   const sseMessage = `event: platform_announcement\ndata: ${JSON.stringify(eventPayload)}\n\n`;
-
-  // 1. Deliver to active browser sessions via SSE respecting strict role isolation
   for (const client of sseClients) {
     const isTenantMatch = isGlobal ? true : (client.tenantId === cleanTenantId);
     if (!isTenantMatch) continue;
 
-    // Strict role isolation:
     if (targetRole === 'SUPERADMIN' && client.role !== 'SUPERADMIN') continue;
     if (targetRole === 'ADMIN' && client.role !== 'ADMIN') continue;
     if (targetRole === 'CASHIER' && client.role !== 'CASHIER') continue;
-    if (targetRole === 'ALL') {
-      // Store-specific alerts should not bleed into superadmin
-      if (cleanTenantId !== null && client.role === 'SUPERADMIN') continue;
-    }
+    if (targetRole === 'ALL' && cleanTenantId !== null && client.role === 'SUPERADMIN') continue;
 
     try {
       client.res.write(sseMessage);
@@ -402,87 +520,113 @@ export async function notifyPlatformAnnouncement(
     }
   }
 
-  // 2. Deliver via Web Push API
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    return;
-  }
-
+  // 2. Deliver via Firebase Cloud Messaging (FCM)
   try {
-    await ensurePushSubscriptionsSchema();
-    let query: string;
-    let params: any[];
+    await ensureFcmTokensSchema();
+    let query = '';
+    let params: any[] = [];
 
     if (targetRole === 'SUPERADMIN') {
-      query = `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'SUPERADMIN'`;
+      query = `SELECT token FROM public.fcm_tokens WHERE UPPER(user_role) = 'SUPERADMIN'`;
       params = [];
     } else if (targetRole === 'ADMIN') {
       query = isGlobal
-        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'ADMIN' AND tenant_id != 0`
-        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) = 'ADMIN'`;
+        ? `SELECT token FROM public.fcm_tokens WHERE UPPER(user_role) IN ('ADMIN', 'OWNER') AND tenant_id != 0`
+        : `SELECT token FROM public.fcm_tokens WHERE tenant_id = $1 AND UPPER(user_role) IN ('ADMIN', 'OWNER')`;
       params = isGlobal ? [] : [cleanTenantId];
     } else if (targetRole === 'CASHIER') {
       query = isGlobal
-        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE UPPER(user_role) = 'CASHIER' AND tenant_id != 0`
-        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) = 'CASHIER'`;
+        ? `SELECT token FROM public.fcm_tokens WHERE UPPER(user_role) = 'CASHIER' AND tenant_id != 0`
+        : `SELECT token FROM public.fcm_tokens WHERE tenant_id = $1 AND UPPER(user_role) = 'CASHIER'`;
       params = isGlobal ? [] : [cleanTenantId];
     } else {
-      // 'ALL'
       query = isGlobal
-        ? `SELECT endpoint, p256dh, auth FROM public.push_subscriptions`
-        : `SELECT endpoint, p256dh, auth FROM public.push_subscriptions WHERE tenant_id = $1 AND UPPER(user_role) IN ('ADMIN', 'CASHIER')`;
+        ? `SELECT token FROM public.fcm_tokens`
+        : `SELECT token FROM public.fcm_tokens WHERE tenant_id = $1 AND UPPER(user_role) IN ('ADMIN', 'OWNER', 'CASHIER')`;
       params = isGlobal ? [] : [cleanTenantId];
     }
 
-    const subsRes = await pgClient.query<{
-      endpoint: string;
-      p256dh: string;
-      auth: string;
-    }>(query, params);
+    const tokensRes = await pgClient.query<{ token: string }>(query, params);
+    if (tokensRes.rows.length === 0) return;
 
-    if (subsRes.rows.length === 0) return;
-
-    const pushData = JSON.stringify({
+    const tokens = tokensRes.rows.map((r) => r.token);
+    await sendFcmPushToTokens(tokens, {
       title: payload.title,
       body: payload.message,
+      deepLinkUrl: payload.actionUrl || '/',
       icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
       tag: `platform-${payload.id || Date.now()}`,
       data: {
-        url: payload.actionUrl || '/',
         type: payload.type || 'INFO',
-        notificationId: payload.id,
-        targetRole,
-        timestamp: eventPayload.timestamp,
+        notificationId: String(payload.id || ''),
       },
-      actions: payload.actionUrl
-        ? [{ action: 'open_announcement', title: payload.actionLabel || 'View Notice' }]
-        : undefined,
     });
-
-    const sendPromises = subsRes.rows.map(async (row) => {
-      const pushSub: webpush.PushSubscription = {
-        endpoint: row.endpoint,
-        keys: {
-          p256dh: row.p256dh,
-          auth: row.auth,
-        },
-      };
-
-      try {
-        await webpush.sendNotification(pushSub, pushData, {
-          TTL: 60 * 60 * 24 * 7, // 7 days
-          urgency: payload.type === 'URGENT' ? 'high' : 'normal',
-        });
-      } catch (pushErr: any) {
-        const code = pushErr?.statusCode;
-        if (code === 404 || code === 410 || code === 401 || code === 403) {
-          await removePushSubscription(row.endpoint).catch(() => {});
-        }
-      }
-    });
-
-    await Promise.allSettled(sendPromises);
   } catch (err) {
-    console.error('Error during Platform Announcement Web Push dispatch:', err);
+    console.error('Error during FCM announcement push dispatch:', err);
   }
+}
+
+// ============================================================================
+// TEST FCM ALERT DISPATCH
+// ============================================================================
+
+export async function testFcmPush(
+  tenantId: number,
+  customTitle?: string,
+  customMessage?: string
+): Promise<{ success: boolean; message: string; sentCount: number; failureCount: number; error?: string }> {
+  const app = getFirebaseAdmin();
+  if (!app) {
+    return {
+      success: false,
+      message: 'Firebase Admin SDK is not initialized. Please configure FCM_PROJECT_ID, FCM_CLIENT_EMAIL, and FCM_PRIVATE_KEY in SuperAdmin Settings.',
+      sentCount: 0,
+      failureCount: 0,
+      error: 'CREDENTIALS_MISSING',
+    };
+  }
+
+  await ensureFcmTokensSchema();
+
+  // Query tokens: if tenantId is 0 or SuperAdmin, send to all tokens; otherwise filter by tenantId
+  let query = 'SELECT token FROM public.fcm_tokens';
+  let params: any[] = [];
+  if (tenantId && tenantId > 0) {
+    query = 'SELECT token FROM public.fcm_tokens WHERE tenant_id = $1';
+    params = [tenantId];
+  }
+
+  const tokensRes = await pgClient.query<{ token: string }>(query, params);
+  const tokens = tokensRes.rows.map((r) => r.token);
+
+  if (tokens.length === 0) {
+    return {
+      success: true,
+      message: '✓ Firebase Admin SDK is verified and active! No client devices have subscribed yet. Open the POS app on a browser/phone and tap "Enable Push Notifications" to receive live alerts.',
+      sentCount: 0,
+      failureCount: 0,
+    };
+  }
+
+  const result = await sendFcmPushToTokens(tokens, {
+    title: customTitle || '🔔 Firebase Cloud Messaging Test',
+    body: customMessage || `FCM Push Alert received successfully at ${new Date().toLocaleTimeString()}! Device notifications are fully operational.`,
+    deepLinkUrl: '/pos',
+    icon: '/pwa-192x192.png',
+    tag: `fcm-test-${Date.now()}`,
+    data: {
+      type: 'TEST_PUSH',
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  return {
+    success: result.success,
+    message: result.success
+      ? `✓ Test notification successfully dispatched to ${result.sentCount} device(s) via Firebase Cloud Messaging!`
+      : `Failed to deliver test notification: ${result.error || 'Unknown error'}`,
+    sentCount: result.sentCount,
+    failureCount: result.failureCount,
+    error: result.error,
+  };
 }

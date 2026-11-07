@@ -113,47 +113,61 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     isSecret: false,
   },
 
-  // 3. Notifications Group
+  // 3. Notifications Group (Firebase Cloud Messaging - Exclusive Push Provider)
   {
-    key: 'VAPID_PUBLIC_KEY',
-    defaultValue: '',
+    key: 'FCM_PROJECT_ID',
+    defaultValue: 'sarbaazsoft-shoe-pos',
     category: 'notifications',
-    description: 'Web Push VAPID Public Key for browser and PWA push notifications',
+    description: 'Firebase Project ID for Firebase Cloud Messaging (e.g. shoe-pos-app-12345)',
     isSecret: false,
   },
   {
-    key: 'VAPID_PRIVATE_KEY',
+    key: 'FCM_CLIENT_EMAIL',
     defaultValue: '',
     category: 'notifications',
-    description: 'Web Push VAPID Private Key for server notification signing',
+    description: 'Firebase Admin SDK Service Account Client Email',
+    isSecret: false,
+  },
+  {
+    key: 'FCM_PRIVATE_KEY',
+    defaultValue: '',
+    category: 'notifications',
+    description: 'Firebase Admin SDK Service Account Private Key (PEM format)',
     isSecret: true,
   },
   {
-    key: 'VAPID_SUBJECT',
-    defaultValue: 'mailto:support@sarbaazsoft.com',
+    key: 'FCM_API_KEY',
+    defaultValue: 'AIzaSyD2TDwK8R-J63QkihZrQXBX3ZD-opHG3ts',
     category: 'notifications',
-    description: 'Web Push contact subject URI or mailto link',
+    description: 'Firebase Web API Key for frontend client push notification initialization',
     isSecret: false,
   },
   {
-    key: 'TELEGRAM_BOT_TOKEN',
-    defaultValue: '',
+    key: 'FCM_MESSAGING_SENDER_ID',
+    defaultValue: '900875095665',
     category: 'notifications',
-    description: 'Platform Telegram Bot Token for POS alert dispatch (e.g. 7891234567:AAFl...)',
-    isSecret: true,
-  },
-  {
-    key: 'TELEGRAM_SUPERADMIN_CHAT_ID',
-    defaultValue: '',
-    category: 'notifications',
-    description: 'Telegram Chat ID or Group ID for SuperAdmin platform alerts',
+    description: 'Firebase Cloud Messaging Sender ID (project number)',
     isSecret: false,
   },
   {
-    key: 'TELEGRAM_ALERTS_ENABLED',
-    defaultValue: 'true',
+    key: 'FCM_APP_ID',
+    defaultValue: '1:900875095665:web:2050a569fe0b7eded995d0',
     category: 'notifications',
-    description: 'Global master toggle for Telegram push notification delivery',
+    description: 'Firebase Web App ID (e.g. 1:123456789:web:abcdef)',
+    isSecret: false,
+  },
+  {
+    key: 'FCM_MEASUREMENT_ID',
+    defaultValue: 'G-YNR6ETB365',
+    category: 'notifications',
+    description: 'Optional Firebase Analytics Measurement ID (e.g. G-XXXXXXX)',
+    isSecret: false,
+  },
+  {
+    key: 'FCM_VAPID_KEY',
+    defaultValue: '',
+    category: 'notifications',
+    description: 'Firebase Web Push Certificate Public Key (VAPID key) for browser getToken()',
     isSecret: false,
   },
 
@@ -235,6 +249,12 @@ export async function ensureAppSettingsSchema(): Promise<void> {
           AND value NOT ILIKE 'https://%'
       `).catch(() => {});
 
+      // Remove legacy Telegram and VAPID keys from app_settings
+      await pgClient.query(`
+        DELETE FROM public.app_settings 
+        WHERE key IN ('TELEGRAM_BOT_TOKEN', 'TELEGRAM_SUPERADMIN_CHAT_ID', 'TELEGRAM_ALERTS_ENABLED', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT')
+      `).catch(() => {});
+
       // Seed all default settings if not already present
       for (const def of APP_SETTINGS_DEFAULTS) {
         // RESEND_API_KEY and email settings must NEVER be loaded or seeded from process.env or .env
@@ -260,6 +280,15 @@ export async function ensureAppSettingsSchema(): Promise<void> {
         UPDATE public.app_settings
         SET value = 'superadmin'
         WHERE key = 'GMAIL_FROM_NAME' AND (value IS NULL OR value = '')
+      `).catch(() => {});
+
+      // Seed default FCM frontend configuration if currently empty
+      await pgClient.query(`
+        UPDATE public.app_settings SET value = 'sarbaazsoft-shoe-pos' WHERE key = 'FCM_PROJECT_ID' AND (value IS NULL OR value = '');
+        UPDATE public.app_settings SET value = 'AIzaSyD2TDwK8R-J63QkihZrQXBX3ZD-opHG3ts' WHERE key = 'FCM_API_KEY' AND (value IS NULL OR value = '');
+        UPDATE public.app_settings SET value = '900875095665' WHERE key = 'FCM_MESSAGING_SENDER_ID' AND (value IS NULL OR value = '');
+        UPDATE public.app_settings SET value = '1:900875095665:web:2050a569fe0b7eded995d0' WHERE key = 'FCM_APP_ID' AND (value IS NULL OR value = '');
+        UPDATE public.app_settings SET value = 'G-YNR6ETB365' WHERE key = 'FCM_MEASUREMENT_ID' AND (value IS NULL OR value = '');
       `).catch(() => {});
     } catch (err: any) {
       console.warn('Notice while ensuring app_settings schema:', err?.message || err);

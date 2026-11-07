@@ -9,10 +9,9 @@ import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import nodemailer from 'nodemailer';
 import { getAllAppSettings, updateAppSettings } from '../services/appSettingsService.ts';
-import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
+import { notifyPlatformAnnouncement, testFcmPush } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
 import { testEmailConfiguration, getDynamicGmailCredentials } from '../utils/email.ts';
-import { testTelegramConnection, getStoreTelegramConfig } from '../services/telegramService.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -256,22 +255,6 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     pricingMode: mode,
     pricingPolicyLocked: locked,
     pricing_policy_locked: locked,
-    telegramBotToken: s.telegram_bot_token || '',
-    telegram_bot_token: s.telegram_bot_token || '',
-    telegramChatId: s.telegram_chat_id || '',
-    telegram_chat_id: s.telegram_chat_id || '',
-    telegramAlertsEnabled: Boolean(s.telegram_alerts_enabled),
-    telegram_alerts_enabled: Boolean(s.telegram_alerts_enabled),
-    emailAlertsEnabled: s.email_alerts_enabled !== false,
-    email_alerts_enabled: s.email_alerts_enabled !== false,
-    gmailUser: s.gmail_user || '',
-    gmail_user: s.gmail_user || '',
-    gmailAppPassword: s.gmail_app_password || '',
-    gmail_app_password: s.gmail_app_password || '',
-    gmailFromName: s.gmail_from_name || '',
-    gmail_from_name: s.gmail_from_name || '',
-    activeAlertProvider: s.active_alert_provider || 'both',
-    active_alert_provider: s.active_alert_provider || 'both',
     updatedAt: s.updated_at,
   };
 }
@@ -758,33 +741,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       }
     }
 
-    // System Alert Notification Providers are exclusive to SuperAdmin (isPlatformOwner).
-    // Store owners and cashiers cannot mutate Telegram or Gmail provider credentials.
-    const finalTelegramBotToken = isPlatformOwner && (req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined)
-      ? telegramBotToken
-      : (currentRow?.telegram_bot_token || '');
-    const finalTelegramChatId = isPlatformOwner && (req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined)
-      ? telegramChatId
-      : (currentRow?.telegram_chat_id || '');
-    const finalTelegramAlertsEnabled = isPlatformOwner && (req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined)
-      ? telegramAlertsEnabled
-      : Boolean(currentRow?.telegram_alerts_enabled);
-    const finalEmailAlertsEnabled = isPlatformOwner && (req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined)
-      ? Boolean(req.body.email_alerts_enabled ?? req.body.emailAlertsEnabled)
-      : (currentRow?.email_alerts_enabled !== undefined ? Boolean(currentRow?.email_alerts_enabled) : true);
-    const finalGmailUser = isPlatformOwner && (req.body.gmail_user !== undefined || req.body.gmailUser !== undefined)
-      ? gmailUser
-      : (currentRow?.gmail_user || '');
-    const finalGmailAppPassword = isPlatformOwner && (req.body.gmail_app_password !== undefined || req.body.gmailAppPassword !== undefined)
-      ? gmailAppPassword
-      : (currentRow?.gmail_app_password || '');
-    const finalGmailFromName = isPlatformOwner && (req.body.gmail_from_name !== undefined || req.body.gmailFromName !== undefined)
-      ? gmailFromName
-      : (currentRow?.gmail_from_name || '');
-    const finalActiveAlertProvider = isPlatformOwner && activeAlertProvider
-      ? activeAlertProvider
-      : (currentRow?.active_alert_provider || 'both');
-
     let updateRes;
     if (currentRow) {
       updateRes = await pgClient.query(
@@ -793,15 +749,11 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
            strn = $4, tax_id = $5, website = $6, logo = $7,
            currency_name = $8, currency = $9, currency_symbol = $10,
            invoice_footer = $11, low_stock_limit = $12,
-           pricing_mode = $13, business_type = $14, pricing_policy_locked = $19,
-           min_selling_quantity = $20, allow_half_carton = $21,
-           show_receipt_logo = $15, receipt_logo = $16,
-           telegram_bot_token = $22, telegram_chat_id = $23, telegram_alerts_enabled = $24,
-           email_alerts_enabled = $25,
-           gmail_user = $26, gmail_app_password = $27, gmail_from_name = $28,
-           active_alert_provider = $29,
+           pricing_mode = $13, business_type = $14, pricing_policy_locked = $15,
+           min_selling_quantity = $16, allow_half_carton = $17,
+           show_receipt_logo = $18, receipt_logo = $19,
            updated_at = NOW()
-         WHERE id = $17 AND tenant_id = $18
+         WHERE id = $20 AND tenant_id = $21
          RETURNING *`,
         [
           effectiveCompanyPhone,
@@ -818,21 +770,13 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           lowStockLimit,
           finalPricingMode,
           finalBusinessType,
+          isLocked,
+          finalMinSellingQuantity,
+          finalAllowHalfCarton,
           showReceiptLogo,
           receiptLogo,
           currentRow.id,
           tenantId,
-          isLocked,
-          finalMinSellingQuantity,
-          finalAllowHalfCarton,
-          finalTelegramBotToken,
-          finalTelegramChatId,
-          finalTelegramAlertsEnabled,
-          finalEmailAlertsEnabled,
-          finalGmailUser,
-          finalGmailAppPassword,
-          finalGmailFromName,
-          finalActiveAlertProvider,
         ]
       );
     } else {
@@ -840,10 +784,8 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
         `INSERT INTO company_settings (
            tenant_id, phone, email, address, strn, tax_id, website, logo,
            currency_name, currency, currency_symbol,
-           invoice_footer, low_stock_limit, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked, show_receipt_logo, receipt_logo,
-           telegram_bot_token, telegram_chat_id, telegram_alerts_enabled, email_alerts_enabled,
-           gmail_user, gmail_app_password, gmail_from_name, active_alert_provider
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+           invoice_footer, low_stock_limit, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked, show_receipt_logo, receipt_logo
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          RETURNING *`,
         [
           tenantId,
@@ -866,14 +808,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           isLocked,
           showReceiptLogo,
           receiptLogo,
-          finalTelegramBotToken,
-          finalTelegramChatId,
-          finalTelegramAlertsEnabled,
-          finalEmailAlertsEnabled,
-          finalGmailUser,
-          finalGmailAppPassword,
-          finalGmailFromName,
-          finalActiveAlertProvider,
         ]
       );
     }
@@ -889,30 +823,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     // For wholesale stores that globally disallow half cartons, set allow_half_carton = false across the entire product catalog
     if (finalBusinessType === 'WHOLESALE' && (!finalAllowHalfCarton || finalMinSellingQuantity > 0.5)) {
       await pgClient.query('UPDATE products SET allow_half_carton = false WHERE COALESCE(tenant_id, 1) = $1', [tenantId]).catch(() => {});
-    }
-
-    // Note: Store notification settings are stored strictly in company_settings.
-    // Platform transactional email credentials (app_settings.GMAIL_APP_PASSWORD) remain completely separate and decoupled.
-    if (isPlatformOwner) {
-      const appUpdates: Record<string, any> = {};
-      if (req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined) {
-        appUpdates.TELEGRAM_BOT_TOKEN = finalTelegramBotToken;
-      }
-      if (req.body.telegram_chat_id !== undefined || req.body.telegramChatId !== undefined) {
-        appUpdates.TELEGRAM_SUPERADMIN_CHAT_ID = finalTelegramChatId;
-      }
-      if (req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined) {
-        appUpdates.TELEGRAM_ALERTS_ENABLED = String(finalTelegramAlertsEnabled);
-      }
-      if (req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined) {
-        appUpdates.EMAIL_POS_ALERTS_ENABLED = String(finalEmailAlertsEnabled);
-      }
-      if (req.body.active_alert_provider !== undefined || req.body.activeAlertProvider !== undefined) {
-        appUpdates.ACTIVE_ALERT_PROVIDER = finalActiveAlertProvider;
-      }
-      if (Object.keys(appUpdates).length > 0) {
-        await updateAppSettings(appUpdates, 'SUPERADMIN', { allowInternal: true }).catch(() => {});
-      }
     }
 
     const populatedTenantRow = await ensureTenantSubscriptionPopulated(tenantId);
@@ -1006,155 +916,33 @@ router.post('/alert-providers', requireAuth, requireSuperAdmin, async (req: Auth
   }
 });
 
-// POST /api/settings/test-telegram - SuperAdmin verification endpoint to test Telegram bot notifications
-router.post('/test-telegram', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/settings/test-fcm - SuperAdmin verification endpoint to test Firebase Cloud Messaging
+router.post('/test-fcm', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    await ensureTelegramSettingsSchema();
-    const tenantId = await resolvePublicOrAuthTenantId(req);
-    const customToken = String(req.body?.botToken || req.body?.bot_token || req.body?.telegramBotToken || '').trim();
-    const customChatId = String(req.body?.chatId || req.body?.chat_id || req.body?.telegramChatId || '').trim();
-
-    let botToken = customToken;
-    let chatId = customChatId;
-    let storeName = 'SarbaazSoft Shoe Store';
-
-    if (!chatId || !botToken) {
-      const config = await getStoreTelegramConfig(tenantId);
-      if (!botToken) botToken = config.botToken;
-      if (!chatId) chatId = config.chatId;
-      if (config.storeName) storeName = config.storeName;
-    }
-
-    if (!chatId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Telegram Chat ID is required. In Telegram, message @userinfobot to find your Chat ID.',
-      });
-    }
-
-    if (!botToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Telegram Bot Token is required. Create a bot using @BotFather in Telegram and paste the token.',
-      });
-    }
-
-    const testRes = await testTelegramConnection(botToken, chatId, storeName);
-    return res.json({
-      success: testRes.ok,
-      message: testRes.message,
-      error: testRes.error,
-    });
+    const result = await testFcmPush(0, req.body?.title, req.body?.message);
+    res.json(result);
   } catch (err: any) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: 'Failed to dispatch test Telegram alert: ' + (err?.message || 'Unknown error'),
+      message: 'Failed to dispatch test FCM alert: ' + (err?.message || 'Unknown error'),
+      error: err?.message,
     });
   }
 });
 
-// POST /api/settings/test-gmail - SuperAdmin verification endpoint to test Gmail SMTP connection & alert delivery
-router.post('/test-gmail', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const tenantId = await resolvePublicOrAuthTenantId(req);
-    const customUser = String(req.body?.gmailUser || req.body?.gmail_user || '').trim();
-    const customPass = String(req.body?.gmailAppPassword || req.body?.gmail_app_password || '').trim();
-    const customFromName = String(req.body?.fromName || req.body?.from_name || '').trim();
-    const recipientEmail = String(req.body?.recipientEmail || req.body?.recipient_email || req.body?.email || '').trim();
+// Legacy endpoint redirects for backward-compatibility
+router.post('/test-telegram', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  res.status(410).json({
+    success: false,
+    message: 'Telegram push notifications have been retired. Firebase Cloud Messaging (FCM) is now the exclusive push provider.',
+  });
+});
 
-    let user = customUser;
-    let pass = customPass;
-    let fromName = customFromName;
-
-    if (!user || !pass) {
-      // Check store settings from database
-      const csRes = await pgClient.query<{ gmail_user: string; gmail_app_password: string; gmail_from_name: string; email: string; company_name: string }>(
-        'SELECT gmail_user, gmail_app_password, gmail_from_name, email, company_name FROM company_settings WHERE tenant_id = $1 LIMIT 1',
-        [tenantId]
-      );
-      const cs = csRes.rows[0];
-      if (!user) user = (cs?.gmail_user || cs?.email || '').trim();
-      if (!pass) pass = (cs?.gmail_app_password || '').trim();
-      if (!fromName) fromName = (cs?.gmail_from_name || cs?.company_name || 'SarbaazSoft POS Alerts').trim();
-    }
-
-    // Fallback to platform settings if still empty
-    if (!user || !pass) {
-      const dynamic = await getDynamicGmailCredentials();
-      if (!user) user = dynamic.user;
-      if (!pass) pass = dynamic.pass;
-      if (!fromName) fromName = dynamic.fromName;
-    }
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        delivered: false,
-        message: 'Gmail email address is required (e.g. yourstore@gmail.com).',
-      });
-    }
-
-    if (!pass) {
-      return res.status(400).json({
-        success: false,
-        delivered: false,
-        message: 'Gmail 16-character App Password is required. Generate one at Google Account -> Security -> 2-Step Verification -> App Passwords.',
-      });
-    }
-
-    const targetRecipient = recipientEmail || user;
-
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user,
-        pass,
-      },
-    });
-
-    await transporter.verify();
-
-    const mailFrom = fromName ? `"${fromName}" <${user}>` : user;
-    const testInfo = await transporter.sendMail({
-      from: mailFrom,
-      to: targetRecipient,
-      subject: `[Test Alert] SarbaazSoft POS Alert via Gmail (${new Date().toLocaleTimeString()})`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 550px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          <div style="background: #4F46E5; color: white; padding: 20px; text-align: center;">
-            <h2 style="margin: 0; font-size: 18px;">✓ Gmail System Alert Connected!</h2>
-          </div>
-          <div style="padding: 24px; color: #1e293b; font-size: 14px; line-height: 1.6;">
-            <p>Congratulations! Your Gmail provider is successfully connected to <strong>SarbaazSoft Shoe POS</strong>.</p>
-            <p>You will receive instant sales, returns, customer exchanges, and inventory alerts to this inbox.</p>
-            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: monospace; font-size: 12px; margin-top: 16px;">
-              <strong>Connected Account:</strong> ${user}<br/>
-              <strong>Sender Name:</strong> ${fromName || 'SarbaazSoft POS Alerts'}<br/>
-              <strong>Delivered To:</strong> ${targetRecipient}<br/>
-              <strong>Timestamp:</strong> ${new Date().toISOString()}
-            </div>
-          </div>
-        </div>
-      `,
-      text: `SarbaazSoft POS Alert Test: Gmail provider is successfully connected for ${user}.`,
-    });
-
-    return res.json({
-      success: true,
-      delivered: true,
-      message: `✓ Test alert delivered successfully to ${targetRecipient} (ID: ${testInfo.messageId || 'ok'}). Check your Gmail inbox!`,
-    });
-  } catch (err: any) {
-    console.warn('[test-gmail] Error sending test email:', err);
-    return res.status(400).json({
-      success: false,
-      delivered: false,
-      message: 'Gmail SMTP authentication failed: ' + (err?.message || 'Check your 16-character App Password and email.'),
-      error: err?.message,
-    });
-  }
+router.post('/test-gmail', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  res.status(410).json({
+    success: false,
+    message: 'Gmail web push alerts have been retired. Firebase Cloud Messaging (FCM) is now the exclusive push provider.',
+  });
 });
 
 

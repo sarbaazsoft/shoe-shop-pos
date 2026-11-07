@@ -335,10 +335,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   ? 'bg-purple-600 text-white shadow-purple-600/30'
                   : 'bg-white dark:bg-[#120726] border border-slate-200/90 dark:border-purple-800/40 text-slate-700 dark:text-purple-200 hover:text-purple-600 dark:hover:text-white'
               }`}
-              title="Switch Notification Server between Telegram, Gmail, or Both (SuperAdmin)"
+              title="Configure Firebase Cloud Messaging (FCM) credentials and test push alerts"
             >
-              <Sliders className="w-3.5 h-3.5 text-purple-500" />
-              <span>{showProviderSettings ? 'Close Server Settings' : 'Switch Notification Server (Telegram / Gmail)'}</span>
+              <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>{showProviderSettings ? 'Close FCM Settings' : 'Firebase FCM Push Settings'}</span>
             </button>
           )}
 

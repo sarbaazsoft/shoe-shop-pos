@@ -234,6 +234,27 @@ export interface CompanySettings {
   updated_at?: string;
 }
 
+export interface FcmPublicConfig {
+  configured: boolean;
+  projectId?: string;
+  apiKey?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+  vapidKey?: string;
+}
+
+export interface FcmTokenRecord {
+  token: string;
+  tenantId: number;
+  userId: number;
+  userRole: string;
+  userAgent?: string;
+  deviceName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Brand {
   id?: number;
   name: string;
