@@ -20,7 +20,6 @@ import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
-import { initNativeNotificationPrompt } from '../../services/pushNotificationClient';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -152,12 +151,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (isSuperAdmin) {
-      const cleanup = initNativeNotificationPrompt('SUPERADMIN');
-      return cleanup;
-    }
-  }, [isSuperAdmin]);
 
   // Control panel state
   const [loading, setLoading] = useState(false);

@@ -28,9 +28,7 @@ import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
 import { NotificationsView } from './components/notifications/NotificationsView.tsx';
 import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
-import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
-
 type SaasRouteMode =
   | 'INSTALLER'
   | 'LANDING'
@@ -549,13 +547,6 @@ export default function App() {
     initializeApp();
   }, []);
 
-  // Directly trigger platform's official native notification permission dialog (no custom HTML banners/popups)
-  useEffect(() => {
-    if (currentUser?.role) {
-      const cleanup = initNativeNotificationPrompt(currentUser.role);
-      return cleanup;
-    }
-  }, [currentUser?.role]);
 
   // PWA launch URLs use /?tenantId=<tenant id>. Resolve the id against the
   // public tenant directory before presenting a tenant-scoped sign-in.
