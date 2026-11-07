@@ -3604,40 +3604,66 @@ setFormErrors(errors);
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="sw-kill-switch-checkbox" className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer flex-1 select-none">
                     Service Worker Kill Switch (SW_KILL_SWITCH)
                   </label>
-                  <select
-                    value={String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase()}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, SW_KILL_SWITCH: e.target.value }))}
-                    className="h-8 px-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-purple-700 dark:text-purple-300"
-                  >
-                    <option value="false">false (Normal PWA Offline Cache)</option>
-                    <option value="true">true (Emergency Cache Clear &amp; Unregister)</option>
-                  </select>
+                  <label className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
+                    <input
+                      id="sw-kill-switch-checkbox"
+                      type="checkbox"
+                      checked={String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true'}
+                      onChange={(e) =>
+                        setAppSettingsForm((prev) => ({
+                          ...prev,
+                          SW_KILL_SWITCH: e.target.checked ? 'true' : 'false',
+                        }))
+                      }
+                      className="w-4.5 h-4.5 rounded text-purple-600 dark:text-purple-500 accent-purple-600 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-purple-500/20 cursor-pointer transition"
+                    />
+                    <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-md ${
+                      String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true'
+                        ? 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-300/60 dark:border-rose-800/60'
+                        : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/60 dark:border-slate-700/60'
+                    }`}>
+                      {String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true' ? 'Enabled (true)' : 'Disabled (false)'}
+                    </span>
+                  </label>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   When enabled (<code className="font-mono font-bold text-rose-500">true</code>), forces all browser client service workers to unregister and purge browser storage.
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="disable-hmr-checkbox" className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer flex-1 select-none">
                     Disable HMR Notice (DISABLE_HMR)
                   </label>
-                  <select
-                    value={String(appSettingsForm.DISABLE_HMR || 'false').toLowerCase()}
-                    onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, DISABLE_HMR: e.target.value }))}
-                    className="h-8 px-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-purple-700 dark:text-purple-300"
-                  >
-                    <option value="false">false (HMR Active)</option>
-                    <option value="true">true (Disabled in Sandboxes)</option>
-                  </select>
+                  <label className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
+                    <input
+                      id="disable-hmr-checkbox"
+                      type="checkbox"
+                      checked={String(appSettingsForm.DISABLE_HMR || 'false').toLowerCase() === 'true'}
+                      onChange={(e) =>
+                        setAppSettingsForm((prev) => ({
+                          ...prev,
+                          DISABLE_HMR: e.target.checked ? 'true' : 'false',
+                        }))
+                      }
+                      className="w-4.5 h-4.5 rounded text-purple-600 dark:text-purple-500 accent-purple-600 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-purple-500/20 cursor-pointer transition"
+                    />
+                    <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-md ${
+                      String(appSettingsForm.DISABLE_HMR || 'false').toLowerCase() === 'true'
+                        ? 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800/60'
+                        : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/60 dark:border-slate-700/60'
+                    }`}>
+                      {String(appSettingsForm.DISABLE_HMR || 'false').toLowerCase() === 'true' ? 'Enabled (true)' : 'Disabled (false)'}
+                    </span>
+                  </label>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   Suppresses benign WebSocket connection notices inside sandboxed iframe preview environments.
                 </p>
               </div>
