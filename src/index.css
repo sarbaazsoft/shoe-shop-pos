@@ -27,6 +27,7 @@
   --font-montserrat: 'Montserrat', sans-serif;
   --font-courgette: 'Courgette', cursive, sans-serif;
   --font-courgate: 'Courgette', cursive, sans-serif;
+  --font-roboto: 'Roboto', system-ui, -apple-system, sans-serif;
 }
 
 @theme {
@@ -36,6 +37,7 @@
   --font-montserrat: 'Montserrat', sans-serif;
   --font-courgette: 'Courgette', cursive, sans-serif;
   --font-courgate: 'Courgette', cursive, sans-serif;
+  --font-roboto: 'Roboto', system-ui, -apple-system, sans-serif;
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-light: var(--primary-light);
@@ -97,6 +99,11 @@ nav button.font-courgette *,
   border: 1px solid rgba(192, 132, 252, 0.55);
   box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);
   color: #e9d5ff;
+}
+
+.font-roboto,
+.font-roboto * {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
 }
 
 

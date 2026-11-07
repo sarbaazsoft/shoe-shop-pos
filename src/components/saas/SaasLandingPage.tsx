@@ -6,6 +6,8 @@ import type { TenantInfo } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
 import { useTheme } from '../../context/ThemeContext';
 import { Navbar } from './Navbar';
+import { LuxuryBadge } from '../common/Badge';
+import type { LuxuryBadgeTone } from '../../utils/badgeStyles';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Autoplay, Pagination } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
@@ -260,6 +262,57 @@ const StoreSliderCard: React.FC<{
   index: number;
   onSelect?: (tenant: TenantInfo) => void;
 }> = ({ tenant, index, onSelect }) => {
+  // Resolve specific business type (e.g., B2C, B2B, or Wholesale & Retail)
+  const rawType = String(tenant.businessType || '').toUpperCase().trim();
+  const nameLower = (tenant.name || '').toLowerCase();
+
+  let businessTypeLabel = 'B2C Retail';
+  let businessTone: LuxuryBadgeTone = 'emerald';
+
+  if (
+    rawType === 'WHOLESALE' ||
+    nameLower.includes('wholesale') ||
+    nameLower.includes('distributor') ||
+    nameLower.includes('bulk')
+  ) {
+    businessTypeLabel = 'B2B Wholesale';
+    businessTone = 'indigo';
+  } else if (
+    rawType === 'HYBRID' ||
+    (nameLower.includes('wholesale') && nameLower.includes('retail'))
+  ) {
+    businessTypeLabel = 'Wholesale & Retail';
+    businessTone = 'purple';
+  } else if (
+    rawType === 'RETAIL' ||
+    nameLower.includes('retail') ||
+    nameLower.includes('shoes') ||
+    nameLower.includes('store') ||
+    nameLower.includes('footwear')
+  ) {
+    businessTypeLabel = 'B2C Retail';
+    businessTone = 'emerald';
+  } else if (index % 3 === 1) {
+    businessTypeLabel = 'B2B Wholesale';
+    businessTone = 'indigo';
+  } else if (index % 3 === 2) {
+    businessTypeLabel = 'Wholesale & Retail';
+    businessTone = 'purple';
+  }
+
+  // Resolve pricing policy (Fixed Price vs Negotiable Price)
+  const rawPolicy = String(tenant.pricingMode || '').toUpperCase().trim();
+  let pricingPolicyLabel = 'Fixed Price';
+  let pricingTone: LuxuryBadgeTone = 'purple';
+
+  if (rawPolicy === 'NEGOTIABLE' || (!rawPolicy && nameLower.includes('bargain'))) {
+    pricingPolicyLabel = 'Negotiable Price';
+    pricingTone = 'amber';
+  } else {
+    pricingPolicyLabel = 'Fixed Price';
+    pricingTone = 'purple';
+  }
+
   return (
     <div
       role="button"
@@ -272,7 +325,7 @@ const StoreSliderCard: React.FC<{
         }
       }}
       aria-label={`${tenant.name} store — click to sign in`}
-      className="group relative flex flex-col items-center justify-between rounded-2xl border border-indigo-400/25 lt:border-indigo-200/80 bg-gradient-to-b from-[#12154A]/80 lt:from-white to-[#0A0C2E]/90 lt:to-[#F8FAFF] p-4 sm:p-5 text-center shadow-[0_12px_28px_-12px_rgba(91,75,255,0.4)] lt:shadow-sm hover:border-purple-400/60 hover:shadow-purple-500/25 hover:scale-[1.02] cursor-pointer transition-all duration-200 select-none w-full h-[175px] sm:h-[185px]"
+      className="group relative flex flex-col items-center justify-between rounded-2xl border border-indigo-400/25 lt:border-indigo-200/80 bg-gradient-to-b from-[#12154A]/80 lt:from-white to-[#0A0C2E]/90 lt:to-[#F8FAFF] p-4 sm:p-5 text-center shadow-[0_12px_28px_-12px_rgba(91,75,255,0.4)] lt:shadow-sm hover:border-purple-400/80 lt:hover:border-purple-400/80 hover:shadow-2xl hover:shadow-purple-600/30 dark:hover:shadow-indigo-500/35 lt:hover:shadow-[0_22px_45px_-12px_rgba(91,75,255,0.28)] hover:scale-[1.045] hover:-translate-y-1 active:scale-[0.985] active:translate-y-0 cursor-pointer transition-all duration-300 ease-out transform-gpu will-change-transform select-none w-full min-h-[220px] sm:min-h-[235px] h-full"
     >
       {/* 1. Store Logo OR Store Name First and Second Letter as Fallback */}
       <StoreLogoBadge tenant={tenant} index={index} />
@@ -281,17 +334,30 @@ const StoreSliderCard: React.FC<{
       <div className="w-3/4 my-2 border-t border-white/10 lt:border-slate-200" aria-hidden="true" />
 
       {/* 2. Store Name Below Logo (plain div, no anchor or h-tag) */}
-      <div className="w-full flex-1 flex flex-col items-center justify-center min-w-0 px-2">
+      <div className="w-full flex-1 flex flex-col items-center justify-center min-w-0 px-1">
         <div
           className="w-full text-sm sm:text-base font-bold text-white lt:text-slate-900 truncate group-hover:text-purple-300 lt:group-hover:text-purple-600 transition-colors"
           title={tenant.name}
         >
           {tenant.name}
         </div>
-        <div className="mt-1 flex items-center justify-center gap-1.5 text-xs font-medium">
-          <div className="font-courgette flex items-center gap-1.5 text-emerald-400 lt:text-emerald-600" style={{ fontFamily: "'Courgette', cursive, sans-serif" }}>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold">Registered Store</span>
+
+        {/* 3. Business Type & Pricing Policy Badges */}
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 w-full">
+          <LuxuryBadge tone={businessTone} size="xs" font="roboto">
+            {businessTypeLabel}
+          </LuxuryBadge>
+
+          <LuxuryBadge tone={pricingTone} size="xs" font="roboto">
+            {pricingPolicyLabel}
+          </LuxuryBadge>
+        </div>
+
+        {/* 4. Registered Store Status */}
+        <div className="mt-2 flex items-center justify-center gap-1 text-[11px] font-medium">
+          <div className="font-courgette flex items-center gap-1 text-emerald-400 lt:text-emerald-600" style={{ fontFamily: "'Courgette', cursive, sans-serif" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold text-[10px]">Registered Store</span>
           </div>
         </div>
       </div>
@@ -899,7 +965,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                   1024: { slidesPerView: 4, spaceBetween: 20 },
                   1280: { slidesPerView: 5, spaceBetween: 22 },
                 }}
-                className="w-full !overflow-hidden"
+                className="w-full !overflow-hidden py-3"
                 aria-label="Retail stores currently registered in SarbaazSoft POS"
               >
                 {storesForSlider.map((tenant, index) => (

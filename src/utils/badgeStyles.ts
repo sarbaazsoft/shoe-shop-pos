@@ -10,12 +10,13 @@ export interface LuxuryBadgeOptions {
   glow?: boolean;
   className?: string;
   pill?: boolean;
+  font?: 'courgette' | 'roboto' | 'sans';
 }
 
 /**
  * Returns Tailwind class names for the 'Luxury' badge variant.
  * Features:
- * - Courgette cursive font styling
+ * - Courgette cursive or Roboto clean font styling
  * - Subtle gradient border matching POS premium branding
  * - Semi-translucent gradient background
  * - Ambient luxury glow
@@ -26,6 +27,7 @@ export function getLuxuryBadgeClass(options: LuxuryBadgeOptions = {}): string {
     size = 'sm',
     glow = true,
     pill = true,
+    font = 'courgette',
     className = '',
   } = options;
 
@@ -94,8 +96,15 @@ export function getLuxuryBadgeClass(options: LuxuryBadgeOptions = {}): string {
     ].join(' '),
   };
 
+  const fontClass =
+    font === 'roboto'
+      ? 'font-roboto tracking-tight'
+      : font === 'sans'
+      ? 'font-sans'
+      : 'font-courgette';
+
   const baseClasses = [
-    'font-courgette',
+    fontClass,
     'inline-flex',
     'items-center',
     pill ? 'rounded-full' : 'rounded-xl',
@@ -113,12 +122,22 @@ export function getLuxuryBadgeClass(options: LuxuryBadgeOptions = {}): string {
 }
 
 /**
- * Returns inline styling ensuring the Courgette cursive font is guaranteed
+ * Returns inline styling ensuring the specified font (Courgette or Roboto) is guaranteed
  * even before external font classes finish cascading.
  */
-export function getLuxuryBadgeStyle(customStyle?: React.CSSProperties): React.CSSProperties {
+export function getLuxuryBadgeStyle(
+  customStyle?: React.CSSProperties,
+  font: 'courgette' | 'roboto' | 'sans' = 'courgette'
+): React.CSSProperties {
+  const defaultFontFamily =
+    font === 'roboto'
+      ? "'Roboto', system-ui, -apple-system, sans-serif"
+      : font === 'sans'
+      ? "'Inter', system-ui, -apple-system, sans-serif"
+      : "'Courgette', cursive, sans-serif";
+
   return {
-    fontFamily: "'Courgette', cursive, sans-serif",
+    fontFamily: defaultFontFamily,
     ...customStyle,
   };
 }

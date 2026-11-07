@@ -17,10 +17,11 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   pulseColor?: string;
   glow?: boolean;
   pill?: boolean;
+  font?: 'courgette' | 'roboto' | 'sans';
 }
 
 /**
- * Universal Badge component supporting the 'Luxury' variant with Courgette
+ * Universal Badge component supporting the 'Luxury' variant with Courgette or Roboto
  * font styling and subtle gradient border.
  */
 export const Badge: React.FC<BadgeProps> = ({
@@ -32,14 +33,15 @@ export const Badge: React.FC<BadgeProps> = ({
   pulseColor,
   glow = true,
   pill = true,
+  font = 'courgette',
   className = '',
   style,
   children,
   ...props
 }) => {
   if (variant === 'luxury') {
-    const luxuryClass = getLuxuryBadgeClass({ tone, size, glow, pill, className });
-    const luxuryStyle = getLuxuryBadgeStyle(style);
+    const luxuryClass = getLuxuryBadgeClass({ tone, size, glow, pill, font, className });
+    const luxuryStyle = getLuxuryBadgeStyle(style, font);
 
     const defaultPulseColor =
       pulseColor ||
