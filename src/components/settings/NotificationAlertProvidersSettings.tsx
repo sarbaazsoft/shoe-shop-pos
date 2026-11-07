@@ -118,6 +118,10 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
 
   // Handle master mode selection (both, telegram, gmail, none)
   const handleSelectMode = (mode: AlertProviderMode) => {
+    if (mode === 'telegram') setActiveTab('telegram');
+    else if (mode === 'gmail') setActiveTab('gmail');
+    else if (mode === 'both') setActiveTab('both');
+
     updateData((prev: any) => {
       let nextTelegram = prev.telegram_alerts_enabled;
       let nextEmail = prev.email_alerts_enabled;
@@ -288,28 +292,41 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
       </div>
 
       <div className="px-5 sm:px-6 space-y-5 pb-5">
-        {/* 1. PROVIDER TOGGLE / MODE SELECTOR */}
-        <div className="space-y-2">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-            Select Active Alert Delivery Channel
-          </label>
+        {/* 1. NOTIFICATION SERVER SWITCHER (TELEGRAM VS GMAIL) */}
+        <div className="space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Choose Active Notification Server (Telegram vs Gmail)</span>
+            </label>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              Select which server delivers real-time counter alerts (sales, returns, exchanges)
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {/* Mode: Both */}
             <button
               type="button"
               onClick={() => handleSelectMode('both')}
-              className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
+              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
                 currentMode === 'both'
-                  ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-500 ring-2 ring-purple-500/20 text-purple-950 dark:text-purple-100 shadow-sm'
+                  ? 'bg-purple-50/90 dark:bg-purple-950/50 border-purple-500 ring-2 ring-purple-500/25 text-purple-950 dark:text-purple-100 shadow-sm'
                   : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-xs flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  Both Providers
+                  Both Active
                 </span>
-                <span className={`w-2 h-2 rounded-full ${currentMode === 'both' ? 'bg-purple-600' : 'bg-transparent'}`} />
+                {currentMode === 'both' ? (
+                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-purple-600 text-white">
+                    ACTIVE
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                )}
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
                 Simultaneous Telegram push + Gmail receipts.
@@ -320,21 +337,27 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             <button
               type="button"
               onClick={() => handleSelectMode('telegram')}
-              className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
+              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
                 currentMode === 'telegram'
-                  ? 'bg-sky-50/80 dark:bg-sky-950/40 border-sky-500 ring-2 ring-sky-500/20 text-sky-950 dark:text-sky-100 shadow-sm'
+                  ? 'bg-sky-50/90 dark:bg-sky-950/50 border-sky-500 ring-2 ring-sky-500/25 text-sky-950 dark:text-sky-100 shadow-sm'
                   : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-xs flex items-center gap-1.5">
                   <Send className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 -rotate-12" />
-                  Telegram Only
+                  Telegram Server
                 </span>
-                <span className={`w-2 h-2 rounded-full ${currentMode === 'telegram' ? 'bg-sky-600' : 'bg-transparent'}`} />
+                {currentMode === 'telegram' ? (
+                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-sky-600 text-white">
+                    ACTIVE
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                )}
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                Instant lockscreen sound &amp; vibration alert.
+                Instant phone sound &amp; lockscreen vibration.
               </p>
             </button>
 
@@ -342,21 +365,27 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             <button
               type="button"
               onClick={() => handleSelectMode('gmail')}
-              className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
+              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
                 currentMode === 'gmail'
-                  ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-500 ring-2 ring-rose-500/20 text-rose-950 dark:text-rose-100 shadow-sm'
+                  ? 'bg-rose-50/90 dark:bg-rose-950/50 border-rose-500 ring-2 ring-rose-500/25 text-rose-950 dark:text-rose-100 shadow-sm'
                   : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-xs flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                  Gmail Only
+                  Gmail Server
                 </span>
-                <span className={`w-2 h-2 rounded-full ${currentMode === 'gmail' ? 'bg-rose-600' : 'bg-transparent'}`} />
+                {currentMode === 'gmail' ? (
+                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-rose-600 text-white">
+                    ACTIVE
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                )}
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                HTML receipt notifications to your inbox.
+                HTML receipt alerts via dedicated notification SMTP.
               </p>
             </button>
 
@@ -364,9 +393,9 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             <button
               type="button"
               onClick={() => handleSelectMode('none')}
-              className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
+              className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer relative ${
                 currentMode === 'none'
-                  ? 'bg-slate-200/80 dark:bg-slate-800 border-slate-400 ring-2 ring-slate-400/20 text-slate-900 dark:text-white shadow-sm'
+                  ? 'bg-slate-200/90 dark:bg-slate-800 border-slate-400 ring-2 ring-slate-400/20 text-slate-900 dark:text-white shadow-sm'
                   : 'bg-slate-50/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
@@ -375,21 +404,27 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                   <Radio className="w-3.5 h-3.5 text-slate-400" />
                   Disable All
                 </span>
-                <span className={`w-2 h-2 rounded-full ${currentMode === 'none' ? 'bg-slate-600' : 'bg-transparent'}`} />
+                {currentMode === 'none' ? (
+                  <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-slate-600 text-white">
+                    PAUSED
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                )}
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                Temporarily pause all external notifications.
+                Temporarily pause all external notification alerts.
               </p>
             </button>
           </div>
         </div>
 
-        {/* 2. SUB-TABS TO CONFIGURE TELEGRAM & GMAIL */}
+        {/* 2. SUB-TABS TO CONFIGURE TELEGRAM & GMAIL CREDENTIALS */}
         <div className="border-b border-slate-200 dark:border-slate-800 flex items-center space-x-2">
           <button
             type="button"
             onClick={() => setActiveTab('both')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'both'
                 ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
@@ -397,12 +432,17 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
           >
             <Sliders className="w-3.5 h-3.5" />
             <span>Overview &amp; Both Providers</span>
+            {currentMode === 'both' && (
+              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold">
+                ACTIVE
+              </span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('telegram')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'telegram'
                 ? 'border-sky-500 text-sky-600 dark:text-sky-400'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
@@ -410,7 +450,12 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
           >
             <Send className="w-3.5 h-3.5 -rotate-12" />
             <span>Telegram Bot API</span>
-            {data.telegram_alerts_enabled && (
+            {currentMode === 'telegram' && (
+              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold">
+                ACTIVE
+              </span>
+            )}
+            {data.telegram_alerts_enabled && currentMode !== 'telegram' && (
               <span className="w-2 h-2 rounded-full bg-sky-500" />
             )}
           </button>
@@ -418,15 +463,20 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
           <button
             type="button"
             onClick={() => setActiveTab('gmail')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'gmail'
                 ? 'border-rose-500 text-rose-600 dark:text-rose-400'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
             }`}
           >
             <Mail className="w-3.5 h-3.5" />
-            <span>Gmail SMTP Configuration</span>
-            {data.email_alerts_enabled && (
+            <span>Gmail SMTP Push Alerts</span>
+            {currentMode === 'gmail' && (
+              <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-bold">
+                ACTIVE
+              </span>
+            )}
+            {data.email_alerts_enabled && currentMode !== 'gmail' && (
               <span className="w-2 h-2 rounded-full bg-rose-500" />
             )}
           </button>
@@ -446,6 +496,11 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                     <span className="text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded border border-sky-200 dark:border-sky-800">
                       Zero Battery Drain
                     </span>
+                    {currentMode === 'telegram' && (
+                      <span className="text-[10px] font-mono font-bold bg-sky-600 text-white px-2 py-0.5 rounded shadow-xs">
+                        ACTIVE SERVER
+                      </span>
+                    )}
                   </h4>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Pushes sales alerts to your personal Telegram or store staff group.
@@ -453,8 +508,19 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                 </div>
               </div>
 
-              {/* Master Telegram Toggle */}
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              {/* Master Telegram Toggle & Quick Server Switcher */}
+              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center flex-wrap">
+                {currentMode !== 'telegram' && currentMode !== 'both' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectMode('telegram')}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-200 dark:hover:bg-sky-900/80 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                    title="Switch active alert server to Telegram"
+                  >
+                    <span>⚡ Switch Server to Telegram</span>
+                  </button>
+                )}
+
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   {data.telegram_alerts_enabled ? 'Telegram: ON' : 'Telegram: OFF'}
                 </span>
@@ -590,6 +656,11 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                     <span className="text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
                       Standard Gmail / Workspace
                     </span>
+                    {currentMode === 'gmail' && (
+                      <span className="text-[10px] font-mono font-bold bg-rose-600 text-white px-2 py-0.5 rounded shadow-xs">
+                        ACTIVE SERVER
+                      </span>
+                    )}
                   </h4>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Dispatches formatted transactional receipts and system notices via your Gmail account.
@@ -597,8 +668,19 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                 </div>
               </div>
 
-              {/* Master Email Toggle */}
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              {/* Quick Server Switcher & Master Toggle */}
+              <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center flex-wrap">
+                {currentMode !== 'gmail' && currentMode !== 'both' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectMode('gmail')}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-900/80 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                    title="Switch active alert server to Gmail"
+                  >
+                    <span>⚡ Switch Server to Gmail</span>
+                  </button>
+                )}
+
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   {data.email_alerts_enabled ? 'Gmail: ON' : 'Gmail: OFF'}
                 </span>
@@ -626,12 +708,21 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
               </div>
             </div>
 
+            {/* Notification Gmail Decoupling Notice */}
+            <div className="p-3 bg-white/80 dark:bg-slate-900/80 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2.5 shadow-2xs">
+              <Mail className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+              <div className="leading-relaxed text-[11px]">
+                <strong className="text-rose-700 dark:text-rose-300 font-bold">Independent Store Alert Credentials</strong>:
+                {' '}This Gmail address and 16-character App Password are used strictly for sending real-time counter sales and return notifications. It is <strong>completely separate</strong> from your Platform Transactional Email (Password Resets / Verification) and updating it will never overwrite your system email password.
+              </div>
+            </div>
+
             {/* Gmail Inputs Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
               {/* Gmail Username */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>Gmail Account Address</span>
+                  <span>Push Alert Gmail Address</span>
                   <span className="text-rose-500 ml-1 font-bold">*</span>
                 </label>
                 <div className="relative">
@@ -649,14 +740,14 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Sender email address for SMTP dispatch.
+                  Gmail account used to send POS transaction receipts.
                 </p>
               </div>
 
               {/* 16-Character App Password */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                  <span>16-Char Google App Password</span>
+                  <span>Push Alert 16-Char App Password</span>
                   <span className="text-rose-500 ml-1 font-bold">*</span>
                 </label>
                 <div className="relative">
@@ -682,7 +773,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Google Account → Security → 2-Step Verification → App Passwords.
+                  Dedicated App Password for this alert sender. Separate from Platform Email.
                 </p>
               </div>
 

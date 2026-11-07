@@ -820,9 +820,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           ...res.appSettings,
           ACTIVE_EMAIL_PROVIDER: active,
           RESEND_API_KEY: res.appSettings.RESEND_API_KEY || res.appSettings.resend_api_key || '',
-          GMAIL_USER: res.appSettings.GMAIL_USER || res.appSettings.gmail_user || 'sarbaazsoft@gmail.com',
-          GMAIL_FROM_NAME: res.appSettings.GMAIL_FROM_NAME || res.appSettings.gmail_from_name || 'superadmin',
-          GMAIL_APP_PASSWORD: res.appSettings.GMAIL_APP_PASSWORD || res.appSettings.gmail_app_password || '',
+          GMAIL_USER: res.appSettings.GMAIL_USER || 'sarbaazsoft@gmail.com',
+          GMAIL_FROM_NAME: res.appSettings.GMAIL_FROM_NAME || 'superadmin',
+          GMAIL_APP_PASSWORD: res.appSettings.GMAIL_APP_PASSWORD || '',
           RESEND_FROM: fullFrom,
           RESEND_FROM_EMAIL: emailFromEnvOrDb,
         }));
@@ -846,9 +846,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             ...fullRes.appSettings,
             ACTIVE_EMAIL_PROVIDER: active,
             RESEND_API_KEY: fullRes.appSettings.RESEND_API_KEY || fullRes.appSettings.resend_api_key || '',
-            GMAIL_USER: fullRes.appSettings.GMAIL_USER || fullRes.appSettings.gmail_user || 'sarbaazsoft@gmail.com',
-            GMAIL_FROM_NAME: fullRes.appSettings.GMAIL_FROM_NAME || fullRes.appSettings.gmail_from_name || 'superadmin',
-            GMAIL_APP_PASSWORD: fullRes.appSettings.GMAIL_APP_PASSWORD || fullRes.appSettings.gmail_app_password || '',
+            GMAIL_USER: fullRes.appSettings.GMAIL_USER || 'sarbaazsoft@gmail.com',
+            GMAIL_FROM_NAME: fullRes.appSettings.GMAIL_FROM_NAME || 'superadmin',
+            GMAIL_APP_PASSWORD: fullRes.appSettings.GMAIL_APP_PASSWORD || '',
             RESEND_FROM: fullFrom,
             RESEND_FROM_EMAIL: emailFromEnvOrDb,
           }));
@@ -883,14 +883,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         RESEND_API_KEY: appSettingsForm.RESEND_API_KEY ?? '',
         resend_api_key: appSettingsForm.RESEND_API_KEY ?? '',
         GMAIL_USER: appSettingsForm.GMAIL_USER ?? '',
-        gmail_user: appSettingsForm.GMAIL_USER ?? '',
         GMAIL_FROM_NAME: appSettingsForm.GMAIL_FROM_NAME ?? '',
-        gmail_from_name: appSettingsForm.GMAIL_FROM_NAME ?? '',
         GMAIL_APP_PASSWORD: appSettingsForm.GMAIL_APP_PASSWORD ?? '',
-        gmail_app_password: appSettingsForm.GMAIL_APP_PASSWORD ?? '',
         RESEND_FROM: fromValue,
         RESEND_FROM_EMAIL: emailValue,
       };
+
+      // Strip any accidental lowercase store notification keys from platform appSettings payload
+      delete (payload as any).gmail_user;
+      delete (payload as any).gmail_app_password;
+      delete (payload as any).gmail_from_name;
 
       const res = await api.settings.saveAppSettings(payload);
       setAppSettingsSuccess(true);
@@ -3189,7 +3191,7 @@ setFormErrors(errors);
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Sender Name (<code className="text-purple-600 dark:text-purple-400">gmail_from_name</code>)
+                      Sender Name (<code className="text-purple-600 dark:text-purple-400">GMAIL_FROM_NAME</code>)
                     </label>
                     <input
                       type="text"
@@ -3197,19 +3199,18 @@ setFormErrors(errors);
                       onChange={(e) => setAppSettingsForm((prev) => ({
                         ...prev,
                         GMAIL_FROM_NAME: e.target.value,
-                        gmail_from_name: e.target.value,
                       }))}
                       placeholder="superadmin"
                       className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                     />
                     <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      Sender display name shown in recipients&apos; inboxes (e.g. <code>superadmin</code> or <code>SuperAdmin</code>).
+                      Sender display name for password resets &amp; auth emails (e.g. <code>superadmin</code>).
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Gmail Address (<code className="text-purple-600 dark:text-purple-400">gmail_user</code>)
+                      Platform Gmail Address (<code className="text-purple-600 dark:text-purple-400">GMAIL_USER</code>)
                     </label>
                     <input
                       type="email"
@@ -3217,19 +3218,18 @@ setFormErrors(errors);
                       onChange={(e) => setAppSettingsForm((prev) => ({
                         ...prev,
                         GMAIL_USER: e.target.value,
-                        gmail_user: e.target.value,
                       }))}
                       placeholder="sarbaazsoft@gmail.com"
                       className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                     />
                     <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      The Google Account or Workspace address used for SMTP relay (e.g. <code>sarbaazsoft@gmail.com</code>).
+                      Google account for system email delivery. Independent from Store Push Notification Gmail.
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Gmail App Password (<code className="text-purple-600 dark:text-purple-400">gmail_app_password</code>)
+                      Platform Gmail App Password (<code className="text-purple-600 dark:text-purple-400">GMAIL_APP_PASSWORD</code>)
                     </label>
                     <div className="relative">
                       <input
@@ -3238,7 +3238,6 @@ setFormErrors(errors);
                         onChange={(e) => setAppSettingsForm((prev) => ({
                           ...prev,
                           GMAIL_APP_PASSWORD: e.target.value,
-                          gmail_app_password: e.target.value,
                         }))}
                         placeholder="xxxx xxxx xxxx xxxx"
                         className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
@@ -3253,7 +3252,7 @@ setFormErrors(errors);
                       </button>
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      16-character Google App Password. White spaces are stripped automatically.
+                      16-character App Password for transactional email. Will NOT overwrite store push alerts password.
                     </p>
                   </div>
                 </div>

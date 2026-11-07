@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import { pgClient } from '../../db/index.ts';
 import { getCachedAppSetting } from './appSettingsService.ts';
 import { sendEmail } from '../utils/email.ts';
@@ -178,6 +179,40 @@ export async function dispatchPosEmailAlert(
 </html>
     `;
 
+    // 3. Priority Dispatch: Use store's dedicated notification Gmail credentials if configured
+    const storeGmailUser = (cs?.gmail_user || '').trim();
+    const storeGmailPass = (cs?.gmail_app_password || '').trim();
+    const storeFromName = (cs?.gmail_from_name || storeName || 'SarbaazSoft Store Alerts').trim();
+
+    if (storeGmailUser && storeGmailPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: storeGmailUser,
+            pass: storeGmailPass,
+          },
+        });
+
+        const fromHeader = storeFromName ? `"${storeFromName}" <${storeGmailUser}>` : storeGmailUser;
+        const mailInfo = await transporter.sendMail({
+          from: fromHeader,
+          to: recipientList,
+          subject: `[${storeName}] ${actionTitle}`,
+          html: htmlBody,
+          text: `[${storeName}] ${actionTitle} - Invoice #${invoiceNum}`,
+        });
+
+        console.log(`✉️ POS transaction email alert delivered to ${recipientList.join(', ')} via store notification Gmail (${storeGmailUser}) [ID: ${mailInfo.messageId || 'ok'}]`);
+        return true;
+      } catch (storeSmtpErr: any) {
+        console.warn(`[emailAlertService] Store notification Gmail SMTP failed (${storeGmailUser}), falling back to system provider:`, storeSmtpErr?.message || storeSmtpErr);
+      }
+    }
+
+    // Fallback to platform transactional email provider if store has not configured a custom notification Gmail account
     const sendRes = await sendEmail({
       to: recipientList,
       subject: `[${storeName}] ${actionTitle}`,
@@ -185,7 +220,7 @@ export async function dispatchPosEmailAlert(
     });
 
     if (sendRes.delivered) {
-      console.log(`✉️ POS transaction email alert delivered to ${recipientList.join(', ')} via ${sendRes.provider}`);
+      console.log(`✉️ POS transaction email alert delivered to ${recipientList.join(', ')} via system email provider (${sendRes.provider})`);
       return true;
     } else {
       console.warn(`[emailAlertService] Delivery notice: ${sendRes.error}`);

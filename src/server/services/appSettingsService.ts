@@ -504,12 +504,9 @@ export async function getAllAppSettings(
     }
   }
 
-  // Provide seamless lowercase aliases for email provider fields
+  // Provide uppercase canonical keys for platform email settings
   if (byKey.ACTIVE_EMAIL_PROVIDER) byKey.active_email_provider = byKey.ACTIVE_EMAIL_PROVIDER;
   if (byKey.RESEND_API_KEY) byKey.resend_api_key = byKey.RESEND_API_KEY;
-  if (byKey.GMAIL_USER) byKey.gmail_user = byKey.GMAIL_USER;
-  if (byKey.GMAIL_FROM_NAME) byKey.gmail_from_name = byKey.GMAIL_FROM_NAME;
-  if (byKey.GMAIL_APP_PASSWORD) byKey.gmail_app_password = byKey.GMAIL_APP_PASSWORD;
 
   return { byKey, grouped, items: rows };
 }
@@ -540,21 +537,12 @@ export async function updateAppSettings(
     cleanUpdates[k] = String(v).trim();
   }
 
-  // Alias lowercase email provider fields to standard configuration keys
+  // Alias uppercase configuration keys for platform email providers
   if (cleanUpdates.active_email_provider && !cleanUpdates.ACTIVE_EMAIL_PROVIDER) {
     cleanUpdates.ACTIVE_EMAIL_PROVIDER = cleanUpdates.active_email_provider;
   }
   if (cleanUpdates.resend_api_key !== undefined && !cleanUpdates.RESEND_API_KEY) {
     cleanUpdates.RESEND_API_KEY = cleanUpdates.resend_api_key;
-  }
-  if (cleanUpdates.gmail_user !== undefined && !cleanUpdates.GMAIL_USER) {
-    cleanUpdates.GMAIL_USER = cleanUpdates.gmail_user;
-  }
-  if (cleanUpdates.gmail_from_name !== undefined && !cleanUpdates.GMAIL_FROM_NAME) {
-    cleanUpdates.GMAIL_FROM_NAME = cleanUpdates.gmail_from_name;
-  }
-  if (cleanUpdates.gmail_app_password !== undefined && !cleanUpdates.GMAIL_APP_PASSWORD) {
-    cleanUpdates.GMAIL_APP_PASSWORD = cleanUpdates.gmail_app_password;
   }
 
   if (cleanUpdates.ACTIVE_EMAIL_PROVIDER) {

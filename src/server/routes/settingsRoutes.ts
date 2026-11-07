@@ -891,7 +891,8 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       await pgClient.query('UPDATE products SET allow_half_carton = false WHERE COALESCE(tenant_id, 1) = $1', [tenantId]).catch(() => {});
     }
 
-    // Synchronize root platform app_settings table when SuperAdmin modifies alert providers
+    // Note: Store notification settings are stored strictly in company_settings.
+    // Platform transactional email credentials (app_settings.GMAIL_APP_PASSWORD) remain completely separate and decoupled.
     if (isPlatformOwner) {
       const appUpdates: Record<string, any> = {};
       if (req.body.telegram_bot_token !== undefined || req.body.telegramBotToken !== undefined) {
@@ -902,15 +903,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       }
       if (req.body.telegram_alerts_enabled !== undefined || req.body.telegramAlertsEnabled !== undefined) {
         appUpdates.TELEGRAM_ALERTS_ENABLED = String(finalTelegramAlertsEnabled);
-      }
-      if (req.body.gmail_user !== undefined || req.body.gmailUser !== undefined) {
-        appUpdates.GMAIL_USER = finalGmailUser;
-      }
-      if (req.body.gmail_app_password !== undefined || req.body.gmailAppPassword !== undefined) {
-        appUpdates.GMAIL_APP_PASSWORD = finalGmailAppPassword;
-      }
-      if (req.body.gmail_from_name !== undefined || req.body.gmailFromName !== undefined) {
-        appUpdates.GMAIL_FROM_NAME = finalGmailFromName;
       }
       if (req.body.email_alerts_enabled !== undefined || req.body.emailAlertsEnabled !== undefined) {
         appUpdates.EMAIL_POS_ALERTS_ENABLED = String(finalEmailAlertsEnabled);
@@ -988,14 +980,11 @@ router.post('/alert-providers', requireAuth, requireSuperAdmin, async (req: Auth
       ]
     );
 
-    // 2. Synchronize root app_settings table
+    // 2. Synchronize Telegram provider defaults in app_settings without overwriting platform transactional email credentials
     const appUpdates: Record<string, any> = {};
     if (telegramBotToken !== undefined) appUpdates.TELEGRAM_BOT_TOKEN = telegramBotToken;
     if (telegramChatId !== undefined) appUpdates.TELEGRAM_SUPERADMIN_CHAT_ID = telegramChatId;
     if (telegramAlertsEnabled !== undefined) appUpdates.TELEGRAM_ALERTS_ENABLED = String(telegramAlertsEnabled);
-    if (gmailUser !== undefined) appUpdates.GMAIL_USER = gmailUser;
-    if (gmailAppPassword !== undefined) appUpdates.GMAIL_APP_PASSWORD = gmailAppPassword;
-    if (gmailFromName !== undefined) appUpdates.GMAIL_FROM_NAME = gmailFromName;
     if (activeAlertProvider !== undefined) appUpdates.ACTIVE_ALERT_PROVIDER = activeAlertProvider;
     if (emailAlertsEnabled !== undefined) appUpdates.EMAIL_POS_ALERTS_ENABLED = String(emailAlertsEnabled);
 
