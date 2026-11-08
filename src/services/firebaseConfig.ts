@@ -102,41 +102,25 @@ export async function initFirebaseClient(): Promise<{ app: FirebaseApp | null; m
 }
 
 /**
- * Requests notification permission from user, registers Service Worker,
- * retrieves FCM device token, and persists it to backend database.
+ * Core background token acquisition and database sync.
+ * Assumes Notification.permission is 'granted' or already established.
+ * Fetches the FCM device token and persists it to backend without requesting UI permission.
  */
-export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
+export async function acquireAndSyncFcmToken(overrideRole?: string): Promise<{
   success: boolean;
   token?: string;
   error?: string;
-  permission?: NotificationPermission;
 }> {
   if (typeof window === 'undefined') {
     return { success: false, error: 'Notifications are only available in a browser environment.' };
   }
 
-  if (!('Notification' in window)) {
-    return { success: false, error: 'Push notifications are not supported by this browser.' };
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return { success: false, error: 'Notification permission is not granted on this device.' };
   }
 
   try {
-    // 1. Request browser permission
-    let permission = Notification.permission;
-    if (permission !== 'granted') {
-      permission = await Notification.requestPermission();
-    }
-
-    if (permission !== 'granted') {
-      return {
-        success: false,
-        permission,
-        error: permission === 'denied'
-          ? 'Notification permission was denied. Please enable notifications in your browser or device settings.'
-          : 'Notification permission request was dismissed.',
-      };
-    }
-
-    // 2. Initialize Firebase client
+    // 1. Initialize Firebase client
     const { messaging } = await initFirebaseClient();
     if (!messaging) {
       return {
@@ -145,7 +129,7 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
       };
     }
 
-    // 3. Register or locate the Service Worker
+    // 2. Register or locate the Service Worker
     let swReg: ServiceWorkerRegistration | undefined;
     if ('serviceWorker' in navigator) {
       swReg =
@@ -162,7 +146,7 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
       return { success: false, error: 'Service Worker could not be registered for push messages.' };
     }
 
-    // 4. Get FCM Token using optional VAPID certificate key
+    // 3. Get FCM Token using optional VAPID certificate key
     const config = await fetchFcmConfig();
     const rawVapid = config?.vapidKey?.trim();
     // VAPID keys are Base64URL strings (typically ~87 chars, no '@'). Ignore if an email was accidentally entered.
@@ -177,7 +161,7 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
       return { success: false, error: 'Failed to generate Firebase device push token.' };
     }
 
-    // 5. Send token to backend
+    // 4. Send token to backend
     let userRole = overrideRole || 'ADMIN';
     let tenantId = getActiveTenantId() || 1;
     let userId = 0;
@@ -204,19 +188,119 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
 
     localStorage.setItem('pos_fcm_token', token);
     localStorage.setItem('pos_push_notifications_enabled', 'true');
+    localStorage.removeItem('pos_push_permission_denied');
+
+    // Notify other components (Header, Settings, Soft Prompt) that push state updated
+    window.dispatchEvent(
+      new CustomEvent('pos:push-status-changed', {
+        detail: { token, permission: 'granted', isSubscribed: true },
+      })
+    );
 
     return {
       success: true,
       token,
-      permission: 'granted',
     };
   } catch (err: any) {
-    console.error('[firebaseConfig] Exception in requestFcmDeviceToken:', err);
+    console.error('[firebaseConfig] Exception in acquireAndSyncFcmToken:', err);
+    return {
+      success: false,
+      error: err?.message || 'Failed to acquire and register FCM push token.',
+    };
+  }
+}
+
+/**
+ * Silent background token sync for active sessions where permission was already granted.
+ * Ensures the token remains valid and registered in the database without any UI disruption.
+ */
+export async function syncFcmTokenSilently(overrideRole?: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return false;
+
+  try {
+    const res = await acquireAndSyncFcmToken(overrideRole);
+    return res.success;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Two-step permission flow entrypoint:
+ * Step 1: Explicitly requests browser/OS permission (triggered only by user intent).
+ * Step 2: If granted, automatically calls acquireAndSyncFcmToken() to obtain and store the FCM token.
+ * If denied: sets local denial flag and returns clean feedback for manual settings fallback.
+ */
+export async function requestFcmPermissionAndToken(overrideRole?: string): Promise<{
+  success: boolean;
+  token?: string;
+  error?: string;
+  permission?: NotificationPermission;
+}> {
+  if (typeof window === 'undefined') {
+    return { success: false, error: 'Notifications are only available in a browser environment.' };
+  }
+
+  if (!('Notification' in window)) {
+    return { success: false, error: 'Push notifications are not supported by this browser.' };
+  }
+
+  try {
+    // 1. Request browser/system notification permission
+    let permission = Notification.permission;
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission !== 'granted') {
+      if (permission === 'denied') {
+        localStorage.setItem('pos_push_permission_denied', 'true');
+        localStorage.setItem('pos_push_notifications_enabled', 'false');
+      }
+      window.dispatchEvent(
+        new CustomEvent('pos:push-status-changed', {
+          detail: { permission, isSubscribed: false },
+        })
+      );
+      return {
+        success: false,
+        permission,
+        error:
+          permission === 'denied'
+            ? 'Notifications are currently blocked by your browser settings. Please click the lock or site settings icon in your address bar to allow alerts.'
+            : 'Notification permission request was dismissed.',
+      };
+    }
+
+    // 2. Permission granted! Automatically acquire token and sync with backend
+    const acquireRes = await acquireAndSyncFcmToken(overrideRole);
+    return {
+      success: acquireRes.success,
+      token: acquireRes.token,
+      permission: 'granted',
+      error: acquireRes.error,
+    };
+  } catch (err: any) {
+    console.error('[firebaseConfig] Exception in requestFcmPermissionAndToken:', err);
     return {
       success: false,
       error: err?.message || 'Failed to request notification permission.',
     };
   }
+}
+
+/**
+ * Alias for requestFcmPermissionAndToken for backwards compatibility with existing callers.
+ */
+export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
+  success: boolean;
+  token?: string;
+  error?: string;
+  permission?: NotificationPermission;
+}> {
+  return requestFcmPermissionAndToken(overrideRole);
 }
 
 /**
@@ -231,6 +315,11 @@ export async function unregisterFcmDeviceToken(): Promise<boolean> {
     localStorage.removeItem('pos_fcm_token');
   }
   localStorage.setItem('pos_push_notifications_enabled', 'false');
+  window.dispatchEvent(
+    new CustomEvent('pos:push-status-changed', {
+      detail: { permission: typeof Notification !== 'undefined' ? Notification.permission : 'default', isSubscribed: false },
+    })
+  );
   return true;
 }
 

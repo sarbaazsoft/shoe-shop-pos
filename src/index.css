@@ -3341,3 +3341,49 @@ html.dark .saas-panel .app-stat-card.app-stat-card:hover {
     -webkit-backdrop-filter: none !important;
   }
 }
+
+/* ========================================================================= */
+/* SAMMI AI ASSISTANT: Chat Typing Indicator Animations                      */
+/* ========================================================================= */
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-7px) scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes typingShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.typing-dot-1 {
+  animation: typingBounce 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.typing-dot-2 {
+  animation: typingBounce 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.18s;
+}
+.typing-dot-3 {
+  animation: typingBounce 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.36s;
+}
+
+.typing-shimmer {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.08) 25%, rgba(168, 85, 247, 0.22) 50%, rgba(168, 85, 247, 0.08) 75%);
+  background-size: 200% 100%;
+  animation: typingShimmer 2s ease-in-out infinite;
+}
+
+.dark .typing-shimmer {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.12) 25%, rgba(168, 85, 247, 0.3) 50%, rgba(168, 85, 247, 0.12) 75%);
+  background-size: 200% 100%;
+  animation: typingShimmer 2s ease-in-out infinite;
+}
+

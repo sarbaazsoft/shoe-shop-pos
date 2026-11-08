@@ -45,8 +45,23 @@ import { recordApplicationBaseUrl } from './src/server/services/welcomeService.t
 const rootDir = path.resolve('.');
 
 export const app = express();
-const portArg = process.argv.indexOf('--port') !== -1 ? Number(process.argv[process.argv.indexOf('--port') + 1]) : undefined;
-const PORT = portArg || (process.env.PORT ? Number(process.env.PORT) : 3000);
+function resolvePort(): number {
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === '--port' && process.argv[i + 1]) {
+      const p = Number(process.argv[i + 1]);
+      if (!isNaN(p) && p > 0) return p;
+    }
+    if (arg.startsWith('--port=')) {
+      const p = Number(arg.slice(7));
+      if (!isNaN(p) && p > 0) return p;
+    }
+  }
+  // In AI Studio, 3000 is the designated port; ignore any ambient container PORT like 8080
+  return 3000;
+}
+
+const PORT = resolvePort();
 
 // Universal API Response Transformer to map database rows (snake_case) to strict camelCase
 app.use('/api', (_req, res, next) => {

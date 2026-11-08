@@ -1,6 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, User, Send, RotateCcw, Copy, Check, ShieldCheck, Cpu } from 'lucide-react';
+import {
+  Bot,
+  User,
+  Send,
+  RotateCcw,
+  Copy,
+  Check,
+  ShieldCheck,
+  Cpu,
+  Globe,
+  ExternalLink,
+  Sparkles,
+  TrendingUp,
+  Loader2,
+} from 'lucide-react';
 import { api } from '../../services/api.ts';
+
+const TYPING_HINTS = [
+  { text: 'Thinking & retrieving knowledge...', icon: Bot },
+  { text: 'Retrieving store data & footwear insights...', icon: Globe },
+  { text: 'Analyzing operational details & catalog...', icon: Sparkles },
+  { text: 'Drafting structured response...', icon: Bot },
+];
 
 export interface ChatMessageItem {
   id: string;
@@ -9,6 +30,8 @@ export interface ChatMessageItem {
   timestamp: string;
   modelUsed?: string;
   inspectedFiles?: string[];
+  groundingSources?: Array<{ uri: string; title: string }>;
+  searchQueries?: string[];
   liveDbSnapshot?: {
     tenantId?: number;
     storeName?: string;
@@ -49,11 +72,24 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
 
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [modelMode, setModelMode] = useState<'fast' | 'general' | 'complex'>('general');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Cycle through contextual typing feedback hints while loading
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingPhase(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setLoadingPhase((prev) => (prev + 1) % TYPING_HINTS.length);
+    }, 1800);
+    return () => clearInterval(timer);
+  }, [isLoading]);
 
   // Persist history to localStorage
   useEffect(() => {
@@ -121,6 +157,8 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         modelUsed: res.modelUsed || targetModel,
         inspectedFiles: Array.isArray(res.inspectedFiles) ? res.inspectedFiles : undefined,
+        groundingSources: Array.isArray(res.groundingSources) ? res.groundingSources : undefined,
+        searchQueries: Array.isArray(res.searchQueries) ? res.searchQueries : undefined,
         liveDbSnapshot: res.liveDbSnapshot || undefined,
       };
 
@@ -216,7 +254,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
               <Bot className="w-6 h-6 text-purple-600 dark:text-purple-300" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-bold text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight">
                   Sammi — AI Assistant
                 </h1>
@@ -224,9 +262,13 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Live AI
                 </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300/80 dark:border-blue-700/60 flex items-center gap-1.5 shadow-2xs">
+                  <Globe className="w-3 h-3 text-blue-500" />
+                  Search Grounded
+                </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-purple-200/80 mt-0.5">
-                {storeName} • Dynamic AI Conversations & Store Intelligence
+                {storeName} • Real-Time Footwear Trends, Shoe Care & Store Operations
               </p>
             </div>
           </div>
@@ -248,7 +290,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
                   ⚡ Fast Response
                 </option>
                 <option value="general" className="bg-white text-slate-900 dark:bg-[#131B2E] dark:text-white">
-                  Balanced
+                  Balanced (Search Grounded)
                 </option>
                 <option value="complex" className="bg-white text-slate-900 dark:bg-[#131B2E] dark:text-white">
                   Detailed Analysis
@@ -307,15 +349,85 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
                     <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 flex items-center justify-center font-bold text-xs shrink-0">
                       <Bot className="w-4 h-4" />
                     </div>
-                    <span className="font-bold text-sm text-purple-900 dark:text-purple-200">
-                      Sammi • {storeName}
-                    </span>
+                    <div>
+                      <span className="font-bold text-sm text-purple-900 dark:text-purple-200">
+                        Sammi • {storeName}
+                      </span>
+                    </div>
                   </div>
+
+                  {msg.groundingSources && msg.groundingSources.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs">
+                      <Globe className="w-3 h-3 text-blue-500" />
+                      <span>Web Grounded</span>
+                    </span>
+                  )}
                 </div>
               )}
 
               {/* Message text content */}
               {renderMessageContent(msg.text)}
+
+              {/* Real-time Google Search Grounding Sources */}
+              {msg.groundingSources && msg.groundingSources.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-purple-900/40">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-purple-200 mb-2.5">
+                    <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>Live Search Grounding Sources:</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {msg.groundingSources.map((source, sIdx) => {
+                      let domain = '';
+                      try {
+                        domain = new URL(source.uri).hostname.replace(/^www\./, '');
+                      } catch {
+                        domain = source.uri;
+                      }
+                      return (
+                        <a
+                          key={sIdx}
+                          href={source.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-50 hover:bg-purple-50/60 dark:bg-[#0B1120] dark:hover:bg-purple-950/30 border border-slate-200 hover:border-purple-300 dark:border-purple-900/50 dark:hover:border-purple-700 transition group text-left"
+                          title={source.title || source.uri}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0 text-[10px] font-bold">
+                              {sIdx + 1}
+                            </span>
+                            <div className="truncate">
+                              <p className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
+                                {source.title || domain}
+                              </p>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                {domain}
+                              </p>
+                            </div>
+                          </div>
+                          <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 shrink-0 transition-colors" />
+                        </a>
+                      );
+                    })}
+                  </div>
+
+                  {/* Search queries extracted from grounding */}
+                  {msg.searchQueries && msg.searchQueries.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="font-medium text-slate-500 dark:text-slate-400">Search queries:</span>
+                      {msg.searchQueries.map((q, qIdx) => (
+                        <span
+                          key={qIdx}
+                          className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/60 text-[10px]"
+                        >
+                          "{q}"
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Message Footer: Timestamp and copy button */}
               <div className={`flex items-center justify-between gap-2 mt-3 pt-2 text-xs border-t ${
@@ -347,21 +459,66 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
           </div>
         ))}
 
-        {/* Loading Bubble */}
+        {/* VISUAL TYPING INDICATOR ANIMATION */}
         {isLoading && (
-          <div className="w-full flex justify-start">
-            <div className="bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-800/80 rounded-2xl rounded-bl-xs p-4 sm:p-5 shadow-xs flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/60 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400 animate-pulse" />
+          <div className="w-full flex justify-start animate-in fade-in duration-200">
+            <div className="w-full sm:max-w-[85%] lg:max-w-[80%] rounded-2xl p-4 sm:p-5 bg-white dark:bg-[#131B2E] text-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-purple-800/80 shadow-xs rounded-bl-xs transition-all">
+              {/* Header inside typing indicator */}
+              <div className="flex items-center justify-between gap-3 pb-2.5 mb-3 border-b border-slate-100 dark:border-purple-900/40">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative">
+                    <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                      <Bot className="w-4 h-4 animate-pulse" />
+                    </div>
+                    {/* Glowing pulse ring */}
+                    <span className="absolute -inset-0.5 rounded-xl bg-purple-500/20 dark:bg-purple-400/30 animate-pulse pointer-events-none" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-purple-900 dark:text-purple-200">
+                      Sammi • {storeName}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600 dark:bg-purple-400 animate-ping" />
+                  <span>Thinking...</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-purple-700 dark:text-purple-300 font-semibold">
-                  Sammi is thinking...
-                </span>
-                <div className="flex items-center gap-1.5 ml-1">
-                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+
+              {/* Typing Wave Animation & Context Hint */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Bouncing typing wave dots */}
+                  <div
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50/80 dark:bg-purple-950/50 border border-purple-100 dark:border-purple-900/40 shadow-2xs"
+                    title="Assistant is typing"
+                    aria-label="Assistant is typing"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600 dark:bg-purple-400 typing-dot-1" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600 dark:bg-purple-400 typing-dot-2" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600 dark:bg-purple-400 typing-dot-3" />
+                  </div>
+
+                  {/* Dynamic rotating context hint */}
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-purple-200/90 py-0.5">
+                    {(() => {
+                      const hint = TYPING_HINTS[loadingPhase] || TYPING_HINTS[0];
+                      const HintIcon = hint.icon;
+                      return (
+                        <>
+                          <HintIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0 animate-pulse" />
+                          <span className="transition-all duration-300">{hint.text}</span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Subtle streaming text shimmer placeholders */}
+                <div className="space-y-2 pt-2 border-t border-slate-100/80 dark:border-purple-900/25">
+                  <div className="h-2.5 w-3/4 rounded-full typing-shimmer opacity-80" />
+                  <div className="h-2.5 w-1/2 rounded-full typing-shimmer opacity-60" />
                 </div>
               </div>
             </div>
@@ -374,25 +531,30 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
       {/* STICKY BOTTOM INPUT: ChatGPT / Gemini Style Centered Dock */}
       <div className="sticky bottom-0 z-30 pt-3 pb-4 sm:pb-6 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent dark:from-[#0A0E1A] dark:via-[#0A0E1A]/95 dark:to-transparent backdrop-blur-xs">
         <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto px-4 sm:px-6">
-          {/* Quick suggested chips */}
+          {/* Quick suggested chips with Retail Trends & Shoe Care */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-1 scrollbar-none">
             {[
-              'CSV file kaise import karein?',
-              'Pricing Policy kaise kaam karti hai?',
-              'Add Product mein size aur color kahan hai?',
-              'Joota wapis ya exchange kaise karein?',
-              'Silent printing kaise enable karein?',
-            ].map((chip, cIdx) => (
-              <button
-                key={cIdx}
-                type="button"
-                onClick={() => handleSendMessage(chip)}
-                disabled={isLoading}
-                className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#131B2E] border border-purple-200 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 shadow-2xs transition-colors shrink-0 cursor-pointer disabled:opacity-50"
-              >
-                ✨ {chip}
-              </button>
-            ))}
+              { label: 'Trending Footwear Styles 2026', icon: TrendingUp },
+              { label: 'Leather Shoe Care & Conditioning Guide', icon: Sparkles },
+              { label: 'How to Clean Suede & Nubuck Shoes', icon: Sparkles },
+              { label: 'White Sneaker Sole Cleaning Tips', icon: Sparkles },
+              { label: 'CSV Bulk Product Import Workflow', icon: Bot },
+              { label: 'Store Pricing Policy & Rules', icon: Bot },
+            ].map((chip, cIdx) => {
+              const IconComp = chip.icon;
+              return (
+                <button
+                  key={cIdx}
+                  type="button"
+                  onClick={() => handleSendMessage(chip.label)}
+                  disabled={isLoading}
+                  className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#131B2E] border border-purple-200 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 shadow-2xs transition-colors shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <IconComp className="w-3.5 h-3.5 text-purple-500" />
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-800/80 rounded-2xl shadow-lg p-2.5 sm:p-3 transition-shadow focus-within:shadow-xl">

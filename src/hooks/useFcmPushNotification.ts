@@ -1,5 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { requestFcmDeviceToken, unregisterFcmDeviceToken, getStoredFcmToken, fetchFcmConfig } from '../services/firebaseConfig.ts';
+import {
+  requestFcmPermissionAndToken,
+  syncFcmTokenSilently,
+  unregisterFcmDeviceToken,
+  getStoredFcmToken,
+  fetchFcmConfig,
+} from '../services/firebaseConfig.ts';
+import {
+  shouldShowSoftPushPrompt,
+  dismissSoftPushPrompt,
+  resetSoftPushPromptDismissal,
+} from '../services/pushNotificationClient.ts';
 import { api } from '../services/api.ts';
 
 export function useFcmPushNotification() {
@@ -11,12 +22,16 @@ export function useFcmPushNotification() {
   });
 
   const [isSubscribed, setIsSubscribed] = useState<boolean>(() => {
-    return Boolean(getStoredFcmToken());
+    if (typeof window === 'undefined') return false;
+    return Boolean(getStoredFcmToken() && Notification.permission === 'granted');
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [fcmConfigured, setFcmConfigured] = useState<boolean>(false);
   const [deviceStats, setDeviceStats] = useState<{ totalTokens: number; configured: boolean } | null>(null);
+  const [showSoftPrompt, setShowSoftPrompt] = useState<boolean>(() => {
+    return shouldShowSoftPushPrompt();
+  });
 
   const checkConfigAndStats = useCallback(async () => {
     try {
@@ -32,43 +47,95 @@ export function useFcmPushNotification() {
     }
   }, []);
 
+  const refreshStatus = useCallback(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const currentPerm = Notification.permission;
+      setPermission(currentPerm);
+      setIsSubscribed(Boolean(getStoredFcmToken() && currentPerm === 'granted'));
+      setShowSoftPrompt(shouldShowSoftPushPrompt());
+    }
+  }, []);
+
   useEffect(() => {
     checkConfigAndStats();
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermission(Notification.permission);
-      setIsSubscribed(Boolean(getStoredFcmToken() && Notification.permission === 'granted'));
-    }
-  }, [checkConfigAndStats]);
+    refreshStatus();
 
-  const subscribe = useCallback(async (role?: string) => {
-    setIsLoading(true);
-    try {
-      const res = await requestFcmDeviceToken(role);
-      if (typeof window !== 'undefined' && 'Notification' in window) {
-        setPermission(Notification.permission);
+    const handleStatusChanged = (e: any) => {
+      refreshStatus();
+      if (e?.detail?.permission) {
+        setPermission(e.detail.permission);
       }
-      if (res.success && res.token) {
-        setIsSubscribed(true);
-        await checkConfigAndStats();
-        return { success: true, token: res.token };
+      if (typeof e?.detail?.isSubscribed === 'boolean') {
+        setIsSubscribed(e.detail.isSubscribed);
       }
-      return { success: false, error: res.error };
-    } finally {
-      setIsLoading(false);
-    }
-  }, [checkConfigAndStats]);
+      setShowSoftPrompt(shouldShowSoftPushPrompt());
+    };
+
+    const handleSoftPromptUpdated = () => {
+      setShowSoftPrompt(shouldShowSoftPushPrompt());
+    };
+
+    window.addEventListener('pos:push-status-changed', handleStatusChanged);
+    window.addEventListener('pos:push-soft-prompt-updated', handleSoftPromptUpdated);
+
+    return () => {
+      window.removeEventListener('pos:push-status-changed', handleStatusChanged);
+      window.removeEventListener('pos:push-soft-prompt-updated', handleSoftPromptUpdated);
+    };
+  }, [checkConfigAndStats, refreshStatus]);
+
+  // Two-step permission flow: triggers prompt and acquires token on grant
+  const subscribe = useCallback(
+    async (role?: string) => {
+      setIsLoading(true);
+      try {
+        const res = await requestFcmPermissionAndToken(role);
+        refreshStatus();
+        if (res.success && res.token) {
+          setIsSubscribed(true);
+          await checkConfigAndStats();
+          return { success: true, token: res.token, permission: 'granted' as NotificationPermission };
+        }
+        return { success: false, error: res.error, permission: res.permission };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [checkConfigAndStats, refreshStatus]
+  );
+
+  // Silent background token synchronization
+  const syncSilently = useCallback(
+    async (role?: string) => {
+      const success = await syncFcmTokenSilently(role);
+      refreshStatus();
+      return success;
+    },
+    [refreshStatus]
+  );
 
   const unsubscribe = useCallback(async () => {
     setIsLoading(true);
     try {
       await unregisterFcmDeviceToken();
       setIsSubscribed(false);
+      refreshStatus();
       await checkConfigAndStats();
       return { success: true };
     } finally {
       setIsLoading(false);
     }
-  }, [checkConfigAndStats]);
+  }, [checkConfigAndStats, refreshStatus]);
+
+  const dismissPrompt = useCallback((days = 3) => {
+    dismissSoftPushPrompt(days);
+    setShowSoftPrompt(false);
+  }, []);
+
+  const resetPrompt = useCallback(() => {
+    resetSoftPushPromptDismissal();
+    setShowSoftPrompt(shouldShowSoftPushPrompt());
+  }, []);
 
   return {
     permission,
@@ -76,8 +143,12 @@ export function useFcmPushNotification() {
     isLoading,
     fcmConfigured,
     deviceStats,
+    showSoftPrompt,
     subscribe,
+    syncSilently,
     unsubscribe,
-    refreshStatus: checkConfigAndStats,
+    dismissPrompt,
+    resetPrompt,
+    refreshStatus,
   };
 }

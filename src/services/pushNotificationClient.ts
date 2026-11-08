@@ -1,6 +1,11 @@
 import { api, getAuthToken, getActiveTenantId } from './api.ts';
 import { playAudioFeedback } from '../utils/audio.ts';
-import { requestFcmDeviceToken } from './firebaseConfig.ts';
+import {
+  initFirebaseClient,
+  requestFcmPermissionAndToken,
+  syncFcmTokenSilently,
+  requestFcmDeviceToken,
+} from './firebaseConfig.ts';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -67,30 +72,67 @@ export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
     };
   }
 
-  // Delegate directly to Firebase Cloud Messaging (FCM)
-  return requestFcmDeviceToken(overrideRole);
+// Delegate directly to Firebase Cloud Messaging (FCM)
+  return requestFcmPermissionAndToken(overrideRole);
 }
-
-
 
 /**
  * Silently re-registers this device with the server when notification permission is already granted.
- * Keeps the server-side subscription row fresh (new DB, rotated VAPID keys, expired endpoint).
+ * Keeps the server-side subscription row fresh (new DB, rotated VAPID keys, expired endpoint) without UI popups.
  */
-export async function resyncPushSubscriptionIfEnabled(): Promise<void> {
+export async function resyncPushSubscriptionIfEnabled(overrideRole?: string): Promise<void> {
   if (!isWebPushSupported() || Notification.permission !== 'granted') return;
   try {
     if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return;
   } catch {
     return;
   }
-  await subscribeDeviceToWebPush();
+  await syncFcmTokenSilently(overrideRole);
+}
+
+const SOFT_PROMPT_STORAGE_KEY = 'pos_push_soft_prompt_dismissed_until';
+
+export function isSoftPromptDismissed(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const raw = localStorage.getItem(SOFT_PROMPT_STORAGE_KEY);
+    if (!raw) return false;
+    const until = Number(raw);
+    return !isNaN(until) && until > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+export function shouldShowSoftPushPrompt(): boolean {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  // If permission has already been decided (granted or denied), do not show soft prompt
+  if (Notification.permission !== 'default') return false;
+  // If user dismissed it recently, do not show
+  if (isSoftPromptDismissed()) return false;
+  return true;
+}
+
+export function dismissSoftPushPrompt(days = 3): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const until = Date.now() + Math.max(days, 1) * 86400000;
+    localStorage.setItem(SOFT_PROMPT_STORAGE_KEY, String(until));
+    window.dispatchEvent(new CustomEvent('pos:push-soft-prompt-updated'));
+  } catch {}
+}
+
+export function resetSoftPushPromptDismissal(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(SOFT_PROMPT_STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent('pos:push-soft-prompt-updated'));
+  } catch {}
 }
 
 /**
- * Prompts the platform's official native system/browser notification permission dialog directly,
- * exactly like YouTube or Google AI Studio, without any intermediate custom HTML popups, dialogs, or banners.
- * If permission is granted, automatically registers the device for Web Push notifications.
+ * Triggers the two-step permission and token registration flow.
+ * Usually invoked when the user clicks 'Allow' on the soft prompt or enables the toggle in settings.
  */
 export async function triggerNativeNotificationPrompt(overrideRole?: string): Promise<NotificationPermission> {
   if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -98,7 +140,7 @@ export async function triggerNativeNotificationPrompt(overrideRole?: string): Pr
   }
 
   if (Notification.permission === 'granted') {
-    subscribeDeviceToWebPush(overrideRole).catch(() => {});
+    await syncFcmTokenSilently(overrideRole).catch(() => {});
     return 'granted';
   }
 
@@ -107,74 +149,34 @@ export async function triggerNativeNotificationPrompt(overrideRole?: string): Pr
   }
 
   try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      await subscribeDeviceToWebPush(overrideRole).catch(() => {});
-    }
-    return permission;
+    const res = await requestFcmPermissionAndToken(overrideRole);
+    return res.permission || Notification.permission;
   } catch (err) {
-    console.warn('[pushNotificationClient] Error requesting native notification permission:', err);
+    console.warn('[pushNotificationClient] Error requesting notification permission:', err);
     return Notification.permission;
   }
 }
 
 /**
- * Directly initializes native notification permission prompt on session load or on first user gesture,
- * ensuring complete compatibility across Android, iOS, and Web browsers without custom HTML prompts.
+ * Background FCM initialization on session load:
+ * 1. Warm up the Firebase client and foreground listener.
+ * 2. If permission is already granted, silently synchronize the FCM device token with the backend.
+ * 3. Does NOT force native permission prompts on page load or clicks, allowing the soft prompt to guide the user.
  */
 export function initNativeNotificationPrompt(overrideRole?: string): () => void {
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return () => {};
   }
 
-  // Already granted: keep background subscription synced
+  // Pre-initialize Firebase client in the background
+  initFirebaseClient().catch(() => {});
+
+  // If already granted, perform silent token verification/resync in background
   if (Notification.permission === 'granted') {
-    subscribeDeviceToWebPush(overrideRole).catch(() => {});
-    return () => {};
+    syncFcmTokenSilently(overrideRole).catch(() => {});
   }
 
-  // Already explicitly denied by user in browser settings
-  if (Notification.permission === 'denied') {
-    return () => {};
-  }
-
-  let hasTriggered = false;
-
-  const runNativePrompt = async () => {
-    if (hasTriggered) return;
-    hasTriggered = true;
-    cleanupListeners();
-    await triggerNativeNotificationPrompt(overrideRole);
-  };
-
-  const onUserGesture = () => {
-    runNativePrompt();
-  };
-
-  const cleanupListeners = () => {
-    window.removeEventListener('click', onUserGesture);
-    window.removeEventListener('pointerdown', onUserGesture);
-    window.removeEventListener('touchstart', onUserGesture);
-    window.removeEventListener('keydown', onUserGesture);
-  };
-
-  // 1. Direct attempt without waiting (standard for YouTube/Google AI Studio)
-  triggerNativeNotificationPrompt(overrideRole)
-    .then((result) => {
-      if (result !== 'default') {
-        hasTriggered = true;
-        cleanupListeners();
-      }
-    })
-    .catch(() => {});
-
-  // 2. Also attach one-time user gesture listeners for browsers that enforce a user gesture (e.g., iOS Safari)
-  window.addEventListener('click', onUserGesture, { once: true, passive: true });
-  window.addEventListener('pointerdown', onUserGesture, { once: true, passive: true });
-  window.addEventListener('touchstart', onUserGesture, { once: true, passive: true });
-  window.addEventListener('keydown', onUserGesture, { once: true, passive: true });
-
-  return cleanupListeners;
+  return () => {};
 }
 
 /**

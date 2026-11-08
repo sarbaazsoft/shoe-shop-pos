@@ -356,13 +356,13 @@ export const Header: React.FC<HeaderProps> = ({
     currentRoleRef.current = currentRole;
   }, [currentRole]);
 
-  // Check push subscription on mount, setup real-time SSE stream, and trigger native platform permission directly
+  // Check push subscription on mount, setup real-time SSE stream, and listen for push status updates
   useEffect(() => {
-    // Directly invoke official native notification permission prompt if permission is 'default' (zero custom HTML popups/banners)
+    // Warm up Firebase client and perform silent background sync if already granted
     const cleanupNativePrompt = initNativeNotificationPrompt(currentRole);
 
     if (isWebPushSupported()) {
-      resyncPushSubscriptionIfEnabled()
+      resyncPushSubscriptionIfEnabled(currentRole)
         .catch(() => {})
         .then(() => isDeviceSubscribedToPush())
         .then((subbed) => {
@@ -370,6 +370,18 @@ export const Header: React.FC<HeaderProps> = ({
           setPushPermission(getNotificationPermissionState());
         });
     }
+
+    const handlePushStatusChanged = (e: any) => {
+      if (typeof e?.detail?.isSubscribed === 'boolean') {
+        setIsPushSubscribed(e.detail.isSubscribed);
+      }
+      if (e?.detail?.permission) {
+        setPushPermission(e.detail.permission);
+      } else {
+        setPushPermission(getNotificationPermissionState());
+      }
+    };
+    window.addEventListener('pos:push-status-changed', handlePushStatusChanged);
 
     // Connect to real-time event stream for active sessions with strict role isolation
     const cleanupStream = connectRealtimeNotificationStream((payload) => {
@@ -466,6 +478,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => {
       cleanupNativePrompt();
       cleanupStream();
+      window.removeEventListener('pos:push-status-changed', handlePushStatusChanged);
       window.removeEventListener('pos:action-notification', handleInAppPushAlert);
       window.removeEventListener('platform:announcement', handleInAppPushAlert);
       if (bellPulseTimeoutRef.current) {
@@ -482,15 +495,28 @@ export const Header: React.FC<HeaderProps> = ({
       if (isPushSubscribed) {
         await unsubscribeDeviceFromWebPush();
         setIsPushSubscribed(false);
+        setPushPermission(getNotificationPermissionState());
         setPushStatusMessage('Push notifications disabled on this device.');
         setTimeout(() => setPushStatusMessage(null), 4000);
       } else {
+        const currentPerm = getNotificationPermissionState();
+        if (currentPerm === 'denied') {
+          setPushPermission('denied');
+          setPushStatusMessage('⚠️ Notifications are blocked in browser settings. Click the lock/site settings icon in your address bar to allow alerts.');
+          setTimeout(() => setPushStatusMessage(null), 8000);
+          return;
+        }
+
         const res = await subscribeDeviceToWebPush(currentRole || 'ADMIN');
         if (res.success) {
           setIsPushSubscribed(true);
           setPushPermission('granted');
           setPushStatusMessage('✅ Push alerts active! Real-time alerts enabled on this device.');
           setTimeout(() => setPushStatusMessage(null), 5000);
+        } else if (res.permission === 'denied') {
+          setPushPermission('denied');
+          setPushStatusMessage('⚠️ Notification permission was blocked. You can unblock it via your browser address bar.');
+          setTimeout(() => setPushStatusMessage(null), 7000);
         } else if (res.error) {
           setPushStatusMessage(res.error);
           setTimeout(() => setPushStatusMessage(null), 7000);
@@ -1473,7 +1499,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 {/* Real-Time Push Notification Device Activation Card */}
-                <div className="p-2 mb-2 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/50">
+                <div className="p-2.5 mb-2 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/50">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <Radio className={`w-3.5 h-3.5 shrink-0 ${isPushSubscribed ? 'text-emerald-500 animate-pulse' : 'text-purple-600 dark:text-purple-300'}`} />
@@ -1484,14 +1510,27 @@ export const Header: React.FC<HeaderProps> = ({
                     <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
                       isPushSubscribed
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                        : pushPermission === 'denied'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
                         : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}>
                       {isPushSubscribed ? 'Active' : pushPermission === 'denied' ? 'Blocked' : 'Off'}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-600 dark:text-purple-200/80 leading-snug mb-1.5">
+                  <p className="text-[10px] text-slate-600 dark:text-purple-200/80 leading-snug mb-2">
                     Real-time alerts for Sales, Returns & Exchanges sent to your phone and browser.
                   </p>
+
+                  {/* Contextual guidance if user previously blocked notifications in browser settings */}
+                  {pushPermission === 'denied' && (
+                    <div className="mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-800 dark:text-amber-200 flex items-start gap-1.5 leading-snug">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        Notifications are blocked in your browser. Click the site settings icon (🔒) in your address bar, set Notifications to <strong>Allow</strong>, then tap <strong>Check Permission</strong>.
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -1503,6 +1542,8 @@ export const Header: React.FC<HeaderProps> = ({
                       className={`flex-1 py-1 px-2 rounded-md font-semibold text-[10.5px] transition cursor-pointer flex items-center justify-center gap-1 ${
                         isPushSubscribed
                           ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700'
+                          : pushPermission === 'denied'
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
                           : 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
                       }`}
                     >
@@ -1510,6 +1551,8 @@ export const Header: React.FC<HeaderProps> = ({
                         <Loader2 className="w-3 h-3 animate-spin" />
                       ) : isPushSubscribed ? (
                         'Disable Push'
+                      ) : pushPermission === 'denied' ? (
+                        'Check Permission'
                       ) : (
                         'Enable Push'
                       )}

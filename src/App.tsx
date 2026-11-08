@@ -16,6 +16,7 @@ import { DashboardOverview } from './components/dashboard/DashboardOverview.tsx'
 import { AuthModal } from './components/auth/AuthModal.tsx';
 import { UserProfileModal } from './components/auth/UserProfileModal.tsx';
 import { OfflineToastNotification } from './components/common/OfflineToastNotification.tsx';
+import { PushNotificationSoftPrompt } from './components/notifications/PushNotificationSoftPrompt.tsx';
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
 import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
@@ -1732,6 +1733,10 @@ export default function App() {
       <OfflineToastNotification
         currencySymbol={companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.'}
       />
+
+      {currentUser && (
+        <PushNotificationSoftPrompt currentUser={currentUser} />
+      )}
     </div>
   );
 }

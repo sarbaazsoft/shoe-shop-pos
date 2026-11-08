@@ -587,6 +587,12 @@ DO NOT assume global, generic retail or wholesale software behaviors (Shopify, L
 12. CONFIDENTIALITY & SECURITY:
     - NEVER disclose confidential secrets: NO database URLs (DATABASE_URL), database credentials, admin passwords, or secret keys.
 
+13. REAL-TIME GOOGLE SEARCH GROUNDING (RETAIL TRENDS & SHOE CARE INTELLIGENCE):
+    • You have real-time Google Search grounding enabled! Whenever the store owner or staff asks about retail footwear trends, trending styles, market pricing, seasonal shoe buying habits, or shoe care and maintenance advice:
+      - RETAIL & FASHION TRENDS: Provide current market insights (e.g. trending sneaker silhouettes, retro runners, chunky loafers, chelsea boots, Peshawari chappal festive demands, summer breathable mesh, formal dress shoes, school reopening seasonal spikes, and margin optimization).
+      - PROFESSIONAL SHOE CARE ADVICE: Provide expert material-specific care routines (genuine leather conditioning, suede & nubuck brass-brushing/crepe rubber care, white sneaker sole un-yellowing, canvas/mesh stain removal without ring marks, waterproofing sprays, odor control, cedar shoe tree preservation, and extending product life for customers).
+      - Connect recommendations back to the store's inventory and categories (e.g. ${storeCategories.length > 0 ? storeCategories.join(', ') : 'Men, Women, Kids'}).
+
 ═══════════════════════════════════════════════════════════════
 TONE & LANGUAGE RULES:
 ═══════════════════════════════════════════════════════════════
@@ -603,11 +609,9 @@ TONE & LANGUAGE RULES:
 
       const candidatePool = [
         chosenModel,
-        'gemini-3.1-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-flash-latest',
         'gemini-3.8-flash',
+        'gemini-flash-latest',
+        'gemini-3.1-flash-lite',
       ];
       const modelCandidates = Array.from(new Set(candidatePool));
 
@@ -615,6 +619,15 @@ TONE & LANGUAGE RULES:
       let usedModel = chosenModel;
       let lastQuotaError = false;
       let lastHighDemandError = false;
+      let groundingSources: Array<{ uri: string; title: string }> = [];
+      let searchQueries: string[] = [];
+
+      // Google Search grounding combined with live function calling
+      const tools: any[] = [
+        { googleSearch: {} },
+        { functionDeclarations: assistantTools },
+      ];
+      const toolConfig = { includeServerSideToolInvocations: true };
 
       for (const model of modelCandidates) {
         try {
@@ -624,8 +637,8 @@ TONE & LANGUAGE RULES:
             contents: currentContents,
             config: {
               systemInstruction,
-              temperature: 0.4,
-              tools: [{ functionDeclarations: assistantTools }],
+              tools,
+              toolConfig,
             },
           });
 
@@ -682,8 +695,8 @@ TONE & LANGUAGE RULES:
               contents: currentContents,
               config: {
                 systemInstruction,
-                temperature: 0.4,
-                tools: [{ functionDeclarations: assistantTools }],
+                tools,
+                toolConfig,
               },
             });
           }
@@ -691,6 +704,25 @@ TONE & LANGUAGE RULES:
           if (response.text) {
             replyText = response.text.trim();
             usedModel = model;
+
+            // Extract Google Search Grounding Metadata
+            const candidate = response.candidates?.[0];
+            const gm = candidate?.groundingMetadata;
+            if (gm) {
+              if (Array.isArray(gm.webSearchQueries)) {
+                searchQueries = gm.webSearchQueries.filter(Boolean);
+              }
+              if (Array.isArray(gm.groundingChunks)) {
+                for (const chunk of gm.groundingChunks) {
+                  if (chunk?.web?.uri) {
+                    groundingSources.push({
+                      uri: chunk.web.uri,
+                      title: chunk.web.title || chunk.web.uri,
+                    });
+                  }
+                }
+              }
+            }
             break;
           }
         } catch (callErr: any) {
@@ -719,6 +751,8 @@ TONE & LANGUAGE RULES:
           modelUsed: usedModel,
           storeName,
           inspectedFiles: Array.from(allInspectedFiles),
+          groundingSources,
+          searchQueries,
           liveDbSnapshot: {
             tenantId,
             storeName,
