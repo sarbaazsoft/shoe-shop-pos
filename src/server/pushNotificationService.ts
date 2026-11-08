@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensureFcmTokensSchema } from '../db/schemaInit.ts';
 import { getCachedAppSetting, getAppSetting, loadAppSettingsCache, registerSettingsUpdateListener } from './services/appSettingsService.ts';
+import { sendTelegramMessage } from './services/telegramService.ts';
 
 // ============================================================================
 // FIREBASE ADMIN SDK SINGLETON & DYNAMIC INITIALIZATION
@@ -504,6 +505,34 @@ export async function notifyPlatformAnnouncement(
   const cleanTenantId = isGlobal ? null : (Number(payload.tenantId) || null);
   const targetRole = String(payload.targetRole || 'ALL').toUpperCase();
 
+  // 0. If target is SUPERADMIN, enforce granular event trigger toggles
+  if (targetRole === 'SUPERADMIN') {
+    const titleLower = (payload.title || '').toLowerCase();
+    const typeUpper = (payload.type || '').toUpperCase();
+
+    const isNewTrial = titleLower.includes('new free trial') || titleLower.includes('free tier store registered') || titleLower.includes('trial activation');
+    const isRenewal = titleLower.includes('renewal request') || titleLower.includes('subscription renewal') || titleLower.includes('upgrade request') || titleLower.includes('upgrade');
+    const isExpired = titleLower.includes('expired') || typeUpper === 'EXPIRED';
+    const isSale = typeUpper === 'SALE' || titleLower.includes('sale') || titleLower.includes('invoice');
+    const isSecurity = typeUpper === 'SECURITY' || typeUpper === 'SYSTEM' || titleLower.includes('security') || titleLower.includes('backup') || titleLower.includes('critical');
+
+    if (isNewTrial && getCachedAppSetting('SUPERADMIN_PUSH_ON_NEW_TRIAL', 'true').toLowerCase() === 'false') {
+      return; // Suppressed by SuperAdmin push event settings
+    }
+    if (isRenewal && getCachedAppSetting('SUPERADMIN_PUSH_ON_RENEWAL', 'true').toLowerCase() === 'false') {
+      return; // Suppressed by SuperAdmin push event settings
+    }
+    if (isExpired && getCachedAppSetting('SUPERADMIN_PUSH_ON_EXPIRED_STORE', 'true').toLowerCase() === 'false') {
+      return; // Suppressed by SuperAdmin push event settings
+    }
+    if (isSale && getCachedAppSetting('SUPERADMIN_PUSH_ON_SALES', 'false').toLowerCase() === 'false') {
+      return; // Suppressed by SuperAdmin push event settings
+    }
+    if (isSecurity && !isRenewal && !isNewTrial && getCachedAppSetting('SUPERADMIN_PUSH_ON_SECURITY_ALERT', 'true').toLowerCase() === 'false') {
+      return; // Suppressed by SuperAdmin push event settings
+    }
+  }
+
   const eventPayload = {
     id: payload.id,
     type: payload.type || 'INFO',
@@ -577,6 +606,25 @@ export async function notifyPlatformAnnouncement(
     });
   } catch (err) {
     console.error('Error during FCM announcement push dispatch:', err);
+  }
+
+  // 3. Deliver via Telegram to SuperAdmin if configured
+  if (targetRole === 'SUPERADMIN') {
+    try {
+      const botToken = getCachedAppSetting('TELEGRAM_BOT_TOKEN', '').trim();
+      const superAdminChatId = getCachedAppSetting('TELEGRAM_SUPERADMIN_CHAT_ID', '').trim();
+      const telegramAlertsEnabled = getCachedAppSetting('TELEGRAM_ALERTS_ENABLED', 'true').toLowerCase() !== 'false';
+
+      if (botToken && superAdminChatId && telegramAlertsEnabled) {
+        const cleanTitle = (payload.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const cleanMsg = (payload.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const actionText = payload.actionUrl ? `\n\n🔗 <i>Action: ${payload.actionLabel || 'Open Dashboard'} (${payload.actionUrl})</i>` : '';
+        const text = `<b>🔔 SuperAdmin Alert: ${cleanTitle}</b>\n\n${cleanMsg}${actionText}\n\n<i>Time: ${new Date().toLocaleString()}</i>`;
+        sendTelegramMessage(botToken, superAdminChatId, text).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('Error during Telegram SuperAdmin announcement dispatch:', err);
+    }
   }
 }
 

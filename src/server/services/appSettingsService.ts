@@ -171,6 +171,43 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
     isSecret: false,
   },
 
+  // 3b. SuperAdmin Native Push Notification Event Triggers
+  {
+    key: 'SUPERADMIN_PUSH_ON_NEW_TRIAL',
+    defaultValue: 'true',
+    category: 'notifications',
+    description: 'Trigger native push notifications for new 30-day Free Trial store registrations',
+    isSecret: false,
+  },
+  {
+    key: 'SUPERADMIN_PUSH_ON_RENEWAL',
+    defaultValue: 'true',
+    category: 'notifications',
+    description: 'Trigger native push notifications for subscription renewals and tier upgrade requests',
+    isSecret: false,
+  },
+  {
+    key: 'SUPERADMIN_PUSH_ON_EXPIRED_STORE',
+    defaultValue: 'true',
+    category: 'notifications',
+    description: 'Trigger native push notifications when a store subscription expires',
+    isSecret: false,
+  },
+  {
+    key: 'SUPERADMIN_PUSH_ON_SECURITY_ALERT',
+    defaultValue: 'true',
+    category: 'notifications',
+    description: 'Trigger native push notifications for platform security events, backups, and critical system logs',
+    isSecret: false,
+  },
+  {
+    key: 'SUPERADMIN_PUSH_ON_SALES',
+    defaultValue: 'false',
+    category: 'notifications',
+    description: 'Trigger native push notifications to SuperAdmin for high-value store sales or platform auditing',
+    isSecret: false,
+  },
+
   // 4. System Group
   {
     key: 'SW_KILL_SWITCH',
@@ -289,6 +326,18 @@ export async function ensureAppSettingsSchema(): Promise<void> {
         UPDATE public.app_settings SET value = '900875095665' WHERE key = 'FCM_MESSAGING_SENDER_ID' AND (value IS NULL OR value = '');
         UPDATE public.app_settings SET value = '1:900875095665:web:2050a569fe0b7eded995d0' WHERE key = 'FCM_APP_ID' AND (value IS NULL OR value = '');
         UPDATE public.app_settings SET value = 'G-YNR6ETB365' WHERE key = 'FCM_MEASUREMENT_ID' AND (value IS NULL OR value = '');
+      `).catch(() => {});
+
+      // Seed default SuperAdmin push event toggles if not already present
+      await pgClient.query(`
+        INSERT INTO public.app_settings (key, value, category, description, is_secret, updated_at)
+        VALUES 
+          ('SUPERADMIN_PUSH_ON_NEW_TRIAL', 'true', 'notifications', 'Trigger native push notifications for new 30-day Free Trial store registrations', false, NOW()),
+          ('SUPERADMIN_PUSH_ON_RENEWAL', 'true', 'notifications', 'Trigger native push notifications for subscription renewals and tier upgrade requests', false, NOW()),
+          ('SUPERADMIN_PUSH_ON_EXPIRED_STORE', 'true', 'notifications', 'Trigger native push notifications when a store subscription expires', false, NOW()),
+          ('SUPERADMIN_PUSH_ON_SECURITY_ALERT', 'true', 'notifications', 'Trigger native push notifications for platform security events, backups, and critical system logs', false, NOW()),
+          ('SUPERADMIN_PUSH_ON_SALES', 'false', 'notifications', 'Trigger native push notifications to SuperAdmin for high-value store sales or platform auditing', false, NOW())
+        ON CONFLICT (key) DO NOTHING;
       `).catch(() => {});
     } catch (err: any) {
       console.warn('Notice while ensuring app_settings schema:', err?.message || err);

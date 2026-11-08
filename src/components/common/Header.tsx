@@ -10,7 +10,7 @@ import { ClickableMessage } from './ClickableMessage.tsx';
 import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
-import { lookupCachedProductOffline, searchCachedProductsOffline } from '../../utils/offlineDb.ts';
+import { lookupCachedProductOffline, searchCachedProductsOffline, getAllCachedProductsOffline } from '../../utils/offlineDb.ts';
 import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream, initNativeNotificationPrompt } from '../../services/pushNotificationClient.ts';
 
 interface HeaderProps {
@@ -182,7 +182,20 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // Quick price search - does NOT change routes, directly retrieves single product price suggestions
+  // Helper to test if product exactly matches query on barcode, article number, or product name
+  const isExactProductMatch = (p: any, queryStr: string): boolean => {
+    if (!p || !queryStr) return false;
+    const cleanQ = queryStr.trim().toLowerCase();
+    if (!cleanQ) return false;
+
+    const barcode = p.barcode ? String(p.barcode).trim().toLowerCase() : '';
+    const article = p.article ? String(p.article).trim().toLowerCase() : '';
+    const name = p.name ? String(p.name).trim().toLowerCase() : '';
+
+    return barcode === cleanQ || article === cleanQ || name === cleanQ;
+  };
+
+  // Quick price search - strictly displays suggestions ONLY on complete exact barcode, article number, or product name match
   const searchTimeoutRef = useRef<any>(null);
 
   const executeSingleProductPriceSearch = async (queryText: string) => {
@@ -195,94 +208,53 @@ export const Header: React.FC<HeaderProps> = ({
 
     setIsLoadingSearch(true);
     try {
-      let singleProduct: any = null;
-      const lowerQ = q.toLowerCase();
+      const cleanQ = q.toLowerCase();
+      const exactMatchesMap = new Map<number | string, any>();
 
-      // 1. Fetch matching products from API
-      const prodRes = await api.products.list({ search: q, limit: 30 }).catch(() => ({ products: [] }));
-      const list = prodRes?.products || [];
+      // 1. Concurrently query exact scanner/barcode lookup and product list for speed & resilience
+      const [directRes, listRes] = await Promise.allSettled([
+        api.products.lookupBarcode(q),
+        api.products.list({ search: q, limit: 50 }),
+      ]);
 
-      if (list.length > 0) {
-        // TOP PRIORITY: Exact match on product article (case-insensitive)
-        const exactArticle = list.find(
-          (p: any) => p.article && p.article.trim().toLowerCase() === lowerQ
-        );
-
-        // SECOND PRIORITY: Exact match on Barcode
-        const exactBarcode = list.find(
-          (p: any) => p.barcode && p.barcode.trim().toLowerCase() === lowerQ
-        );
-
-        // THIRD PRIORITY: Article starts with search query
-        const startsArticle = list.find(
-          (p: any) => p.article && p.article.trim().toLowerCase().startsWith(lowerQ)
-        );
-
-        singleProduct = exactArticle || exactBarcode || startsArticle || list[0];
-      }
-
-      // 2. If not found in product list, try direct scanner lookup endpoint as fallback
-      if (!singleProduct) {
-        try {
-          const directLookup = await api.products.lookupBarcode(q);
-          if (directLookup?.product) {
-            singleProduct = directLookup.product;
-          }
-        } catch {
-          // not found via network lookup
+      // Direct lookup endpoint matches exact barcode, article, or name in Postgres
+      if (directRes.status === 'fulfilled' && directRes.value?.product) {
+        const prod = directRes.value.product;
+        if (isExactProductMatch(prod, cleanQ)) {
+          exactMatchesMap.set(prod.id, prod);
         }
       }
 
-      // 3. OFFLINE FALLBACK: If network failed or server unreachable, lookup from browser IndexedDB cached catalog
-      if (!singleProduct) {
+      // Check product list strictly for complete exact matches (zero premature partial suggestions)
+      if (listRes.status === 'fulfilled' && Array.isArray(listRes.value?.products)) {
+        for (const prod of listRes.value.products) {
+          if (isExactProductMatch(prod, cleanQ) && !exactMatchesMap.has(prod.id)) {
+            exactMatchesMap.set(prod.id, prod);
+          }
+        }
+      }
+
+      // 2. Offline fallback: strictly match against local cached catalog when offline or server unreachable
+      if (exactMatchesMap.size === 0) {
         try {
-          const cachedProduct = await lookupCachedProductOffline(q).catch(() => null);
-          if (cachedProduct) {
-            singleProduct = {
-              ...cachedProduct,
-              totalStock: cachedProduct.totalStock ?? cachedProduct.total_stock ?? 0,
-              costPrice: parseFloat(cachedProduct.costPrice || cachedProduct.cost_price || 0),
-              minSalePrice: parseFloat(cachedProduct.minSalePrice || cachedProduct.min_sale_price || 0),
-              maxSalePrice: parseFloat(cachedProduct.maxSalePrice || cachedProduct.max_sale_price || 0),
-              sellingPrice: parseFloat(
-                cachedProduct.sellingPrice ||
-                  cachedProduct.selling_price ||
-                  cachedProduct.salePrice ||
-                  cachedProduct.sale_price ||
-                  0
-              ),
-              isOfflineCached: true,
-            };
-          } else {
-            const cachedList = await searchCachedProductsOffline(q).catch(() => []);
-            if (cachedList && cachedList.length > 0) {
-              const exactArticle = cachedList.find(
-                (p: any) => p.article && p.article.trim().toLowerCase() === lowerQ
-              );
-              const exactBarcode = cachedList.find(
-                (p: any) => p.barcode && p.barcode.trim().toLowerCase() === lowerQ
-              );
-              const startsArticle = cachedList.find(
-                (p: any) => p.article && p.article.trim().toLowerCase().startsWith(lowerQ)
-              );
-              const found = exactArticle || exactBarcode || startsArticle || cachedList[0];
-              if (found) {
-                singleProduct = {
-                  ...found,
-                  totalStock: found.totalStock ?? found.total_stock ?? 0,
-                  costPrice: parseFloat(found.costPrice || found.cost_price || 0),
-                  minSalePrice: parseFloat(found.minSalePrice || found.min_sale_price || 0),
-                  maxSalePrice: parseFloat(found.maxSalePrice || found.max_sale_price || 0),
-                  sellingPrice: parseFloat(
-                    found.sellingPrice ||
-                      found.selling_price ||
-                      found.salePrice ||
-                      found.sale_price ||
-                      0
-                  ),
-                  isOfflineCached: true,
-                };
-              }
+          const cachedProducts = await getAllCachedProductsOffline().catch(() => []);
+          for (const cached of cachedProducts) {
+            if (isExactProductMatch(cached, cleanQ) && !exactMatchesMap.has(cached.id)) {
+              exactMatchesMap.set(cached.id, {
+                ...cached,
+                totalStock: cached.totalStock ?? cached.total_stock ?? 0,
+                costPrice: parseFloat(cached.costPrice || cached.cost_price || 0),
+                minSalePrice: parseFloat(cached.minSalePrice || cached.min_sale_price || 0),
+                maxSalePrice: parseFloat(cached.maxSalePrice || cached.max_sale_price || 0),
+                sellingPrice: parseFloat(
+                  cached.sellingPrice ||
+                    cached.selling_price ||
+                    cached.salePrice ||
+                    cached.sale_price ||
+                    0
+                ),
+                isOfflineCached: true,
+              });
             }
           }
         } catch {
@@ -290,8 +262,9 @@ export const Header: React.FC<HeaderProps> = ({
         }
       }
 
-      // Always return ONLY the single matching product
-      setPriceSearchResults(singleProduct ? [singleProduct] : []);
+      // Set results: only complete exact matches are returned (no partial or premature autocomplete items)
+      const results = Array.from(exactMatchesMap.values());
+      setPriceSearchResults(results);
     } catch {
       setPriceSearchResults([]);
     } finally {
@@ -310,10 +283,10 @@ export const Header: React.FC<HeaderProps> = ({
       clearTimeout(searchTimeoutRef.current);
     }
 
-    setIsLoadingSearch(true);
+    // Debounce search by 200ms without flashing premature loading skeletons on intermediate keystrokes
     searchTimeoutRef.current = setTimeout(() => {
       executeSingleProductPriceSearch(searchQuery);
-    }, 180);
+    }, 200);
 
     return () => {
       if (searchTimeoutRef.current) {
