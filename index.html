@@ -69,6 +69,25 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- PWA Root Service Worker Registration (PWABuilder & Chromium WebAPK compliant) -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/sw.js', { scope: '/' })
+            .then(function (registration) {
+              // Ensure immediate updates if new version is waiting
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+            })
+            .catch(function (error) {
+              console.warn('[PWA] Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

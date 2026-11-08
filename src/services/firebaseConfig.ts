@@ -148,9 +148,12 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
     // 3. Register or locate the Service Worker
     let swReg: ServiceWorkerRegistration | undefined;
     if ('serviceWorker' in navigator) {
-      swReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+      swReg =
+        (await navigator.serviceWorker.getRegistration('/')) ||
+        (await navigator.serviceWorker.getRegistration('/sw.js')) ||
+        (await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js'));
       if (!swReg) {
-        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+        swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       }
       await navigator.serviceWorker.ready;
     }

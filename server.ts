@@ -63,16 +63,15 @@ app.use('/api', (_req, res, next) => {
 app.use(express.json({ limit: '50mb', strict: false }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Self-cleaning Service Worker endpoint.
-// ONLY used in development / sandbox previews (or when SW_KILL_SWITCH=true in app_settings) so stale registrations never
-// intercept /api calls. In production this MUST fall through to the real Workbox sw.js in /dist,
-// otherwise the PWA is never installable (no service worker => no "Install app" in Chrome's menu).
-app.get('/sw.js', (_req, res, next) => {
+// Root Service Worker endpoints (/sw.js, /firebase-messaging-sw.js, /sw-background-sync.js)
+// Serves service workers directly from the domain root with Service-Worker-Allowed: /
+// and application/javascript MIME type to satisfy PWABuilder, Lighthouse, and browser engines.
+app.get(['/sw.js', '/firebase-messaging-sw.js', '/sw-background-sync.js'], (req, res, next) => {
   const swKillSwitchEnabled = getCachedAppSetting('SW_KILL_SWITCH', 'false') === 'true';
-  if (!swKillSwitchEnabled) return next();
-  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.send(`
+  if (swKillSwitchEnabled && req.path === '/sw.js') {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.send(`
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -84,6 +83,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 `);
+  }
+
+  const filename = req.path.replace(/^\//, '');
+  const candidatePath = path.join(rootDir, 'public', filename);
+  if (fs.existsSync(candidatePath)) {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(candidatePath);
+  }
+  next();
 });
 
 // Cross-Origin API Authentication & Store Isolation Middleware
