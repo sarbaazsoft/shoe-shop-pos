@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
@@ -360,6 +360,21 @@ export const Header: React.FC<HeaderProps> = ({
     actionLabel?: string;
   } | null>(null);
 
+  // Animate notification bell icon to pulse when a new push notification arrives while app is active
+  const [isBellPulsing, setIsBellPulsing] = useState(false);
+  const bellPulseTimeoutRef = useRef<any>(null);
+
+  const triggerBellPulse = useCallback(() => {
+    setIsBellPulsing(true);
+    if (bellPulseTimeoutRef.current) {
+      clearTimeout(bellPulseTimeoutRef.current);
+    }
+    // Pulse for 6.5 seconds or until user interacts with notification dropdown
+    bellPulseTimeoutRef.current = setTimeout(() => {
+      setIsBellPulsing(false);
+    }, 6500);
+  }, []);
+
   const currentRole = String(currentUser?.role || '').trim().toUpperCase();
   const isSuperAdminUser = currentRole === 'SUPERADMIN';
   const isAdminUser = currentRole === 'ADMIN';
@@ -445,6 +460,8 @@ export const Header: React.FC<HeaderProps> = ({
         }
       }
 
+      // Animate notification bell icon to pulse when a push notification arrives
+      triggerBellPulse();
       fetchLiveNotifications();
       // Display instant floating notification toast
       setLivePushToast({
@@ -466,11 +483,25 @@ export const Header: React.FC<HeaderProps> = ({
       }, 9000);
     });
 
+    // Also trigger bell pulse on foreground push events and platform announcements
+    const handleInAppPushAlert = () => {
+      triggerBellPulse();
+      fetchLiveNotifications();
+    };
+
+    window.addEventListener('pos:action-notification', handleInAppPushAlert);
+    window.addEventListener('platform:announcement', handleInAppPushAlert);
+
     return () => {
       cleanupNativePrompt();
       cleanupStream();
+      window.removeEventListener('pos:action-notification', handleInAppPushAlert);
+      window.removeEventListener('platform:announcement', handleInAppPushAlert);
+      if (bellPulseTimeoutRef.current) {
+        clearTimeout(bellPulseTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [triggerBellPulse]);
 
   const handleTogglePushNotifications = async () => {
     if (isTogglingPush) return;
@@ -509,6 +540,9 @@ export const Header: React.FC<HeaderProps> = ({
       const res = await api.notifications.testPush();
       setTestPushStatus(res.success ? 'success' : 'error');
       setPushStatusMessage('🔔 Test alert sent to your registered devices.');
+      if (res.success) {
+        triggerBellPulse();
+      }
       setTimeout(() => {
         setTestPushStatus(null);
         setPushStatusMessage(null);
@@ -1338,6 +1372,10 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() => {
               setShowNotifications((prev) => !prev);
+              setIsBellPulsing(false);
+              if (bellPulseTimeoutRef.current) {
+                clearTimeout(bellPulseTimeoutRef.current);
+              }
               setShowUserDropdown(false);
               setShowThemeDropdown(false);
               setIsSearching(false);
@@ -1345,9 +1383,11 @@ export const Header: React.FC<HeaderProps> = ({
                 fetchLiveNotifications();
               }
             }}
-            className={`h-8 sm:h-8.5 flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs ${
+            className={`h-8 sm:h-8.5 flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs relative ${
               showNotifications
                 ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 ring-2 ring-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_16px_rgba(147,51,234,0.4)]'
+                : isBellPulsing
+                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-400 ring-2 ring-purple-500/80 shadow-lg shadow-purple-500/30 dark:bg-purple-900/40 dark:text-purple-100 dark:border-purple-400 dark:ring-purple-400/80 dark:shadow-[0_0_20px_rgba(168,85,247,0.45)]'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:text-purple-200 dark:hover:text-white dark:bg-purple-500/20 dark:hover:bg-purple-500/30 dark:border-purple-400/40 dark:shadow-[0_0_14px_rgba(147,51,234,0.2)]'
             }`}
             title="System Notifications"
@@ -1356,7 +1396,39 @@ export const Header: React.FC<HeaderProps> = ({
             aria-haspopup="true"
           >
             <div className="relative shrink-0 flex items-center justify-center">
-              <Bell className="w-3.5 h-3.5 stroke-[2]" />
+              {isBellPulsing && (
+                <>
+                  <span className="absolute -inset-1 rounded-full bg-purple-500/50 dark:bg-purple-400/60 animate-ping pointer-events-none" />
+                  <span className="absolute -inset-2 rounded-full bg-purple-500/30 dark:bg-purple-400/35 animate-pulse pointer-events-none blur-xs" />
+                </>
+              )}
+              <motion.div
+                animate={
+                  isBellPulsing
+                    ? {
+                        rotate: [0, -20, 20, -15, 15, -8, 8, -4, 4, 0],
+                        scale: [1, 1.25, 1.15, 1.25, 1.15, 1.2, 1],
+                      }
+                    : { rotate: 0, scale: 1 }
+                }
+                transition={
+                  isBellPulsing
+                    ? {
+                        duration: 1.2,
+                        repeat: Infinity,
+                        repeatDelay: 0.35,
+                        ease: 'easeInOut',
+                      }
+                    : { duration: 0.2 }
+                }
+                className="flex items-center justify-center"
+              >
+                {isBellPulsing ? (
+                  <BellRing className="w-3.5 h-3.5 stroke-[2.2] text-purple-700 dark:text-purple-200 drop-shadow-[0_0_8px_rgba(168,85,247,0.7)]" />
+                ) : (
+                  <Bell className="w-3.5 h-3.5 stroke-[2]" />
+                )}
+              </motion.div>
               {unreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3 px-0.5 rounded-full bg-rose-500 text-white font-bold text-[8px] flex items-center justify-center ring-1 ring-white dark:ring-[#120726]">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -1365,7 +1437,11 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span
               className={`hidden sm:inline-block text-xs font-semibold ${
-                showNotifications ? 'text-white' : 'text-slate-700 dark:text-purple-200'
+                showNotifications
+                  ? 'text-white'
+                  : isBellPulsing
+                  ? 'text-purple-900 dark:text-purple-100 font-bold'
+                  : 'text-slate-700 dark:text-purple-200'
               }`}
             >
               Alerts
