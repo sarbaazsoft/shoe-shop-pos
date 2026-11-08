@@ -97,13 +97,15 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
       [tenantId]
     );
 
-    // Monthly Sales Chart (Rolling 6 Months)
+    // Monthly Sales & Inventory Volume Chart (Rolling 12 Months: Gross Sales Rs. + Sold Volume + Stock Inflow)
     const monthlySalesRes = await pgClient.query<{
       month: string;
       label: string;
       year_label: string;
       amount: string;
       tx_count: string;
+      volume_sold: string;
+      volume_purchased: string;
     }>(
       `WITH months AS (
          SELECT 
@@ -112,26 +114,287 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
            TO_CHAR(d, 'YYYY') as year_label,
            d as month_date
          FROM generate_series(
-           DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months',
+           DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months',
            DATE_TRUNC('month', CURRENT_DATE),
            '1 month'::interval
          ) as d
+       ),
+       sales_agg AS (
+         SELECT 
+           SUBSTRING(s.sale_date, 1, 7) as m_key,
+           COALESCE(SUM(s.total_amount), 0) as total_sales,
+           COUNT(s.id)::int as tx_cnt,
+           COALESCE(SUM(si.quantity), 0)::int as vol_sold
+         FROM sales s
+         LEFT JOIN sale_items si ON si.sale_id = s.id AND si.tenant_id = $1
+         WHERE s.tenant_id = $1
+         GROUP BY SUBSTRING(s.sale_date, 1, 7)
+       ),
+       purch_agg AS (
+         SELECT 
+           SUBSTRING(p.purchase_date, 1, 7) as m_key,
+           COALESCE(SUM(pi.quantity), 0)::int as vol_purch
+         FROM purchases p
+         LEFT JOIN purchase_items pi ON pi.purchase_id = p.id AND pi.tenant_id = $1
+         WHERE p.tenant_id = $1
+         GROUP BY SUBSTRING(p.purchase_date, 1, 7)
        )
        SELECT 
          months.month_key as month,
          months.label,
          months.year_label,
-         COALESCE(SUM(s.total_amount), 0) as amount,
-         COUNT(s.id)::int as tx_count
+         COALESCE(sa.total_sales, 0) as amount,
+         COALESCE(sa.tx_cnt, 0) as tx_count,
+         COALESCE(sa.vol_sold, 0) as volume_sold,
+         COALESCE(pa.vol_purch, 0) as volume_purchased
        FROM months
-       LEFT JOIN sales s ON s.tenant_id = $1 AND s.sale_date LIKE (months.month_key || '%')
-       GROUP BY months.month_key, months.label, months.year_label, months.month_date
+       LEFT JOIN sales_agg sa ON sa.m_key = months.month_key
+       LEFT JOIN purch_agg pa ON pa.m_key = months.month_key
        ORDER BY months.month_date ASC`,
       [tenantId]
     );
 
-    // Recent Transactions (Sales + Purchases + Returns combined)
-    const recentTxRes = await pgClient.query<{
+    // 12-Month Total Sales & Total Orders for AOV calculation
+    const twelveMonthSalesNum = monthlySalesRes.rows.reduce(
+      (sum, m) => sum + (parseFloat(m.amount) || 0),
+      0
+    );
+    const twelveMonthTxNum = monthlySalesRes.rows.reduce(
+      (sum, m) => sum + (parseInt(m.tx_count, 10) || 0),
+      0
+    );
+    const overallAov = twelveMonthTxNum > 0 ? Math.round(twelveMonthSalesNum / twelveMonthTxNum) : 0;
+    const todayAov = parseInt(todaySales.rows[0].count, 10) > 0
+      ? Math.round(parseFloat(todaySales.rows[0].total_sales) / parseInt(todaySales.rows[0].count, 10))
+      : 0;
+
+    // Top Selling Categories and Article Prefixes (Shared Bar Chart data)
+    const categoryArticlesRes = await pgClient.query<{
+      key: string;
+      category_name: string;
+      article_prefix: string;
+      units_sold: string;
+      gross_sales: string;
+      in_stock: string;
+    }>(
+      `SELECT 
+         COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized') as category_name,
+         COALESCE(NULLIF(SPLIT_PART(TRIM(COALESCE(p.article, p.name)), '-', 1), ''), 'ART') as article_prefix,
+         (COALESCE(NULLIF(TRIM(p.category), ''), 'General') || ' (' || COALESCE(NULLIF(SPLIT_PART(TRIM(COALESCE(p.article, p.name)), '-', 1), ''), 'ART') || ')') as key,
+         COALESCE(SUM(si.quantity), 0)::int as units_sold,
+         COALESCE(SUM((si.unit_price * si.quantity) - si.discount), 0)::numeric as gross_sales,
+         COALESCE(SUM(p.total_stock), 0)::int as in_stock
+       FROM products p
+       LEFT JOIN sale_items si ON si.product_id = p.id AND si.tenant_id = $1
+       WHERE p.tenant_id = $1 AND p.active = true
+       GROUP BY p.category, SPLIT_PART(TRIM(COALESCE(p.article, p.name)), '-', 1)
+       ORDER BY units_sold DESC, gross_sales DESC
+       LIMIT 7`,
+      [tenantId]
+    );
+
+    // Wholesale Financial Ledger Analytics:
+    // 1. Total Receivables (Customer Ledger balances)
+    const receivablesRes = await pgClient.query<{
+      total_receivables: string;
+      customer_count: string;
+      debtor_count: string;
+    }>(
+      `SELECT 
+         COALESCE(SUM(GREATEST(0, COALESCE(outstanding_balance, current_balance, 0))), 0)::numeric as total_receivables,
+         COUNT(*)::int as customer_count,
+         COUNT(CASE WHEN COALESCE(outstanding_balance, current_balance, 0) > 0 THEN 1 END)::int as debtor_count
+       FROM customers 
+       WHERE tenant_id = $1`,
+      [tenantId]
+    );
+
+    // 2. Total Payables (Suppliers net balances)
+    const payablesRes = await pgClient.query<{
+      total_payables: string;
+      supplier_count: string;
+      creditor_count: string;
+    }>(
+      `WITH sup_calc AS (
+         SELECT 
+           s.id,
+           (COALESCE(sl.opening_bal, 0) + COALESCE(p.purch_amt, 0) - COALESCE(pr.ret_amt, 0) - COALESCE(sp.paid_amt, 0)) as net_payable
+         FROM suppliers s
+         LEFT JOIN (
+           SELECT supplier_id, SUM(credit - debit) as opening_bal
+           FROM supplier_ledger
+           WHERE tenant_id = $1
+           GROUP BY supplier_id
+         ) sl ON sl.supplier_id = s.id
+         LEFT JOIN (
+           SELECT supplier_id, SUM(total_amount) as purch_amt
+           FROM purchases
+           WHERE tenant_id = $1
+           GROUP BY supplier_id
+         ) p ON p.supplier_id = s.id
+         LEFT JOIN (
+           SELECT supplier_id, SUM(total_debit_amount) as ret_amt
+           FROM purchase_returns
+           WHERE tenant_id = $1
+           GROUP BY supplier_id
+         ) pr ON pr.supplier_id = s.id
+         LEFT JOIN (
+           SELECT supplier_id, SUM(amount) as paid_amt
+           FROM supplier_payments
+           WHERE tenant_id = $1
+           GROUP BY supplier_id
+         ) sp ON sp.supplier_id = s.id
+         WHERE s.tenant_id = $1
+       )
+       SELECT 
+         COALESCE(SUM(GREATEST(0, net_payable)), 0)::numeric as total_payables,
+         COUNT(*)::int as supplier_count,
+         COUNT(CASE WHEN net_payable > 0 THEN 1 END)::int as creditor_count
+       FROM sup_calc`,
+      [tenantId]
+    );
+
+    // 3. Customer Aging Report (0-30 days, 31-60 days, 60-90+ days)
+    // We check the oldest unpaid/outstanding invoice or last transaction date per debtor
+    const agingRes = await pgClient.query<{
+      days_0_30: string;
+      days_31_60: string;
+      days_61_90: string;
+      days_90_plus: string;
+      count_0_30: string;
+      count_31_60: string;
+      count_61_90: string;
+      count_90_plus: string;
+    }>(
+      `WITH debtor_dates AS (
+         SELECT 
+           c.id,
+           c.name,
+           GREATEST(0, COALESCE(c.outstanding_balance, c.current_balance, 0)) as balance,
+           COALESCE(
+             (
+               SELECT MAX(s.sale_date)::date 
+               FROM sales s 
+               WHERE s.customer_id = c.id AND s.tenant_id = $1
+             ),
+             c.created_at::date,
+             CURRENT_DATE
+           ) as last_activity_date
+         FROM customers c
+         WHERE c.tenant_id = $1 AND GREATEST(0, COALESCE(c.outstanding_balance, c.current_balance, 0)) > 0
+       ),
+       debtor_aging AS (
+         SELECT 
+           id,
+           balance,
+           (CURRENT_DATE - last_activity_date)::int as days_old
+         FROM debtor_dates
+       )
+       SELECT 
+         COALESCE(SUM(CASE WHEN days_old <= 30 THEN balance ELSE 0 END), 0)::numeric as days_0_30,
+         COALESCE(SUM(CASE WHEN days_old > 30 AND days_old <= 60 THEN balance ELSE 0 END), 0)::numeric as days_31_60,
+         COALESCE(SUM(CASE WHEN days_old > 60 AND days_old <= 90 THEN balance ELSE 0 END), 0)::numeric as days_61_90,
+         COALESCE(SUM(CASE WHEN days_old > 90 THEN balance ELSE 0 END), 0)::numeric as days_90_plus,
+         COUNT(CASE WHEN days_old <= 30 THEN 1 END)::int as count_0_30,
+         COUNT(CASE WHEN days_old > 30 AND days_old <= 60 THEN 1 END)::int as count_31_60,
+         COUNT(CASE WHEN days_old > 60 AND days_old <= 90 THEN 1 END)::int as count_61_90,
+         COUNT(CASE WHEN days_old > 90 THEN 1 END)::int as count_90_plus
+       FROM debtor_aging`,
+      [tenantId]
+    );
+
+    // 4. High Balance vs. Low Balance Customers
+    // High Balance = Balance >= Rs. 25,000 (or >= 50% of avg debtor balance); Low Balance = Under Rs. 25,000
+    const highLowBalanceRes = await pgClient.query<{
+      high_count: string;
+      high_total: string;
+      low_count: string;
+      low_total: string;
+      zero_count: string;
+    }>(
+      `SELECT 
+         COUNT(CASE WHEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) >= 25000 THEN 1 END)::int as high_count,
+         COALESCE(SUM(CASE WHEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) >= 25000 THEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) ELSE 0 END), 0)::numeric as high_total,
+         COUNT(CASE WHEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) > 0 AND GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) < 25000 THEN 1 END)::int as low_count,
+         COALESCE(SUM(CASE WHEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) > 0 AND GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) < 25000 THEN GREATEST(0, COALESCE(outstanding_balance, current_balance, 0)) ELSE 0 END), 0)::numeric as low_total,
+         COUNT(CASE WHEN COALESCE(outstanding_balance, current_balance, 0) <= 0 THEN 1 END)::int as zero_count
+       FROM customers
+       WHERE tenant_id = $1`,
+      [tenantId]
+    );
+
+    // 5. Top Wholesale Customer Turnover against Outstanding Balances
+    const wholesaleCustomersTurnoverRes = await pgClient.query<{
+      id: number;
+      name: string;
+      shop_name: string;
+      city: string;
+      phone: string;
+      outstanding_balance: string;
+      total_sales_turnover: string;
+      orders_count: string;
+      last_sale_date: string;
+    }>(
+      `SELECT 
+         c.id,
+         c.name,
+         COALESCE(c.shop_name, '') as shop_name,
+         COALESCE(c.city, '') as city,
+         COALESCE(c.phone, '') as phone,
+         GREATEST(0, COALESCE(c.outstanding_balance, c.current_balance, 0))::numeric as outstanding_balance,
+         COALESCE(s_agg.turnover, 0)::numeric as total_sales_turnover,
+         COALESCE(s_agg.order_count, 0)::int as orders_count,
+         COALESCE(s_agg.last_date, '') as last_sale_date
+       FROM customers c
+       LEFT JOIN (
+         SELECT 
+           customer_id,
+           SUM(total_amount) as turnover,
+           COUNT(id) as order_count,
+           MAX(sale_date) as last_date
+         FROM sales
+         WHERE tenant_id = $1 AND customer_id IS NOT NULL
+         GROUP BY customer_id
+       ) s_agg ON s_agg.customer_id = c.id
+       WHERE c.tenant_id = $1
+       ORDER BY total_sales_turnover DESC, outstanding_balance DESC
+       LIMIT 6`,
+      [tenantId]
+    );
+
+    // 6. Top Selling Sizes / Footwear Articles Breakdown
+    const topSizesArticlesRes = await pgClient.query<{
+      article: string;
+      name: string;
+      category: string;
+      size_label: string;
+      units_sold: string;
+      revenue: string;
+      stock: string;
+    }>(
+      `SELECT 
+         COALESCE(p.article, p.name) as article,
+         p.name,
+         COALESCE(p.category, 'Shoes') as category,
+         COALESCE(
+           NULLIF(SUBSTRING(COALESCE(p.article, p.name) FROM '-(?:SZ|S)?([0-9]{1,2}(?:\\.[0-9])?)'), ''),
+           NULLIF(SUBSTRING(COALESCE(p.article, p.name) FROM '([0-9]{1,2})$'), ''),
+           '40-44 (Pack)'
+         ) as size_label,
+         COALESCE(SUM(si.quantity), 0)::int as units_sold,
+         COALESCE(SUM((si.unit_price * si.quantity) - si.discount), 0)::numeric as revenue,
+         p.total_stock::int as stock
+       FROM products p
+       LEFT JOIN sale_items si ON si.product_id = p.id AND si.tenant_id = $1
+       WHERE p.tenant_id = $1 AND p.active = true
+       GROUP BY p.id, p.article, p.name, p.category, p.total_stock
+       ORDER BY units_sold DESC, stock DESC
+       LIMIT 5`,
+      [tenantId]
+    );
+
+    // Recent Transactions (Last 6 combined across sales, purchases, returns)
+    const recentTransactionsRes = await pgClient.query<{
       type: string;
       reference: string;
       amount: string;
@@ -607,7 +870,7 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
         amount: parseFloat(r.amount) || 0,
         txCount: parseInt(r.tx_count, 10) || 0,
       })),
-      recentTransactions: recentTxRes.rows.map((r) => ({
+      recentTransactions: recentTransactionsRes.rows.map((r) => ({
         type: r.type,
         reference: r.reference,
         amount: parseFloat(r.amount) || 0,
@@ -631,6 +894,65 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
         salesTargets,
         categoryBreakdown,
         inventoryClearance,
+      },
+      // Shared Analytics Additions (12M Monthly Sales & Inventory Volume, Top Categories / Article Prefixes)
+      twelveMonthSales: twelveMonthSalesNum,
+      twelveMonthOrders: twelveMonthTxNum,
+      overallAov,
+      todayAov,
+      categoryArticles: categoryArticlesRes.rows.map((row) => ({
+        key: row.key,
+        categoryName: row.category_name,
+        articlePrefix: row.article_prefix,
+        unitsSold: parseInt(row.units_sold, 10) || 0,
+        grossSales: parseFloat(row.gross_sales) || 0,
+        inStock: parseInt(row.in_stock, 10) || 0,
+      })),
+      topSizesArticles: topSizesArticlesRes.rows.map((row) => ({
+        article: row.article,
+        name: row.name,
+        category: row.category,
+        sizeLabel: row.size_label,
+        unitsSold: parseInt(row.units_sold, 10) || 0,
+        revenue: parseFloat(row.revenue) || 0,
+        stock: parseInt(row.stock, 10) || 0,
+      })),
+      // Wholesale-Specific Financial Ledger & Balance Analytics
+      wholesaleLedger: {
+        totalReceivables: parseFloat(receivablesRes.rows[0]?.total_receivables) || 0,
+        debtorCount: parseInt(receivablesRes.rows[0]?.debtor_count, 10) || 0,
+        totalCustomers: parseInt(receivablesRes.rows[0]?.customer_count, 10) || 0,
+        totalPayables: parseFloat(payablesRes.rows[0]?.total_payables) || 0,
+        creditorCount: parseInt(payablesRes.rows[0]?.creditor_count, 10) || 0,
+        totalSuppliers: parseInt(payablesRes.rows[0]?.supplier_count, 10) || 0,
+        customerAging: {
+          days0to30: parseFloat(agingRes.rows[0]?.days_0_30) || 0,
+          days31to60: parseFloat(agingRes.rows[0]?.days_31_60) || 0,
+          days61to90: parseFloat(agingRes.rows[0]?.days_61_90) || 0,
+          days90Plus: parseFloat(agingRes.rows[0]?.days_90_plus) || 0,
+          count0to30: parseInt(agingRes.rows[0]?.count_0_30, 10) || 0,
+          count31to60: parseInt(agingRes.rows[0]?.count_31_60, 10) || 0,
+          count61to90: parseInt(agingRes.rows[0]?.count_61_90, 10) || 0,
+          count90Plus: parseInt(agingRes.rows[0]?.count_90_plus, 10) || 0,
+        },
+        highLowBalance: {
+          highCount: parseInt(highLowBalanceRes.rows[0]?.high_count, 10) || 0,
+          highTotal: parseFloat(highLowBalanceRes.rows[0]?.high_total) || 0,
+          lowCount: parseInt(highLowBalanceRes.rows[0]?.low_count, 10) || 0,
+          lowTotal: parseFloat(highLowBalanceRes.rows[0]?.low_total) || 0,
+          zeroCount: parseInt(highLowBalanceRes.rows[0]?.zero_count, 10) || 0,
+        },
+        wholesaleCustomersTurnover: wholesaleCustomersTurnoverRes.rows.map((c) => ({
+          id: c.id,
+          name: c.name,
+          shopName: c.shop_name,
+          city: c.city,
+          phone: c.phone,
+          outstandingBalance: parseFloat(c.outstanding_balance) || 0,
+          totalSalesTurnover: parseFloat(c.total_sales_turnover) || 0,
+          ordersCount: parseInt(c.orders_count, 10) || 0,
+          lastSaleDate: c.last_sale_date,
+        })),
       },
     });
   } catch (err: any) {
