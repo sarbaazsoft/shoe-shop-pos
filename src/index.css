@@ -102,9 +102,21 @@ nav button.font-courgette *,
 }
 
 .font-roboto,
-.font-roboto * {
+.font-roboto *,
+.brand-name-roboto,
+.brand-name-roboto *,
+.brand-subtitle-roboto,
+.brand-subtitle-roboto * {
   font-family: 'Roboto', system-ui, -apple-system, sans-serif !important;
 }
+
+.theme-dropdown-courgette,
+.theme-dropdown-courgette *,
+.theme-dropdown-courgate,
+.theme-dropdown-courgate * {
+  font-family: 'Courgette', cursive, sans-serif !important;
+}
+
 
 
 /* ========================================================================= */

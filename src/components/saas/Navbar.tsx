@@ -33,9 +33,28 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
   { key: 'about', label: 'About', section: 'about' },
 ];
 
+const renderBrandName = (name: string) => {
+  if (name.includes('SarbaazSoft')) {
+    const parts = name.split('SarbaazSoft');
+    return (
+      <span className="font-roboto brand-name-roboto inline-flex items-center font-bold tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+        {parts[0]}
+        <span className="text-black dark:text-white">Sarbaaz</span>
+        <span className="text-purple-600 dark:text-purple-400 font-extrabold ml-0.5">Soft</span>
+        {parts[1] && <span className="text-black dark:text-white">{parts[1]}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="font-roboto brand-name-roboto font-bold text-black dark:text-white tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+      {name}
+    </span>
+  );
+};
+
 export const Navbar: React.FC<NavbarProps> = ({
   storeName = 'SarbaazSoft Shoe POS',
-  subtitle = 'Dual-engine wholesale & retail',
+  subtitle = 'Dual-Engine Wholesale & Retail',
   activeNav = 'home',
   navItems = DEFAULT_NAV_ITEMS,
   onNavigate,
@@ -154,15 +173,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
 
-              {/* Brand Typography (Clean, no badge, shortened subtitle) */}
-              <div className="min-w-0">
-                <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
-                  {storeName}
-                </span>
-                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5">
+              {/* Brand Typography (Roboto font for brand name & subtitle) */}
+              <div className="min-w-0 font-roboto brand-name-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+                <div
+                  className="font-roboto brand-name-roboto font-bold text-black dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block"
+                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
+                >
+                  {renderBrandName(storeName)}
+                </div>
+                <div
+                  className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5 tracking-normal"
+                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
+                >
                   <span className="text-purple-600 dark:text-purple-400">👟</span>
-                  <span>{subtitle}</span>
-                </span>
+                  <span className="font-roboto brand-subtitle-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+                    {subtitle}
+                  </span>
+                </div>
               </div>
             </button>
           </div>
@@ -221,12 +248,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               (Unified 3-way theme switcher like PublicHeader / Header)
              ======================================================== */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* 3-Way Theme Dropdown Menu (Light, Dark, System) */}
-            <div className="relative">
+            {/* 3-Way Theme Dropdown Menu (Light, Dark, System) - Courgette Styled */}
+            <div
+              className="relative font-courgette font-courgate theme-dropdown-courgette"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
               <ThemeDropdown
                 id="landing-navbar-theme-dropdown"
                 dropdownAlign="right"
                 showLabel={true}
+                font="courgette"
+                className="font-courgette font-courgate theme-dropdown-courgette"
               />
             </div>
 
@@ -382,19 +414,24 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Mobile 3-Way Theme Mode Quick Switcher */}
               <div
-                className={`pt-2 border-t font-courgette ${
+                className={`pt-2 border-t font-courgette font-courgate ${
                   isDark ? 'border-indigo-950/70' : 'border-slate-200'
                 }`}
+                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
               >
                 <div className="flex items-center justify-between px-1 mb-2">
                   <span
-                    className={`text-xs font-bold uppercase tracking-wider font-courgette ${
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                    className={`text-xs font-bold uppercase tracking-wider font-courgette font-courgate ${
                       isDark ? 'text-slate-400' : 'text-slate-500'
                     }`}
                   >
                     Theme Mode
                   </span>
-                  <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-400/30 capitalize font-courgette">
+                  <span
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                    className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-400/30 capitalize font-courgette font-courgate"
+                  >
                     {themeMode}
                   </span>
                 </div>
@@ -402,7 +439,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={() => setThemeMode('light')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette ${
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette font-courgate ${
                       themeMode === 'light'
                         ? 'bg-purple-50 text-purple-700 border-purple-400 font-bold shadow-xs'
                         : isDark
@@ -416,7 +454,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={() => setThemeMode('dark')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette ${
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette font-courgate ${
                       themeMode === 'dark'
                         ? 'bg-purple-950/60 text-purple-300 border-purple-500 font-bold shadow-xs'
                         : isDark
@@ -430,7 +469,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={() => setThemeMode('system')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette ${
+                    style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition cursor-pointer border font-courgette font-courgate ${
                       themeMode === 'system'
                         ? 'bg-purple-600 text-white border-purple-500 font-bold shadow-xs'
                         : isDark

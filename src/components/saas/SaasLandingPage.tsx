@@ -712,8 +712,8 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-16 lg:gap-6 items-center">
             <div>
               <div
-                className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700"
-                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+                className="font-roboto brand-subtitle-roboto inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3.5 py-1.5 text-xs text-violet-100 lt:text-indigo-700"
+                style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
               >
                 <Zap className="w-3.5 h-3.5 text-violet-300 lt:text-[#5B4BFF]" aria-hidden="true" />
                 Dual-Engine Wholesale & Retail POS Solution for Shoe Stores

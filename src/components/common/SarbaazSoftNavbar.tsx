@@ -13,6 +13,25 @@ export interface SarbaazSoftNavbarProps {
   className?: string;
 }
 
+const renderBrandName = (name: string) => {
+  if (name.includes('SarbaazSoft')) {
+    const parts = name.split('SarbaazSoft');
+    return (
+      <span className="font-roboto brand-name-roboto inline-flex items-center font-bold tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+        {parts[0]}
+        <span className="text-black dark:text-white">Sarbaaz</span>
+        <span className="text-purple-600 dark:text-purple-400 font-extrabold ml-0.5">Soft</span>
+        {parts[1] && <span className="text-black dark:text-white">{parts[1]}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="font-roboto brand-name-roboto font-bold text-black dark:text-white tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+      {name}
+    </span>
+  );
+};
+
 export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
   activeItem = 'Dashboard',
   onNavigate,
@@ -71,15 +90,23 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
                 <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
 
-              {/* Brand Typography (Clean, no badge, shortened subtitle) */}
-              <div className="min-w-0">
-                <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
-                  SarbaazSoft Shoe POS
-                </span>
-                <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5">
+              {/* Brand Typography (Roboto font for brand name & subtitle) */}
+              <div className="min-w-0 font-roboto brand-name-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+                <div
+                  className="font-roboto brand-name-roboto font-bold text-black dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block"
+                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
+                >
+                  {renderBrandName('SarbaazSoft Shoe POS')}
+                </div>
+                <div
+                  className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5 tracking-normal"
+                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
+                >
                   <span className="text-purple-600 dark:text-purple-400">👟</span>
-                  <span>Dual-engine wholesale &amp; retail</span>
-                </span>
+                  <span className="font-roboto brand-subtitle-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+                    Dual-Engine Wholesale &amp; Retail
+                  </span>
+                </div>
               </div>
             </a>
           </div>
@@ -131,12 +158,20 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
             })}
           </nav>
 
-          {/* ========================================================
-              RIGHT: 3-WAY THEME DROPDOWN
-             ======================================================== */}
           <div className="flex items-center space-x-2 sm:space-x-3">
-            {/* 3-Way Theme Switcher */}
-            <ThemeDropdown id="sarbaaz-theme-dropdown-trigger" dropdownAlign="right" showLabel={true} />
+            {/* 3-Way Theme Switcher - Courgette Styled */}
+            <div
+              className="relative font-courgette font-courgate theme-dropdown-courgette"
+              style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
+            >
+              <ThemeDropdown
+                id="sarbaaz-theme-dropdown-trigger"
+                dropdownAlign="right"
+                showLabel={true}
+                font="courgette"
+                className="font-courgette font-courgate theme-dropdown-courgette"
+              />
+            </div>
 
             {/* Mobile Hamburger Toggle Button */}
             <div className="flex md:hidden">
