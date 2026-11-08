@@ -910,9 +910,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* ROW 1: 5 KPI METRIC CARDS WITH ANIMATED COUNTER */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {/* Card 1: Today's Sales */}
+      {/* ROW 1: 5 KPI METRIC CARDS WITH ANIMATED COUNTER & DYNAMIC RESPONSIVE GRID */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+        {/* Card 1: Today's Sales - Hero spanning full width (2 cols) on mobile, 1 col on sm+ */}
         <StatCard
           id="stat-today-sales"
           title="Today's Sales"
@@ -921,6 +921,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon={ShoppingCart}
           iconColor="blue"
           sparkline="blue"
+          className="col-span-2 sm:col-span-1"
           trendIndicator={
             dashboardData.todaySales > 0
               ? { value: 'Active', direction: 'up', label: 'today' }
@@ -939,6 +940,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon={Boxes}
           iconColor="purple"
           sparkline="purple"
+          className="col-span-1"
           trendIndicator={
             dashboardData.totalProducts > 0
               ? { value: `${dashboardData.totalProducts}`, direction: 'up', label: 'in inventory' }
@@ -957,6 +959,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon={Users}
           iconColor="cyan"
           sparkline="cyan"
+          className="col-span-1"
           trendIndicator={
             dashboardData.totalCustomers > 0
               ? { value: `${dashboardData.totalCustomers}`, direction: 'up', label: 'registered' }
@@ -975,6 +978,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon={AlertTriangle}
           iconColor="rose"
           sparkline="rose"
+          className="col-span-1"
           valueClassName="text-rose-600 dark:text-rose-400"
           trendIndicator={
             dashboardData.lowStockCount > 0
@@ -995,6 +999,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon={Truck}
           iconColor="sky"
           sparkline="sky"
+          className="col-span-2 sm:col-span-1"
           trendIndicator={
             dashboardData.totalPurchases > 0
               ? { value: `${dashboardData.totalPurchases}`, direction: 'up', label: 'orders' }
@@ -1021,10 +1026,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         variant="dashboard"
       />
 
-      {/* ROW 2: 3 CARDS (Sales Trends + Best Selling Brands + Best Selling Products) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-        {/* Card 1: Sales Trends with Weekly / Monthly Tab Switcher (Full on md/lg, span 5 on xl) */}
-        <div className="md:col-span-2 lg:col-span-12 xl:col-span-5 app-card p-5 flex flex-col justify-between">
+      {/* ROW 2: COMPARATIVE REVENUE CHART & COMPANION METRICS (BALANCED RESPONSIVE GRID) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Card 1: Sales Trends with Weekly / Monthly Tab Switcher (Occupies lg:7, xl:8 columns for generous visual clarity) */}
+        <div className="col-span-1 lg:col-span-7 xl:col-span-8 app-card p-5 sm:p-6 flex flex-col justify-between">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
               <div className="flex items-center gap-2">
@@ -1196,8 +1201,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             )}
           </div>
 
-          {/* Recharts Canvas */}
-          <div className="w-full h-48 sm:h-52 pt-1">
+          {/* Recharts Canvas: Taller height for enhanced visual clarity */}
+          <div className="w-full h-56 sm:h-64 lg:h-72 pt-1">
             <ResponsiveContainer width="100%" height="100%">
               {activeTrendTab === 'weekly' ? (
                 <AreaChart
@@ -1348,161 +1353,164 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Best Selling Brands (Span 1 on md, 6 on lg, 4 on xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-4 app-card p-5 flex flex-col justify-between min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Best Selling Brands
-            </h2>
-            <button
-              type="button"
-              onClick={() => onNavigate('inventory')}
-              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
-            >
-              View Catalog
-            </button>
+        {/* Companion Column: Best Selling Brands & Products (Occupies lg:5, xl:4 columns; stacked vertically on desktop, side-by-side on tablet sm/md) */}
+        <div className="col-span-1 lg:col-span-5 xl:col-span-4 flex flex-col sm:grid sm:grid-cols-2 lg:flex lg:flex-col gap-5 justify-between">
+          {/* Card 2: Best Selling Brands */}
+          <div className="app-card p-5 flex flex-col justify-between min-w-0 flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Best Selling Brands
+              </h2>
+              <button
+                type="button"
+                onClick={() => onNavigate('inventory')}
+                className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
+              >
+                View Catalog
+              </button>
+            </div>
+
+            {/* Circular Donut Gauges with Brand Logos / Placeholders */}
+            {dashboardData.topBrands.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                No brand performance data yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 py-2 my-auto min-w-0">
+                {dashboardData.topBrands.slice(0, 2).map((brand, idx) => {
+                  const pct = brand.percentage || 0;
+                  const circumference = 238.76;
+                  const strokeColor = idx === 0 ? '#3B82F6' : '#8B5CF6';
+
+                  return (
+                    <div key={`top-brand-${brand.id || brand.name || idx}-${idx}`} className="flex flex-col items-center text-center min-w-0">
+                      <div className="relative w-20 h-20 sm:w-24 sm:h-24 max-w-full flex items-center justify-center shrink-0">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          {/* Track */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            className="text-slate-100 dark:text-slate-800 stroke-current"
+                            strokeWidth="7"
+                            fill="none"
+                          />
+                          {/* Progress Arc */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            stroke={strokeColor}
+                            strokeWidth="7"
+                            strokeLinecap="round"
+                            fill="none"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={circumference}
+                            data-per={pct}
+                            data-per-role="donut"
+                            data-circumference={circumference}
+                            data-stagger-index={idx}
+                            className={`${idx === 0 ? 'neon-glow-blue' : ''}`}
+                          />
+                        </svg>
+                        {/* Brand Logo or Placeholder in center of ring */}
+                        <div className="absolute inset-0 flex items-center justify-center p-2">
+                          <BrandLogo
+                            logo={brand.logo}
+                            name={brand.name}
+                            size="sm"
+                            className="pointer-events-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-2.5 w-full min-w-0 px-1">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {brand.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">
+                          {brand.subtitle}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Circular Donut Gauges with Brand Logos / Placeholders */}
-          {dashboardData.topBrands.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
-              No brand performance data yet.
+          {/* Card 3: Best Selling Products */}
+          <div className="app-card p-5 flex flex-col justify-between min-w-0 flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Best Selling Products
+              </h2>
+              <button
+                type="button"
+                onClick={() => onNavigate('inventory')}
+                className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
+              >
+                View All
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 py-2 my-auto min-w-0">
-              {dashboardData.topBrands.slice(0, 2).map((brand, idx) => {
-                const pct = brand.percentage || 0;
-                const circumference = 238.76;
-                const strokeColor = idx === 0 ? '#3B82F6' : '#8B5CF6';
 
-                return (
-                  <div key={`top-brand-${brand.id || brand.name || idx}-${idx}`} className="flex flex-col items-center text-center min-w-0">
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 max-w-full flex items-center justify-center shrink-0">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Track */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          className="text-slate-100 dark:text-slate-800 stroke-current"
-                          strokeWidth="7"
-                          fill="none"
-                        />
-                        {/* Progress Arc */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke={strokeColor}
-                          strokeWidth="7"
-                          strokeLinecap="round"
-                          fill="none"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={circumference}
-                          data-per={pct}
-                          data-per-role="donut"
-                          data-circumference={circumference}
-                          data-stagger-index={idx}
-                          className={`${idx === 0 ? 'neon-glow-blue' : ''}`}
-                        />
-                      </svg>
-                      {/* Brand Logo or Placeholder in center of ring */}
-                      <div className="absolute inset-0 flex items-center justify-center p-2">
-                        <BrandLogo
-                          logo={brand.logo}
-                          name={brand.name}
-                          size="sm"
-                          className="pointer-events-none"
+            {dashboardData.topSelling.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                No product sales recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-3 my-auto min-w-0">
+                {dashboardData.topSelling.slice(0, 3).map((prod, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition min-w-0"
+                  >
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-100 dark:bg-slate-950/60 overflow-hidden shrink-0 border border-slate-200/60 dark:border-slate-800">
+                        <img
+                          src={
+                            prod.imageUrl ||
+                            'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150&auto=format&fit=crop&q=80'
+                          }
+                          alt={prod.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
                         />
                       </div>
-                    </div>
-                    <div className="mt-2.5 w-full min-w-0 px-1">
-                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {brand.name}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">
-                        {brand.subtitle}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Card 3: Best Selling Products (Span 1 on md, 6 on lg, 3 on xl) */}
-        <div className="md:col-span-1 lg:col-span-6 xl:col-span-3 app-card p-5 flex flex-col justify-between min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Best Selling Products
-            </h2>
-            <button
-              type="button"
-              onClick={() => onNavigate('inventory')}
-              className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
-            >
-              View All
-            </button>
-          </div>
-
-          {dashboardData.topSelling.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-xs">
-              No product sales recorded yet.
-            </div>
-          ) : (
-            <div className="space-y-3 my-auto min-w-0">
-              {dashboardData.topSelling.slice(0, 3).map((prod, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between gap-2 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition min-w-0"
-                >
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-100 dark:bg-slate-950/60 overflow-hidden shrink-0 border border-slate-200/60 dark:border-slate-800">
-                      <img
-                        src={
-                          prod.imageUrl ||
-                          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150&auto=format&fit=crop&q=80'
-                        }
-                        alt={prod.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {prod.name}
-                      </div>
-                      <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5 flex-wrap">
-                        {prod.categoryName && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-cyan-500/30 whitespace-nowrap">
-                            {prod.categoryName}
-                          </span>
-                        )}
-                        {prod.brandName && (
-                          <div className="inline-flex items-center gap-1 min-w-0">
-                            <BrandLogo logo={prod.brandLogo} name={prod.brandName} size="xs" />
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[80px]">
-                              {prod.brandName}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {prod.name}
+                        </div>
+                        <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5 flex-wrap">
+                          {prod.categoryName && (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-cyan-500/30 whitespace-nowrap">
+                              {prod.categoryName}
                             </span>
-                          </div>
-                        )}
+                          )}
+                          {prod.brandName && (
+                            <div className="inline-flex items-center gap-1 min-w-0">
+                              <BrandLogo logo={prod.brandLogo} name={prod.brandName} size="xs" />
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[80px]">
+                                {prod.brandName}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 ml-1">
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        Stock: {prod.stock}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
+                        Sold: {prod.unitsSold}
                       </div>
                     </div>
                   </div>
-
-                  <div className="text-right shrink-0 ml-1">
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                      Stock: {prod.stock}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
-                      Sold: {prod.unitsSold}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
