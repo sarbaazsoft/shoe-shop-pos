@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Bell, Cpu, KeyRound, Save, Send, Check, BellRing, CreditCard, ArrowUpCircle, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Bell, Cpu, KeyRound, Save, Send, Check, BellRing, CreditCard, ArrowUpCircle, ShoppingBag, AlertTriangle, Layers, Flame } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { PrinterHardwareSettings } from './PrinterHardwareSettings.tsx';
 import { DataBackupRestore } from './DataBackupRestore.tsx';
@@ -685,9 +685,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     VAPID_PUBLIC_KEY: '',
     VAPID_PRIVATE_KEY: '',
     VAPID_SUBJECT: 'mailto:support@sarbaazsoft.com',
+    FCM_PROJECT_ID: '',
+    FCM_CLIENT_EMAIL: '',
+    FCM_PRIVATE_KEY: '',
+    FCM_API_KEY: '',
+    FCM_MESSAGING_SENDER_ID: '',
+    FCM_APP_ID: '',
+    FCM_MEASUREMENT_ID: '',
+    FCM_VAPID_KEY: '',
     SW_KILL_SWITCH: 'false',
     DISABLE_HMR: 'false',
   });
+  const [servicesIntegrationsTab, setServicesIntegrationsTab] = useState<'email' | 'fcm'>('email');
   const [emailProviderTab, setEmailProviderTab] = useState<'resend' | 'gmail'>('resend');
   const [, setAppSettingsGrouped] = useState<Record<string, any[]>>({});
   const [isLoadingAppSettings, setIsLoadingAppSettings] = useState(false);
@@ -2865,83 +2874,107 @@ setFormErrors(errors);
             </div>
           </div>
 
-          {/* CATEGORY 2: MULTI-PROVIDER TRANSACTIONAL EMAIL DELIVERY */}
+          {/* UNIFIED SERVICES & INTEGRATIONS (EMAIL & FCM NOTIFICATIONS) */}
           <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-5">
-            {/* Header */}
-            <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-purple-900/40">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 flex items-center justify-center shrink-0">
-                <Mail className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Outbound Email Providers &amp; Configuration
-                  </h4>
-                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                    email
-                  </span>
+            {/* Header & Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-purple-900/40">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50 flex items-center justify-center shrink-0 shadow-xs">
+                  <Layers className="w-5 h-5" />
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                  Configure Resend API and Gmail SMTP credentials dynamically. System routes password resets, trial confirmations, and staff invites through the active provider.
-                </p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                      Services &amp; Integrations
+                    </h4>
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      integrations
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Two Tabs Navigation */}
+              <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-purple-900/50 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setServicesIntegrationsTab('email')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                    servicesIntegrationsTab === 'email'
+                      ? 'bg-white dark:bg-purple-900/60 text-purple-700 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Email Settings</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setServicesIntegrationsTab('fcm')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                    servicesIntegrationsTab === 'fcm'
+                      ? 'bg-white dark:bg-purple-900/60 text-purple-700 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5 text-amber-500" />
+                  <span>FCM Notification Settings</span>
+                </button>
               </div>
             </div>
 
-            {/* Active Provider Selector / Toggle */}
-            <div className="p-4 bg-gradient-to-r from-slate-50 via-purple-50/30 to-slate-50 dark:from-slate-900/80 dark:via-purple-950/20 dark:to-slate-900/80 rounded-2xl border border-slate-200 dark:border-purple-900/50 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
+            {/* TAB 1: EMAIL SETTINGS */}
+            <div className={servicesIntegrationsTab === 'email' ? 'block space-y-5' : 'hidden'}>
+              {/* Active Provider Selector */}
+              <div className="p-4 bg-gradient-to-r from-slate-50 via-purple-50/30 to-slate-50 dark:from-slate-900/80 dark:via-purple-950/20 dark:to-slate-900/80 rounded-2xl border border-slate-200 dark:border-purple-900/50 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     Active Outbound Email Provider
                   </span>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Select which service the server will invoke when dispatching live transactional emails.
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
-                    Active:
-                  </span>
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono border flex items-center gap-1.5 ${
-                    (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
-                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700'
-                      : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
-                  }`}>
-                    <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                    {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail SMTP' : 'Resend API'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Toggle Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppSettingsForm((prev) => ({
-                      ...prev,
-                      ACTIVE_EMAIL_PROVIDER: 'resend',
-                      active_email_provider: 'resend',
-                    }));
-                    setEmailProviderTab('resend');
-                  }}
-                  className={`p-3 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
-                    (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend'
-                      ? 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 shadow-xs ring-1 ring-blue-400 dark:ring-blue-600'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                    (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend'
-                      ? 'bg-blue-600 text-white border-blue-700'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                  }`}>
-                    <Server className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                      Active:
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono border flex items-center gap-1.5 ${
+                      (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700'
+                        : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                    }`}>
+                      <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                      {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail SMTP' : 'Resend API'}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
+                </div>
+
+                {/* Toggle Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        ACTIVE_EMAIL_PROVIDER: 'resend',
+                        active_email_provider: 'resend',
+                      }));
+                      setEmailProviderTab('resend');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-center gap-3 cursor-pointer ${
+                      (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend'
+                        ? 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 shadow-xs ring-1 ring-blue-400 dark:ring-blue-600'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                      (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend'
+                        ? 'bg-blue-600 text-white border-blue-700'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    }`}>
+                      <Server className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white">
                         Resend (API)
                       </span>
@@ -2951,37 +2984,32 @@ setFormErrors(errors);
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Cloud REST API via <code>resend_api_key</code> with sandbox domain or verified custom domain.
-                    </p>
-                  </div>
-                </button>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppSettingsForm((prev) => ({
-                      ...prev,
-                      ACTIVE_EMAIL_PROVIDER: 'gmail',
-                      active_email_provider: 'gmail',
-                    }));
-                    setEmailProviderTab('gmail');
-                  }}
-                  className={`p-3 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
-                    (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
-                      ? 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-400 dark:border-rose-600 shadow-xs ring-1 ring-rose-400 dark:ring-rose-600'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                    (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
-                      ? 'bg-rose-600 text-white border-rose-700'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                  }`}>
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        ACTIVE_EMAIL_PROVIDER: 'gmail',
+                        active_email_provider: 'gmail',
+                      }));
+                      setEmailProviderTab('gmail');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-center gap-3 cursor-pointer ${
+                      (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
+                        ? 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-400 dark:border-rose-600 shadow-xs ring-1 ring-rose-400 dark:ring-rose-600'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                      (appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail'
+                        ? 'bg-rose-600 text-white border-rose-700'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    }`}>
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white">
                         Gmail (App Password)
                       </span>
@@ -2991,464 +3019,413 @@ setFormErrors(errors);
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Direct Google SMTP relay (<code>smtp.gmail.com:465</code>) using <code>gmail_user</code> and 16-char App Password.
-                    </p>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Provider Tabs Header */}
-            <div>
-              <div className="flex items-center border-b border-slate-200 dark:border-purple-900/50 space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setEmailProviderTab('resend')}
-                  className={`pb-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-                    emailProviderTab === 'resend'
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Server className="w-3.5 h-3.5" />
-                  <span>Resend</span>
-                  {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend' && (
-                    <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                      ACTIVE
-                    </span>
-                  )}
-                </button>
+              {/* Sub-tabs Header for Provider Configuration */}
+              <div>
+                <div className="flex items-center border-b border-slate-200 dark:border-purple-900/50 space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setEmailProviderTab('resend')}
+                    className={`pb-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                      emailProviderTab === 'resend'
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Server className="w-3.5 h-3.5" />
+                    <span>Resend Configuration</span>
+                    {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend' && (
+                      <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                        ACTIVE
+                      </span>
+                    )}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setEmailProviderTab('gmail')}
-                  className={`pb-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-                    emailProviderTab === 'gmail'
-                      ? 'border-rose-600 text-rose-600 dark:text-rose-400 dark:border-rose-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Gmail (App Password)</span>
-                  {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' && (
-                    <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300">
-                      ACTIVE
-                    </span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmailProviderTab('gmail')}
+                    className={`pb-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                      emailProviderTab === 'gmail'
+                        ? 'border-rose-600 text-rose-600 dark:text-rose-400 dark:border-rose-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Gmail Configuration</span>
+                    {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' && (
+                      <span className="px-1.5 py-0.2 rounded font-mono text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300">
+                        ACTIVE
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* TAB 1: RESEND CONFIGURATION */}
-            {emailProviderTab === 'resend' && (
-              <div className="space-y-4 pt-1">
-                {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend' && !appSettingsForm.RESEND_API_KEY && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              {/* RESEND CONFIGURATION */}
+              {emailProviderTab === 'resend' && (
+                <div className="space-y-4 pt-1">
+                  {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'resend' && !appSettingsForm.RESEND_API_KEY && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      <div>
+                        <strong className="font-bold">Resend is selected as the Active Provider</strong>, but no API key is configured yet.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <strong className="font-bold">Resend is selected as the Active Provider</strong>, but no API key is configured yet. Outbound transactional emails will fail until you provide a valid Resend API key.
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Resend API Key (<code className="text-purple-600 dark:text-purple-400">resend_api_key</code>)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={revealedSecrets.RESEND_API_KEY ? 'text' : 'password'}
-                        value={appSettingsForm.RESEND_API_KEY ?? ''}
-                        onChange={(e) => setAppSettingsForm((prev) => ({
-                          ...prev,
-                          RESEND_API_KEY: e.target.value,
-                          resend_api_key: e.target.value,
-                        }))}
-                        placeholder="re_xxxxxxxxxxxxxx"
-                        className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => toggleSecretVisibility('RESEND_API_KEY')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                        title={revealedSecrets.RESEND_API_KEY ? 'Hide secret' : 'Show secret'}
-                      >
-                        {revealedSecrets.RESEND_API_KEY ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      Stored securely in the <code>app_settings</code> database table. Masked input prevents shoulder-surfing.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Sender Email Address (<code className="text-purple-600 dark:text-purple-400">RESEND_FROM_EMAIL</code>)
-                    </label>
-                    <input
-                      type="email"
-                      value={appSettingsForm.RESEND_FROM_EMAIL ?? ''}
-                      onChange={(e) => {
-                        const emailVal = e.target.value;
-                        setAppSettingsForm((prev) => {
-                          const prevFrom = prev.RESEND_FROM || '';
-                          const nameMatch = prevFrom.match(/^([^<]+)</);
-                          const displayName = nameMatch ? nameMatch[1].trim() : 'SarbaazSoft Shoe POS Security';
-                          return {
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Resend API Key (<code className="text-purple-600 dark:text-purple-400">resend_api_key</code>)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={revealedSecrets.RESEND_API_KEY ? 'text' : 'password'}
+                          value={appSettingsForm.RESEND_API_KEY ?? ''}
+                          onChange={(e) => setAppSettingsForm((prev) => ({
                             ...prev,
-                            RESEND_FROM_EMAIL: emailVal,
-                            RESEND_FROM: emailVal ? `${displayName} <${emailVal.trim()}>` : prevFrom,
-                          };
-                        });
-                      }}
-                      placeholder="onboarding@resend.dev"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      The raw sender address. For testing without a domain, use <code>onboarding@resend.dev</code> (Resend sandbox).
-                    </p>
-                  </div>
+                            RESEND_API_KEY: e.target.value,
+                            resend_api_key: e.target.value,
+                          }))}
+                          placeholder="re_xxxxxxxxxxxxxx"
+                          className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleSecretVisibility('RESEND_API_KEY')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          title={revealedSecrets.RESEND_API_KEY ? 'Hide secret' : 'Show secret'}
+                        >
+                          {revealedSecrets.RESEND_API_KEY ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Sender Header &amp; Display Name (<code className="text-purple-600 dark:text-purple-400">RESEND_FROM</code>)
-                    </label>
-                    <input
-                      type="text"
-                      value={appSettingsForm.RESEND_FROM ?? ''}
-                      onChange={(e) => {
-                        const fromVal = e.target.value;
-                        const emailMatch = fromVal.match(/<([^>]+)>/);
-                        const emailVal = emailMatch ? emailMatch[1].trim() : (fromVal.includes('@') ? fromVal.trim() : '');
-                        setAppSettingsForm((prev) => ({
-                          ...prev,
-                          RESEND_FROM: fromVal,
-                          ...(emailVal ? { RESEND_FROM_EMAIL: emailVal } : {}),
-                        }));
-                      }}
-                      placeholder="SarbaazSoft Shoe POS Security <onboarding@resend.dev>"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      The complete From header format: <code>Display Name &lt;email@domain.com&gt;</code>.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Email Notification Webhook (<code className="text-purple-600 dark:text-purple-400">EMAIL_WEBHOOK_URL</code>)
-                    </label>
-                    <input
-                      type="text"
-                      value={appSettingsForm.EMAIL_WEBHOOK_URL ?? ''}
-                      onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, EMAIL_WEBHOOK_URL: e.target.value }))}
-                      placeholder="https://hooks.yourdomain.com/emails"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Resend Delivery Webhook (<code className="text-purple-600 dark:text-purple-400">RESEND_WEBHOOK_URL</code>)
-                    </label>
-                    <input
-                      type="text"
-                      value={appSettingsForm.RESEND_WEBHOOK_URL ?? ''}
-                      onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, RESEND_WEBHOOK_URL: e.target.value }))}
-                      placeholder="https://api.yourdomain.com/webhooks/resend"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: GMAIL SMTP CONFIGURATION */}
-            {emailProviderTab === 'gmail' && (
-              <div className="space-y-4 pt-1">
-                {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' &&
-                  (!appSettingsForm.GMAIL_USER || !appSettingsForm.GMAIL_APP_PASSWORD) && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                     <div>
-                      <strong className="font-bold">Gmail SMTP is selected as the Active Provider</strong>, but your Gmail address or App Password is missing. Outbound transactional emails will fail until both credentials are saved.
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Sender Email Address (<code className="text-purple-600 dark:text-purple-400">RESEND_FROM_EMAIL</code>)
+                      </label>
+                      <input
+                        type="email"
+                        value={appSettingsForm.RESEND_FROM_EMAIL ?? ''}
+                        onChange={(e) => {
+                          const emailVal = e.target.value;
+                          setAppSettingsForm((prev) => {
+                            const prevFrom = prev.RESEND_FROM || '';
+                            const nameMatch = prevFrom.match(/^([^<]+)</);
+                            const displayName = nameMatch ? nameMatch[1].trim() : 'SarbaazSoft Shoe POS Security';
+                            return {
+                              ...prev,
+                              RESEND_FROM_EMAIL: emailVal,
+                              RESEND_FROM: emailVal ? `${displayName} <${emailVal.trim()}>` : prevFrom,
+                            };
+                          });
+                        }}
+                        placeholder="onboarding@resend.dev"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Sender Header &amp; Display Name (<code className="text-purple-600 dark:text-purple-400">RESEND_FROM</code>)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettingsForm.RESEND_FROM ?? ''}
+                        onChange={(e) => {
+                          const fromVal = e.target.value;
+                          const emailMatch = fromVal.match(/<([^>]+)>/);
+                          const emailVal = emailMatch ? emailMatch[1].trim() : (fromVal.includes('@') ? fromVal.trim() : '');
+                          setAppSettingsForm((prev) => ({
+                            ...prev,
+                            RESEND_FROM: fromVal,
+                            ...(emailVal ? { RESEND_FROM_EMAIL: emailVal } : {}),
+                          }));
+                        }}
+                        placeholder="SarbaazSoft Shoe POS Security <onboarding@resend.dev>"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Email Notification Webhook (<code className="text-purple-600 dark:text-purple-400">EMAIL_WEBHOOK_URL</code>)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettingsForm.EMAIL_WEBHOOK_URL ?? ''}
+                        onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, EMAIL_WEBHOOK_URL: e.target.value }))}
+                        placeholder="https://hooks.yourdomain.com/emails"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Resend Delivery Webhook (<code className="text-purple-600 dark:text-purple-400">RESEND_WEBHOOK_URL</code>)
+                      </label>
+                      <input
+                        type="text"
+                        value={appSettingsForm.RESEND_WEBHOOK_URL ?? ''}
+                        onChange={(e) => setAppSettingsForm((prev) => ({ ...prev, RESEND_WEBHOOK_URL: e.target.value }))}
+                        placeholder="https://api.yourdomain.com/webhooks/resend"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                      />
                     </div>
                   </div>
-                )}
-
-                {/* Live Header Preview Pill */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-purple-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      Live Sender Header (From):
-                    </span>
-                    <span className="font-mono text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100/60 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
-                      &quot;{appSettingsForm.GMAIL_FROM_NAME || 'superadmin'}&quot; &lt;{appSettingsForm.GMAIL_USER || 'sarbaazsoft@gmail.com'}&gt;
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    Shown to email recipients
-                  </span>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Sender Name (<code className="text-purple-600 dark:text-purple-400">GMAIL_FROM_NAME</code>)
-                    </label>
-                    <input
-                      type="text"
-                      value={appSettingsForm.GMAIL_FROM_NAME ?? 'superadmin'}
-                      onChange={(e) => setAppSettingsForm((prev) => ({
-                        ...prev,
-                        GMAIL_FROM_NAME: e.target.value,
-                      }))}
-                      placeholder="superadmin"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      Sender display name for password resets &amp; auth emails (e.g. <code>superadmin</code>).
-                    </p>
+              {/* GMAIL CONFIGURATION */}
+              {emailProviderTab === 'gmail' && (
+                <div className="space-y-4 pt-1">
+                  {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' &&
+                    (!appSettingsForm.GMAIL_USER || !appSettingsForm.GMAIL_APP_PASSWORD) && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      <div>
+                        <strong className="font-bold">Gmail SMTP is selected as the Active Provider</strong>, but your Gmail address or App Password is missing.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sender Header Preview */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-purple-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                        Sender Header (From):
+                      </span>
+                      <span className="font-mono text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100/60 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
+                        &quot;{appSettingsForm.GMAIL_FROM_NAME || 'superadmin'}&quot; &lt;{appSettingsForm.GMAIL_USER || 'sarbaazsoft@gmail.com'}&gt;
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      smtp.gmail.com:465
+                    </span>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Platform Gmail Address (<code className="text-purple-600 dark:text-purple-400">GMAIL_USER</code>)
-                    </label>
-                    <input
-                      type="email"
-                      value={appSettingsForm.GMAIL_USER ?? ''}
-                      onChange={(e) => setAppSettingsForm((prev) => ({
-                        ...prev,
-                        GMAIL_USER: e.target.value,
-                      }))}
-                      placeholder="sarbaazsoft@gmail.com"
-                      className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      Google account for system email delivery. Independent from Store Push Notification Gmail.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Platform Gmail App Password (<code className="text-purple-600 dark:text-purple-400">GMAIL_APP_PASSWORD</code>)
-                    </label>
-                    <div className="relative">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Sender Name (<code className="text-purple-600 dark:text-purple-400">GMAIL_FROM_NAME</code>)
+                      </label>
                       <input
-                        type={revealedSecrets.GMAIL_APP_PASSWORD ? 'text' : 'password'}
-                        value={appSettingsForm.GMAIL_APP_PASSWORD ?? ''}
+                        type="text"
+                        value={appSettingsForm.GMAIL_FROM_NAME ?? 'superadmin'}
                         onChange={(e) => setAppSettingsForm((prev) => ({
                           ...prev,
-                          GMAIL_APP_PASSWORD: e.target.value,
+                          GMAIL_FROM_NAME: e.target.value,
                         }))}
-                        placeholder="xxxx xxxx xxxx xxxx"
-                        className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                        placeholder="superadmin"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
                       />
-                      <button
-                        type="button"
-                        onClick={() => toggleSecretVisibility('GMAIL_APP_PASSWORD')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                        title={revealedSecrets.GMAIL_APP_PASSWORD ? 'Hide password' : 'Show password'}
-                      >
-                        {revealedSecrets.GMAIL_APP_PASSWORD ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
                     </div>
-                    <p className="text-[10px] text-slate-500 dark:text-purple-300/70 mt-1 leading-normal">
-                      16-character App Password for transactional email. Will NOT overwrite store push alerts password.
-                    </p>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Platform Gmail Address (<code className="text-purple-600 dark:text-purple-400">GMAIL_USER</code>)
+                      </label>
+                      <input
+                        type="email"
+                        value={appSettingsForm.GMAIL_USER ?? ''}
+                        onChange={(e) => setAppSettingsForm((prev) => ({
+                          ...prev,
+                          GMAIL_USER: e.target.value,
+                        }))}
+                        placeholder="sarbaazsoft@gmail.com"
+                        className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Platform Gmail App Password (<code className="text-purple-600 dark:text-purple-400">GMAIL_APP_PASSWORD</code>)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={revealedSecrets.GMAIL_APP_PASSWORD ? 'text' : 'password'}
+                          value={appSettingsForm.GMAIL_APP_PASSWORD ?? ''}
+                          onChange={(e) => setAppSettingsForm((prev) => ({
+                            ...prev,
+                            GMAIL_APP_PASSWORD: e.target.value,
+                          }))}
+                          placeholder="xxxx xxxx xxxx xxxx"
+                          className="w-full h-9 pl-3 pr-8 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleSecretVisibility('GMAIL_APP_PASSWORD')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          title={revealedSecrets.GMAIL_APP_PASSWORD ? 'Hide password' : 'Show password'}
+                        >
+                          {revealedSecrets.GMAIL_APP_PASSWORD ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL TOGGLE */}
+              <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Require Email Verification for Free Trial Registrations
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL
+                    </span>
                   </div>
                 </div>
 
-                {/* Gmail App Password Setup Instructions Callout */}
-                <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/60 text-xs space-y-2">
-                  <div className="font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    How to generate a Gmail App Password:
-                  </div>
-                  <ol className="list-decimal list-inside space-y-1 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed pl-1">
-                    <li>Go to your <strong>Google Account</strong> settings (<code>myaccount.google.com/security</code>).</li>
-                    <li>Ensure <strong>2-Step Verification</strong> is enabled under "How you sign in to Google".</li>
-                    <li>Search for <strong>"App passwords"</strong> in the search bar or navigate to the 2-Step Verification settings bottom.</li>
-                    <li>Enter <strong>"SarbaazSoft Shoe POS"</strong> as the app name and click <strong>Create</strong>.</li>
-                    <li>Copy the 16-character generated code (e.g., <code>abcd efgh ijkl mnop</code>) and paste it into the field above.</li>
-                  </ol>
-                  <div className="pt-1.5 border-t border-blue-200/60 dark:border-blue-900/40 text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-3">
-                    <span>Host: <code className="font-mono text-blue-700 dark:text-blue-300">smtp.gmail.com</code></span>
-                    <span>Port: <code className="font-mono text-blue-700 dark:text-blue-300">465 (SSL/TLS direct)</code></span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL TOGGLE */}
-            <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    Require Email Verification for Free Trial Registrations
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                    REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 max-w-xl">
-                  When enabled (<strong>true</strong>), new free trial registrants must verify their email address before access is granted. When disabled (<strong>false</strong>), the server bypasses sending the activation email, immediately activates the account, and signs the user in automatically upon trial signup.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
-                  (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                }`}>
-                  {(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true' ? 'Active (Required)' : 'Bypassed (Instant)'}
-                </span>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'}
-                  onClick={() => {
-                    const current = (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true';
-                    setAppSettingsForm((prev) => ({
-                      ...prev,
-                      REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL: current ? 'false' : 'true',
-                    }));
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
                     (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
-                      ? 'bg-purple-600'
-                      : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true' ? 'Active (Required)' : 'Bypassed (Instant)'}
+                  </span>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'}
+                    onClick={() => {
+                      const current = (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true';
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL: current ? 'false' : 'true',
+                      }));
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                       (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
-                        ? 'translate-x-5'
-                        : 'translate-x-0'
+                        ? 'bg-purple-600'
+                        : 'bg-slate-300 dark:bg-slate-700'
                     }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* EMAIL_POS_ALERTS_ENABLED MASTER TOGGLE */}
-            <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    Master Email Alerts for POS Transactions (Sales, Returns, Exchanges)
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                    EMAIL_POS_ALERTS_ENABLED
-                  </span>
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        (appSettingsForm.REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL ?? 'true') === 'true'
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 max-w-xl">
-                  When enabled (<strong>true</strong>), the server automatically dispatches formatted transactional email receipts via your active provider (Gmail SMTP or Resend) to store owners on cashier sales, returns, and exchanges.
-                </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
-                  (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                }`}>
-                  {(appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true' ? 'Active (Alerts On)' : 'Suppressed (Muted)'}
-                </span>
+              {/* EMAIL_POS_ALERTS_ENABLED MASTER TOGGLE */}
+              <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Master Email Alerts for POS Transactions (Sales, Returns, Exchanges)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      EMAIL_POS_ALERTS_ENABLED
+                    </span>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={(appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'}
-                  onClick={() => {
-                    const current = (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true';
-                    setAppSettingsForm((prev) => ({
-                      ...prev,
-                      EMAIL_POS_ALERTS_ENABLED: current ? 'false' : 'true',
-                    }));
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
                     (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'
-                      ? 'bg-purple-600'
-                      : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {(appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true' ? 'Active (Alerts On)' : 'Suppressed (Muted)'}
+                  </span>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'}
+                    onClick={() => {
+                      const current = (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true';
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        EMAIL_POS_ALERTS_ENABLED: current ? 'false' : 'true',
+                      }));
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                       (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'
-                        ? 'translate-x-5'
-                        : 'translate-x-0'
+                        ? 'bg-purple-600'
+                        : 'bg-slate-300 dark:bg-slate-700'
                     }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* EMAIL_SUPERADMIN_ON_SALES OPTIONAL COPY */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    Send SuperAdmin Copy of All POS Sales
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    EMAIL_SUPERADMIN_ON_SALES
-                  </span>
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        (appSettingsForm.EMAIL_POS_ALERTS_ENABLED ?? 'true') === 'true'
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 max-w-xl">
-                  When enabled (<strong>true</strong>), the SuperAdmin email (e.g. <code>fatima.khalid.dashti@gmail.com</code> or <code>sarbaazsoft@gmail.com</code>) receives a copy of every sale across the platform for auditing. Default is <strong>false</strong> to maintain store isolation.
-                </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
-                  (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                }`}>
-                  {(appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true' ? 'Audit Copy: On' : 'Audit Copy: Off (Isolated)'}
-                </span>
+              {/* EMAIL_SUPERADMIN_ON_SALES OPTIONAL COPY */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Send SuperAdmin Copy of All POS Sales
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      EMAIL_SUPERADMIN_ON_SALES
+                    </span>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={(appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'}
-                  onClick={() => {
-                    const current = (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true';
-                    setAppSettingsForm((prev) => ({
-                      ...prev,
-                      EMAIL_SUPERADMIN_ON_SALES: current ? 'false' : 'true',
-                    }));
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`text-xs font-bold font-mono px-2 py-1 rounded-lg border ${
                     (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'
-                      ? 'bg-purple-600'
-                      : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'
-                        ? 'translate-x-5'
-                        : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {(appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true' ? 'Audit Copy: On' : 'Audit Copy: Off (Isolated)'}
+                  </span>
 
-            {/* TEST OUTBOUND EMAIL DISPATCHER */}
-            <div className="pt-3 border-t border-slate-200 dark:border-purple-900/40">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-purple-900/40">
-                <div className="flex-1">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={(appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'}
+                    onClick={() => {
+                      const current = (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true';
+                      setAppSettingsForm((prev) => ({
+                        ...prev,
+                        EMAIL_SUPERADMIN_ON_SALES: current ? 'false' : 'true',
+                      }));
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                      (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'
+                        ? 'bg-purple-600'
+                        : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        (appSettingsForm.EMAIL_SUPERADMIN_ON_SALES ?? 'false') === 'true'
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* TEST OUTBOUND EMAIL DISPATCHER */}
+              <div className="pt-3 border-t border-slate-200 dark:border-purple-900/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-purple-900/40">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                       Verify Outbound Email Delivery
@@ -3461,66 +3438,66 @@ setFormErrors(errors);
                       via {(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail SMTP' : 'Resend API'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                    Dispatches a live transactional test email via the active provider (<strong>{(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail SMTP' : 'Resend'}</strong>) to verify your saved credentials.
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={testEmailRecipient}
+                      onChange={(e) => setTestEmailRecipient(e.target.value)}
+                      placeholder="Enter recipient email address"
+                      className="h-8.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 w-48 sm:w-56"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendTestEmail}
+                      disabled={isSendingTestEmail}
+                      className="h-8.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 shadow-xs"
+                    >
+                      <Send className={`w-3.5 h-3.5 ${isSendingTestEmail ? 'animate-spin' : ''}`} />
+                      <span>{isSendingTestEmail ? 'Dispatching...' : `Send Test (${(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail' : 'Resend'})`}</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="email"
-                    value={testEmailRecipient}
-                    onChange={(e) => setTestEmailRecipient(e.target.value)}
-                    placeholder="Enter recipient email address"
-                    className="h-8.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 w-48 sm:w-56"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendTestEmail}
-                    disabled={isSendingTestEmail}
-                    className="h-8.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 shadow-xs"
-                  >
-                    <Send className={`w-3.5 h-3.5 ${isSendingTestEmail ? 'animate-spin' : ''}`} />
-                    <span>{isSendingTestEmail ? 'Dispatching...' : `Send Test (${(appSettingsForm.ACTIVE_EMAIL_PROVIDER || 'resend').toLowerCase() === 'gmail' ? 'Gmail' : 'Resend'})`}</span>
-                  </button>
-                </div>
-              </div>
 
-              {testEmailResult && (
-                <div className={`mt-2.5 p-3.5 rounded-xl text-xs font-medium border ${
-                  testEmailResult.delivered
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-                }`}>
-                  <div className="font-bold flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      {testEmailResult.delivered ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />}
-                      {testEmailResult.delivered ? '✓ Test Email Delivered Successfully' : '✕ Test Email Delivery Notice'}
-                    </span>
-                    {testEmailResult.details?.provider && (
-                      <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
-                        Provider: {testEmailResult.details.provider}
+                {testEmailResult && (
+                  <div className={`mt-2.5 p-3.5 rounded-xl text-xs font-medium border ${
+                    testEmailResult.delivered
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+                  }`}>
+                    <div className="font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        {testEmailResult.delivered ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />}
+                        {testEmailResult.delivered ? '✓ Test Email Delivered Successfully' : '✕ Test Email Delivery Notice'}
                       </span>
+                      {testEmailResult.details?.provider && (
+                        <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                          Provider: {testEmailResult.details.provider}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-[11px] leading-relaxed">
+                      {testEmailResult.message}
+                    </div>
+                    {testEmailResult.details?.messageId && (
+                      <div className="mt-1 font-mono text-[10px] opacity-80">
+                        Message ID: {testEmailResult.details.messageId}
+                      </div>
                     )}
                   </div>
-                  <div className="mt-1 text-[11px] leading-relaxed">
-                    {testEmailResult.message}
-                  </div>
-                  {testEmailResult.details?.messageId && (
-                    <div className="mt-1 font-mono text-[10px] opacity-80">
-                      Message ID: {testEmailResult.details.messageId}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+
+            {/* TAB 2: FCM NOTIFICATION SETTINGS */}
+            <div className={servicesIntegrationsTab === 'fcm' ? 'block' : 'hidden'}>
+              <NotificationAlertProvidersSettings
+                embedded={true}
+                onSaveSuccess={() => {
+                  loadAppSettings();
+                }}
+              />
             </div>
           </div>
-
-          {/* CATEGORY 3: SYSTEM ALERT NOTIFICATION PROVIDERS (TELEGRAM & GMAIL) - SUPERADMIN EXCLUSIVE */}
-          <NotificationAlertProvidersSettings
-            onSaveSuccess={() => {
-              loadAppSettings();
-            }}
-          />
 
           {/* CATEGORY 4: SUPERADMIN NATIVE PUSH NOTIFICATION EVENT TRIGGERS */}
           <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-5">

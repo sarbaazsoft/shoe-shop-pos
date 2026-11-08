@@ -6,13 +6,9 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
   Smartphone,
   Save,
-  Check,
   RefreshCw,
-  ExternalLink,
-  ShieldCheck,
   Send,
   X,
   BellRing,
@@ -25,11 +21,13 @@ interface NotificationAlertProvidersSettingsProps {
   formData?: any;
   setFormData?: React.Dispatch<React.SetStateAction<any>>;
   isEmbeddedInForm?: boolean;
+  embedded?: boolean;
   onSaveSuccess?: (updated?: any) => void;
   onClose?: () => void;
 }
 
 export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvidersSettingsProps> = ({
+  embedded = false,
   onSaveSuccess,
   onClose,
 }) => {
@@ -132,7 +130,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
 
       setSaveMessage({
         type: 'success',
-        text: 'Firebase Cloud Messaging credentials saved and initialized successfully!',
+        text: 'Firebase Cloud Messaging credentials saved successfully!',
       });
 
       await loadSettings();
@@ -154,7 +152,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
 
     try {
       const res = await api.notifications.testFcm({
-        title: '🔥 Firebase Cloud Messaging Live Test',
+        title: '🔥 Firebase Cloud Messaging Test',
         message: `FCM push delivery confirmed at ${new Date().toLocaleTimeString()}! Real-time alerts are operational.`,
       });
 
@@ -163,7 +161,6 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
         message: res.message || (res.success ? '✓ Test push notification dispatched!' : 'Failed to deliver test alert.'),
       });
 
-      // Refresh device counts
       const stats = await api.notifications.getFcmStats().catch(() => null);
       if (stats) setDeviceStats(stats);
     } catch (err: any) {
@@ -216,9 +213,289 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
     return (
       <div className="p-8 text-center bg-white dark:bg-[#131B2E] rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm">
         <RefreshCw className="w-6 h-6 animate-spin text-purple-600 mx-auto mb-2" />
-        <span className="text-xs text-slate-500 dark:text-slate-400">Loading Firebase Cloud Messaging configuration...</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">Loading FCM configuration...</span>
       </div>
     );
+  }
+
+  const content = (
+    <div className="space-y-5">
+      {/* STATUS METRICS OVERVIEW */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-purple-900/40">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Push Provider</span>
+          <span className="text-xs font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5 flex items-center gap-1">
+            <Flame className="w-3.5 h-3.5 fill-amber-500" /> Firebase FCM
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-purple-900/40">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Admin SDK Status</span>
+          <span
+            className={`text-xs font-bold font-mono mt-0.5 ${
+              isBackendConfigured ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+            }`}
+          >
+            {isBackendConfigured ? '✓ Initialized' : 'Keys Needed'}
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-purple-900/40">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Registered Devices</span>
+          <span className="text-xs font-bold text-purple-600 dark:text-purple-400 font-mono mt-0.5 flex items-center gap-1">
+            <Smartphone className="w-3.5 h-3.5" />
+            {deviceStats.totalTokens} Device(s)
+          </span>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-purple-900/40">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">This Browser</span>
+          <span
+            className={`text-xs font-bold font-mono mt-0.5 flex items-center gap-1 ${
+              thisDeviceSubscribed ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <Laptop className="w-3.5 h-3.5" />
+            {thisDeviceSubscribed ? 'Subscribed' : 'Not Subscribed'}
+          </span>
+        </div>
+      </div>
+
+      {/* SECTION 1: BACKEND FIREBASE ADMIN SDK KEYS */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
+          <Key className="w-4 h-4 text-amber-500" />
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Backend Firebase Admin SDK Credentials
+          </h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Firebase Project ID</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PROJECT_ID)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_PROJECT_ID}
+              onChange={(e) => handleChange('FCM_PROJECT_ID', e.target.value.trim())}
+              placeholder="e.g. shoe-pos-app-12345"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Service Account Client Email</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_CLIENT_EMAIL)</code>
+            </label>
+            <input
+              type="email"
+              value={fcmSettings.FCM_CLIENT_EMAIL}
+              onChange={(e) => handleChange('FCM_CLIENT_EMAIL', e.target.value.trim())}
+              placeholder="e.g. firebase-adminsdk-xyz@shoe-pos-app.iam.gserviceaccount.com"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+              <span>Service Account Private Key (PEM)</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PRIVATE_KEY)</code>
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowPrivateKey(!showPrivateKey)}
+              className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 flex items-center gap-1 cursor-pointer font-medium"
+            >
+              {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{showPrivateKey ? 'Hide Key' : 'Reveal Key'}</span>
+            </button>
+          </div>
+          <textarea
+            rows={4}
+            value={showPrivateKey ? fcmSettings.FCM_PRIVATE_KEY : fcmSettings.FCM_PRIVATE_KEY ? '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••\n[Private Key Stored Securely]' : ''}
+            onChange={(e) => handleChange('FCM_PRIVATE_KEY', e.target.value)}
+            placeholder="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----"
+            className="w-full p-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 leading-relaxed"
+          />
+        </div>
+      </div>
+
+      {/* SECTION 2: FRONTEND FIREBASE WEB CLIENT KEYS */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
+          <Smartphone className="w-4 h-4 text-purple-500" />
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+            Frontend Firebase Web Client Configuration
+          </h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Web API Key</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_API_KEY)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_API_KEY}
+              onChange={(e) => handleChange('FCM_API_KEY', e.target.value.trim())}
+              placeholder="AIzaSy..."
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Messaging Sender ID</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MESSAGING_SENDER_ID)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_MESSAGING_SENDER_ID}
+              onChange={(e) => handleChange('FCM_MESSAGING_SENDER_ID', e.target.value.trim())}
+              placeholder="e.g. 104857291039"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Web App ID</span>
+              <span className="text-rose-500 ml-1 font-bold">*</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_APP_ID)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_APP_ID}
+              onChange={(e) => handleChange('FCM_APP_ID', e.target.value.trim())}
+              placeholder="1:104857291039:web:abcdef"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Web Push Certificate / VAPID Key</span>
+              <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_VAPID_KEY)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_VAPID_KEY}
+              onChange={(e) => handleChange('FCM_VAPID_KEY', e.target.value.trim())}
+              placeholder="e.g. BEl62iUY... (Web Push Key Pair)"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+              <span>Analytics Measurement ID</span>
+              <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
+              <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MEASUREMENT_ID)</code>
+            </label>
+            <input
+              type="text"
+              value={fcmSettings.FCM_MEASUREMENT_ID}
+              onChange={(e) => handleChange('FCM_MEASUREMENT_ID', e.target.value.trim())}
+              placeholder="G-XXXXXXX"
+              className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* FEEDBACK BANNERS */}
+      {saveMessage && (
+        <div
+          className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+            saveMessage.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+          }`}
+        >
+          {saveMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+          )}
+          <span>{saveMessage.text}</span>
+        </div>
+      )}
+
+      {testResult && (
+        <div
+          className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 border ${
+            testResult.success
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+          }`}
+        >
+          {testResult.success ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <span>{testResult.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ACTION BAR */}
+      <div className="pt-4 border-t border-slate-100 dark:border-purple-900/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleSubscribeThisDevice}
+            disabled={isSubscribingThisDevice}
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+          >
+            <BellRing className={`w-3.5 h-3.5 text-purple-500 ${isSubscribingThisDevice ? 'animate-spin' : ''}`} />
+            <span>{thisDeviceSubscribed ? 'Re-register This Device' : 'Enable Push on This Device'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTestPush}
+            disabled={isTestingPush || !isBackendConfigured}
+            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-xs"
+            title={!isBackendConfigured ? 'Save Firebase credentials first to enable test push' : 'Send test FCM push notification'}
+          >
+            <Send className={`w-3.5 h-3.5 ${isTestingPush ? 'animate-spin' : ''}`} />
+            <span>{isTestingPush ? 'Dispatching...' : 'Test Push Alert (FCM)'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleSave()}
+            disabled={isSaving}
+            className="w-full sm:w-auto px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-purple-600/25 active:scale-95"
+          >
+            <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+            <span>{isSaving ? 'Saving...' : 'Save Firebase Credentials'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return content;
   }
 
   return (
@@ -233,7 +510,7 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                  Firebase Cloud Messaging (FCM) Push Provider
+                  Firebase Cloud Messaging (FCM)
                 </h3>
                 <span
                   className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1.5 ${
@@ -247,12 +524,9 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
                       isBackendConfigured && isClientConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                     }`}
                   />
-                  {isBackendConfigured && isClientConfigured ? 'FCM Push Active' : 'Setup Required'}
+                  {isBackendConfigured && isClientConfigured ? 'FCM Active' : 'Setup Required'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Exclusive push notification provider for POS sales, customer returns, exchanges, and low-stock alerts across Android, iPhone, Windows, and Mac PWAs.
-              </p>
             </div>
           </div>
 
@@ -266,315 +540,10 @@ export const NotificationAlertProvidersSettings: React.FC<NotificationAlertProvi
             </button>
           )}
         </div>
-
-        {/* STATUS METRICS OVERVIEW */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-200/60 dark:border-purple-900/40">
-          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Push Provider</span>
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5 flex items-center gap-1">
-              <Flame className="w-3.5 h-3.5 fill-amber-500" /> Firebase FCM
-            </span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Admin SDK Status</span>
-            <span
-              className={`text-xs font-bold font-mono mt-0.5 ${
-                isBackendConfigured ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-              }`}
-            >
-              {isBackendConfigured ? '✓ Initialized' : 'Keys Needed'}
-            </span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">Registered Devices</span>
-            <span className="text-xs font-bold text-purple-600 dark:text-purple-400 font-mono mt-0.5 flex items-center gap-1">
-              <Smartphone className="w-3.5 h-3.5" />
-              {deviceStats.totalTokens} Device(s)
-            </span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-purple-900/40">
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium">This Browser</span>
-            <span
-              className={`text-xs font-bold font-mono mt-0.5 flex items-center gap-1 ${
-                thisDeviceSubscribed ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <Laptop className="w-3.5 h-3.5" />
-              {thisDeviceSubscribed ? 'Subscribed' : 'Not Subscribed'}
-            </span>
-          </div>
-        </div>
       </div>
 
-      <div className="p-5 sm:p-6 space-y-6">
-        {/* QUICK SETUP INSTRUCTIONS BANNER */}
-        <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 via-orange-50/50 to-purple-50/40 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-purple-950/20 border border-amber-200 dark:border-amber-800/60 text-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              Quick Firebase Setup Guide:
-            </span>
-            <a
-              href="https://console.firebase.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 font-semibold"
-            >
-              <span>Open Firebase Console</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-          <ol className="list-decimal list-inside space-y-1.5 text-slate-700 dark:text-slate-300 pl-1 leading-relaxed">
-            <li>
-              In <strong>Firebase Console</strong>, create or select your project.
-            </li>
-            <li>
-              Go to <strong>Project Settings &gt; Service accounts</strong>, click <strong>&quot;Generate new private key&quot;</strong>, and copy your <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">project_id</code>, <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">client_email</code>, and <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">private_key</code> below.
-            </li>
-            <li>
-              Under <strong>Project Settings &gt; General &gt; Your apps</strong>, click <strong>Web (&lt;/&gt;)</strong> to create a Web App and copy your <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">apiKey</code>, <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">appId</code>, and <code className="bg-white/80 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">messagingSenderId</code>.
-            </li>
-          </ol>
-        </div>
-
-        {/* SECTION 1: BACKEND FIREBASE ADMIN SDK KEYS */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
-            <Key className="w-4 h-4 text-amber-500" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              1. Backend Firebase Admin SDK Keys (Server Push Dispatch)
-            </h4>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Firebase Project ID</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PROJECT_ID)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_PROJECT_ID}
-                onChange={(e) => handleChange('FCM_PROJECT_ID', e.target.value.trim())}
-                placeholder="e.g. shoe-pos-app-12345"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Service Account Client Email</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_CLIENT_EMAIL)</code>
-              </label>
-              <input
-                type="email"
-                value={fcmSettings.FCM_CLIENT_EMAIL}
-                onChange={(e) => handleChange('FCM_CLIENT_EMAIL', e.target.value.trim())}
-                placeholder="e.g. firebase-adminsdk-xyz@shoe-pos-app.iam.gserviceaccount.com"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                <span>Service Account Private Key (PEM)</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_PRIVATE_KEY)</code>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowPrivateKey(!showPrivateKey)}
-                className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 flex items-center gap-1 cursor-pointer font-medium"
-              >
-                {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                <span>{showPrivateKey ? 'Hide Key' : 'Reveal Key'}</span>
-              </button>
-            </div>
-            <textarea
-              rows={4}
-              value={showPrivateKey ? fcmSettings.FCM_PRIVATE_KEY : fcmSettings.FCM_PRIVATE_KEY ? '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••\n[Private Key Stored Securely]' : ''}
-              onChange={(e) => handleChange('FCM_PRIVATE_KEY', e.target.value)}
-              placeholder="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----"
-              className="w-full p-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 leading-relaxed"
-            />
-          </div>
-        </div>
-
-        {/* SECTION 2: FRONTEND FIREBASE WEB CLIENT KEYS */}
-        <div className="space-y-4 pt-2">
-          <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-purple-900/40">
-            <Smartphone className="w-4 h-4 text-purple-500" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              2. Frontend Firebase Web Client Keys (Device Token Generation)
-            </h4>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Web API Key</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_API_KEY)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_API_KEY}
-                onChange={(e) => handleChange('FCM_API_KEY', e.target.value.trim())}
-                placeholder="AIzaSy..."
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Messaging Sender ID</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MESSAGING_SENDER_ID)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_MESSAGING_SENDER_ID}
-                onChange={(e) => handleChange('FCM_MESSAGING_SENDER_ID', e.target.value.trim())}
-                placeholder="e.g. 104857291039"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Web App ID</span>
-                <span className="text-rose-500 ml-1 font-bold">*</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_APP_ID)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_APP_ID}
-                onChange={(e) => handleChange('FCM_APP_ID', e.target.value.trim())}
-                placeholder="1:104857291039:web:abcdef"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Web Push Certificate / VAPID Key</span>
-                <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_VAPID_KEY)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_VAPID_KEY}
-                onChange={(e) => handleChange('FCM_VAPID_KEY', e.target.value.trim())}
-                placeholder="e.g. BEl62iUY... (Leave blank or generate in Cloud Messaging tab)"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-              {fcmSettings.FCM_VAPID_KEY.includes('@') && (
-                <p className="text-[10px] text-amber-500 font-semibold mt-1">
-                  ⚠️ Note: This field is for a Web Push Key Pair (starts with B... from Project Settings &gt; Cloud Messaging), not an email address. Leave blank if not generated.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                <span>Analytics Measurement ID</span>
-                <span className="text-[10px] text-slate-400 font-normal ml-1">(Optional)</span>
-                <code className="text-[10px] text-purple-600 dark:text-purple-400 font-mono ml-1.5">(FCM_MEASUREMENT_ID)</code>
-              </label>
-              <input
-                type="text"
-                value={fcmSettings.FCM_MEASUREMENT_ID}
-                onChange={(e) => handleChange('FCM_MEASUREMENT_ID', e.target.value.trim())}
-                placeholder="G-XXXXXXX"
-                className="w-full h-10 px-3 font-mono bg-slate-50 dark:bg-[#060B18]/90 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* FEEDBACK BANNERS */}
-        {saveMessage && (
-          <div
-            className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
-              saveMessage.type === 'success'
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-            }`}
-          >
-            {saveMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-            )}
-            <span>{saveMessage.text}</span>
-          </div>
-        )}
-
-        {testResult && (
-          <div
-            className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 border ${
-              testResult.success
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
-            }`}
-          >
-            {testResult.success ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-            )}
-            <div className="flex-1">
-              <span>{testResult.message}</span>
-            </div>
-          </div>
-        )}
-
-        {/* ACTION BAR */}
-        <div className="pt-4 border-t border-slate-100 dark:border-purple-900/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleSubscribeThisDevice}
-              disabled={isSubscribingThisDevice}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-            >
-              <BellRing className={`w-3.5 h-3.5 text-purple-500 ${isSubscribingThisDevice ? 'animate-spin' : ''}`} />
-              <span>{thisDeviceSubscribed ? 'Re-register This Device' : 'Enable Push on This Device'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleTestPush}
-              disabled={isTestingPush || !isBackendConfigured}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-xs"
-              title={!isBackendConfigured ? 'Save Firebase credentials first to enable test push' : 'Send test FCM push notification'}
-            >
-              <Send className={`w-3.5 h-3.5 ${isTestingPush ? 'animate-spin' : ''}`} />
-              <span>{isTestingPush ? 'Dispatching...' : 'Test Push Alert (FCM)'}</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleSave()}
-              disabled={isSaving}
-              className="w-full sm:w-auto px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-purple-600/25 active:scale-95"
-            >
-              <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
-              <span>{isSaving ? 'Saving...' : 'Save Firebase Credentials'}</span>
-            </button>
-          </div>
-        </div>
+      <div className="p-5 sm:p-6">
+        {content}
       </div>
     </div>
   );
