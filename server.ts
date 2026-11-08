@@ -219,8 +219,8 @@ app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.e
   res.end(buf);
 });
 
-// Dynamic Android APK Wrapper (.APK) Download Endpoint
-app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
+// Signed Android APK (.APK) Download Endpoint
+app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk', '/assets/ShoePOS.apk'], (req, res) => {
   const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
   const apkPath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS.apk');
   if (!fs.existsSync(apkPath)) {
@@ -230,50 +230,21 @@ app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
   const cleanStore = storeQuery ? storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Shoe-POS';
   const downloadFileName = `${cleanStore}.apk`;
 
-  try {
-    const zip = new AdmZip(apkPath);
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+  return res.sendFile(apkPath);
+});
 
-    if (storeQuery) {
-      const shortName = storeQuery.length > 12 ? storeQuery.slice(0, 12).trim() : storeQuery;
-      let appManifest: any = {};
-      try {
-        appManifest = JSON.parse(zip.readAsText('assets/app-manifest.json'));
-      } catch {}
-
-      appManifest.id = '/';
-      appManifest.name = storeQuery;
-      appManifest.short_name = shortName;
-      appManifest.description = `Dedicated Point of Sale & Retail Inventory Management for ${storeQuery}`;
-      appManifest.theme_color = '#4F46E5';
-      appManifest.background_color = '#4F46E5';
-      appManifest.display = 'standalone';
-
-      // Ensure proper standard and maskable app icons
-      appManifest.icons = [
-        { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        { src: '/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
-      ];
-
-      zip.updateFile('assets/app-manifest.json', Buffer.from(JSON.stringify(appManifest, null, 2)));
-
-      // Align title in launcher splash page inside APK
-      const indexHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${storeQuery}</title><script>window.location.href = "/";</script></head><body style="background:#0F172A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>Launching ${storeQuery}...</h2><p>Connecting to retail terminal</p></div></body></html>`;
-      zip.updateFile('assets/www/index.html', Buffer.from(indexHtml));
-    }
-
-    const apkBuf = zip.toBuffer();
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
-    res.setHeader('Content-Length', apkBuf.length);
-    return res.end(apkBuf);
-  } catch (_err) {
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
-    return res.sendFile(apkPath);
+// Official Digital Asset Links endpoint for Android TWA verification
+app.get('/.well-known/assetlinks.json', (_req, res) => {
+  const assetLinksPath = path.join(rootDir, 'public', '.well-known', 'assetlinks.json');
+  if (fs.existsSync(assetLinksPath)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(assetLinksPath);
   }
+  return res.status(404).json({ error: 'assetlinks.json not found' });
 });
 
 app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink, Bell, BellRing, CheckCheck, SlidersHorizontal, CreditCard } from 'lucide-react';
+import { Shield, Store, CheckCircle2, Power, Plus, RefreshCw, Wand2, Lock, LogOut, TrendingUp, Clock, KeyRound, FileCode2, Mail, AlertCircle, Eye, EyeOff, Fingerprint, ArrowRight, LayoutDashboard, Search, Menu, X, PanelLeftClose, PanelLeftOpen, Sun, Moon, Keyboard, Calendar, Globe, Download, Upload, FileText, Trash2, BarChart3, User as UserIcon, Building2, ChevronDown, UserCog, ShieldCheck, Sliders, Sparkles, Megaphone, Send, Radio, Info, AlertTriangle, ExternalLink, Bell, BellRing, CheckCheck, SlidersHorizontal, CreditCard, Loader2 } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api';
 import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
@@ -20,7 +20,7 @@ import { toTitleCaseLive, toTitleCaseTrimmed, toLowerTrimmed } from '../../utils
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
-import { initNativeNotificationPrompt } from '../../services/pushNotificationClient';
+import { initNativeNotificationPrompt, isDeviceSubscribedToPush, getNotificationPermissionState, subscribeDeviceToWebPush, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -64,6 +64,13 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       return [];
     }
   });
+
+  // SuperAdmin Push Notification state (equivalent to Store Owner Header.tsx)
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+  const [isTogglingPush, setIsTogglingPush] = useState(false);
+  const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
 
   // SuperAdmin Platform Tools Dropdown state (Send Notification, Import Data, Export Platform Backup)
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
@@ -275,6 +282,97 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       setLoadingNotifications(false);
     }
   }, [isSuperAdmin]);
+
+  // Sync push notification subscription status and permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermission(getNotificationPermissionState());
+      isDeviceSubscribedToPush()
+        .then((subscribed) => {
+          setIsPushSubscribed(subscribed);
+        })
+        .catch(() => {});
+    }
+  }, [isSuperAdmin]);
+
+  // Connect real-time Server-Sent Events (SSE) stream for SuperAdmin
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const cleanupStream = connectRealtimeNotificationStream((_payload) => {
+      loadNotifications();
+    });
+    return () => {
+      cleanupStream();
+    };
+  }, [isSuperAdmin, loadNotifications]);
+
+  const handleTogglePushNotifications = async () => {
+    if (isTogglingPush) return;
+    setIsTogglingPush(true);
+    setPushStatusMessage(null);
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeDeviceFromWebPush();
+        setIsPushSubscribed(false);
+        setPushStatusMessage('Push notifications disabled on this device.');
+        setTimeout(() => setPushStatusMessage(null), 4000);
+      } else {
+        const res = await subscribeDeviceToWebPush('SUPERADMIN');
+        if (res.success) {
+          setIsPushSubscribed(true);
+          setPushPermission('granted');
+          setPushStatusMessage('✅ SuperAdmin push alerts active! Real-time alerts enabled on this device.');
+          setTimeout(() => setPushStatusMessage(null), 5000);
+        } else if (res.error) {
+          setPushStatusMessage(res.error);
+          setTimeout(() => setPushStatusMessage(null), 7000);
+        }
+      }
+    } catch (err: any) {
+      setPushStatusMessage('Error updating push notification settings: ' + (err?.message || err));
+      setTimeout(() => setPushStatusMessage(null), 6000);
+    } finally {
+      setIsTogglingPush(false);
+      setPushPermission(getNotificationPermissionState());
+    }
+  };
+
+  const handleSendTestPush = async () => {
+    try {
+      setTestPushStatus('sending');
+      const res = await api.notifications.testPush({
+        title: '🔔 SuperAdmin Test Push Alert',
+        message: 'SuperAdmin push notification test delivered successfully to registered devices!',
+      });
+      setTestPushStatus(res.success ? 'success' : 'error');
+      setPushStatusMessage(res.message || '🔔 Test alert sent to registered devices.');
+
+      // Fallback local desktop alert if browser permission is already granted
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('🔔 SuperAdmin Test Alert', {
+            body: 'SuperAdmin push alert test confirmed on this device.',
+            icon: '/pwa-192x192.png',
+            tag: `superadmin-test-${Date.now()}`,
+          });
+        } catch {}
+      }
+
+      setTimeout(() => {
+        setTestPushStatus(null);
+      }, 4000);
+      setTimeout(() => {
+        setPushStatusMessage(null);
+      }, 6000);
+    } catch (err: any) {
+      setTestPushStatus('error');
+      setPushStatusMessage('Test alert failed: ' + (err?.message || err));
+      setTimeout(() => {
+        setTestPushStatus(null);
+        setPushStatusMessage(null);
+      }, 5000);
+    }
+  };
 
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1908,6 +2006,21 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
       {/* RIGHT COLUMN: TOP HEADER + MAIN WORKSPACE + FOOTER (Aligned with Store Page) */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#F8FAFC] dark:bg-[#0A0E1A]">
+        {/* Push Status Feedback Notification */}
+        {pushStatusMessage && (
+          <div className="bg-indigo-900/95 text-indigo-100 px-3 sm:px-4 py-1.5 text-xs flex items-center justify-between border-b border-indigo-700/50 no-print z-40 relative">
+            <span className="truncate">{pushStatusMessage}</span>
+            <button
+              type="button"
+              onClick={() => setPushStatusMessage(null)}
+              className="text-indigo-200 hover:text-white ml-2 cursor-pointer p-0.5"
+              aria-label="Close status message"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
         {/* STICKY TOP HEADER BAR (Exact h-[3.6rem] aligned with Store Header.tsx) */}
         <header className="h-[3.6rem] sticky top-0 z-20 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-lg border-b border-indigo-500/20 px-3 sm:px-6 flex items-center justify-between gap-3 shrink-0 shadow-2xs transition-colors">
           {/* Left: Mobile Menu Button */}
@@ -2119,6 +2232,71 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           <RefreshCw className={`w-3 h-3 ${loadingNotifications ? 'animate-spin text-purple-600 dark:text-purple-200' : ''}`} />
                         </button>
                       </div>
+                    </div>
+
+                    {/* SuperAdmin Device Push Activation & Test Alert Card */}
+                    <div className="p-2 mb-2 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/50 shrink-0">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Radio className={`w-3.5 h-3.5 shrink-0 ${isPushSubscribed ? 'text-emerald-500 animate-pulse' : 'text-purple-600 dark:text-purple-300'}`} />
+                          <span className="text-[11px] font-bold text-slate-800 dark:text-purple-100 truncate">
+                            SuperAdmin Push Alerts (Web & Mobile)
+                          </span>
+                        </div>
+                        <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                          isPushSubscribed
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                            : pushPermission === 'denied'
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          {isPushSubscribed ? 'Active' : pushPermission === 'denied' ? 'Blocked' : 'Off'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-purple-200/80 leading-snug mb-1.5">
+                        Real-time push alerts for store trial requests, license renewals &amp; system notices.
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTogglePushNotifications();
+                          }}
+                          disabled={isTogglingPush}
+                          className={`flex-1 py-1 px-2 rounded-md font-semibold text-[10.5px] transition cursor-pointer flex items-center justify-center gap-1 ${
+                            isPushSubscribed
+                              ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700'
+                              : 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
+                          }`}
+                        >
+                          {isTogglingPush ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : isPushSubscribed ? (
+                            'Disable Push'
+                          ) : (
+                            'Enable Push'
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendTestPush();
+                          }}
+                          disabled={testPushStatus === 'sending'}
+                          className="py-1 px-2 rounded-md bg-white dark:bg-purple-900/40 hover:bg-slate-100 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-700 font-semibold text-[10.5px] transition cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Test push notification delivery on this device"
+                        >
+                          <BellRing className={`w-3 h-3 ${testPushStatus === 'sending' ? 'animate-bounce' : ''}`} />
+                          <span>{testPushStatus === 'success' ? 'Sent!' : 'Test Alert'}</span>
+                        </button>
+                      </div>
+                      {pushStatusMessage && (
+                        <div className="mt-1.5 p-1 rounded bg-purple-100/90 dark:bg-purple-900/60 text-[9.5px] text-purple-900 dark:text-purple-200 leading-tight">
+                          {pushStatusMessage}
+                        </div>
+                      )}
                     </div>
 
                     {/* Category Filter Tabs */}
@@ -4632,7 +4810,37 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0 self-start md:self-center">
+                    <button
+                      type="button"
+                      onClick={handleTogglePushNotifications}
+                      disabled={isTogglingPush}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 border ${
+                        isPushSubscribed
+                          ? 'bg-slate-100 hover:bg-slate-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 text-slate-700 dark:text-purple-200 border-slate-200 dark:border-purple-800/40'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs border-purple-500'
+                      }`}
+                      title={isPushSubscribed ? 'Disable push notifications on this device' : 'Enable push notifications on this device'}
+                    >
+                      {isTogglingPush ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Radio className={`w-3.5 h-3.5 ${isPushSubscribed ? 'text-emerald-500 animate-pulse' : ''}`} />
+                      )}
+                      <span>{isPushSubscribed ? 'Disable Push' : 'Enable Push'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSendTestPush}
+                      disabled={testPushStatus === 'sending'}
+                      className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 text-xs font-bold transition cursor-pointer active:scale-95"
+                      title="Dispatch test push alert to SuperAdmin devices"
+                    >
+                      <BellRing className={`w-3.5 h-3.5 ${testPushStatus === 'sending' ? 'animate-bounce' : ''}`} />
+                      <span>{testPushStatus === 'success' ? 'Sent!' : 'Test Alert'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -4652,6 +4860,65 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                       className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-[#0E1628] dark:hover:bg-[#1A263D] border border-slate-200 dark:border-indigo-500/20 text-slate-700 dark:text-slate-200 transition cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`w-4 h-4 ${loadingNotifications ? 'animate-spin text-purple-600 dark:text-purple-400' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* SuperAdmin Device Push Alert Status Ribbon */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#131B2E] border border-purple-200/80 dark:border-purple-800/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      isPushSubscribed
+                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : 'bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300'
+                    }`}>
+                      <Radio className={`w-5 h-5 ${isPushSubscribed ? 'animate-pulse text-emerald-500' : ''}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          SuperAdmin Device Push Alerts
+                        </span>
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          isPushSubscribed
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                            : pushPermission === 'denied'
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          {isPushSubscribed ? 'Active' : pushPermission === 'denied' ? 'Blocked' : 'Off'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Receive instant alerts on this browser and mobile device for store trial activations, subscription renewals &amp; critical platform events.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleTogglePushNotifications}
+                      disabled={isTogglingPush}
+                      className={`px-3.5 py-2 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                        isPushSubscribed
+                          ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }`}
+                    >
+                      {isTogglingPush ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        isPushSubscribed ? 'Disable Push' : 'Enable Push'
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendTestPush}
+                      disabled={testPushStatus === 'sending'}
+                      className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <BellRing className={`w-3.5 h-3.5 ${testPushStatus === 'sending' ? 'animate-bounce' : ''}`} />
+                      <span>{testPushStatus === 'success' ? 'Sent!' : 'Test Alert'}</span>
                     </button>
                   </div>
                 </div>

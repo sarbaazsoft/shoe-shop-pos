@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "studio.ai.sarbaazsoft.twa",
+        "sha256_cert_fingerprints": ["58:54:C6:78:45:D3:CD:EA:AC:3B:42:57:23:DD:C9:EA:1B:7C:22:23:16:DF:93:6B:E3:06:DF:FF:00:FA:5F:50"]
+      }
+    }]

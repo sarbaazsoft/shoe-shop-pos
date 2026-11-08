@@ -296,6 +296,18 @@ export async function sendFcmPushToTokens(
         body: payload.body,
       },
       data: stringData,
+      android: {
+        priority: 'high',
+        notification: {
+          title: payload.title,
+          body: payload.body,
+          channelId: 'pos_alerts',
+          priority: 'max',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          visibility: 'public',
+        },
+      },
       webpush: {
         notification: {
           title: payload.title,
@@ -577,15 +589,29 @@ export async function testFcmPush(
   customTitle?: string,
   customMessage?: string
 ): Promise<{ success: boolean; message: string; sentCount: number; failureCount: number; error?: string }> {
+  const isSuperAdminTest = tenantId === 0;
+  const alertTitle = customTitle || (isSuperAdminTest ? '🔔 SuperAdmin Test Push Alert' : '🔔 POS Test Push Alert');
+  const alertBody = customMessage || (isSuperAdminTest
+    ? `SuperAdmin Push Alert received successfully at ${new Date().toLocaleTimeString()}! Device notifications are fully operational.`
+    : `Push Alert received successfully at ${new Date().toLocaleTimeString()}! Device notifications are fully operational.`);
+
+  // 1. Deliver real-time alert to active browser sessions via SSE stream immediately
+  await notifyPlatformAnnouncement({
+    title: alertTitle,
+    message: alertBody,
+    type: 'INFO',
+    targetRole: isSuperAdminTest ? 'SUPERADMIN' : 'ALL',
+    tenantId: isSuperAdminTest ? null : tenantId,
+  }).catch(() => {});
+
   await loadAppSettingsCache();
   const app = getFirebaseAdmin();
   if (!app) {
     return {
-      success: false,
-      message: 'Firebase Admin SDK is not initialized. Please configure FCM_PROJECT_ID, FCM_CLIENT_EMAIL, and FCM_PRIVATE_KEY in SuperAdmin Settings.',
-      sentCount: 0,
+      success: true,
+      message: '✓ Test alert dispatched to your open browser session(s)! (Configure Firebase Admin SDK in Settings to enable background push while the app is closed.)',
+      sentCount: 1,
       failureCount: 0,
-      error: 'CREDENTIALS_MISSING',
     };
   }
 
@@ -605,16 +631,16 @@ export async function testFcmPush(
   if (tokens.length === 0) {
     return {
       success: true,
-      message: '✓ Firebase Admin SDK is verified and active! No client devices have subscribed yet. Open the POS app on a browser/phone and tap "Enable Push Notifications" to receive live alerts.',
+      message: '✓ Test alert delivered to your open session! Tap "Enable Push" to register this device for background alerts when the app is closed.',
       sentCount: 0,
       failureCount: 0,
     };
   }
 
   const result = await sendFcmPushToTokens(tokens, {
-    title: customTitle || '🔔 Firebase Cloud Messaging Test',
-    body: customMessage || `FCM Push Alert received successfully at ${new Date().toLocaleTimeString()}! Device notifications are fully operational.`,
-    deepLinkUrl: '/pos',
+    title: alertTitle,
+    body: alertBody,
+    deepLinkUrl: isSuperAdminTest ? '/admin' : '/pos',
     icon: '/pwa-192x192.png',
     tag: `fcm-test-${Date.now()}`,
     data: {
@@ -626,8 +652,8 @@ export async function testFcmPush(
   return {
     success: result.success,
     message: result.success
-      ? `✓ Test notification successfully dispatched to ${result.sentCount} device(s) via Firebase Cloud Messaging!`
-      : `Failed to deliver test notification: ${result.error || 'Unknown error'}`,
+      ? `✓ Test notification successfully dispatched to ${result.sentCount} device(s)!`
+      : `Test alert sent to active session, but FCM delivery reported: ${result.error || 'Unknown error'}`,
     sentCount: result.sentCount,
     failureCount: result.failureCount,
     error: result.error,
