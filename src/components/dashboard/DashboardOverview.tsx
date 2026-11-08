@@ -7,7 +7,6 @@ import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailable
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { StatCard, triggerStatRecount } from '../common/StatCard.tsx';
 import { RetailShoeMetrics, useDataPerIntersectionObserver, type RetailShoeMetricsData } from '../common/RetailShoeMetrics.tsx';
-import { LuxuryBadge } from '../common/Badge.tsx';
 
 interface CustomCategoryArticlesTooltipProps {
   active?: boolean;
@@ -270,47 +269,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     }
   };
 
-  const isServerWelcomeDismissed = Boolean(
-    companySettings?.welcomeDismissed ||
-    companySettings?.welcome_dismissed ||
-    currentUser?.welcomeDismissed
-  );
-
-  const checkWelcomeDismissedLocally = () => {
-    try {
-      if (typeof localStorage === 'undefined') return false;
-      return (
-        localStorage.getItem(dismissKey) === 'true' ||
-        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}`) === 'true' ||
-        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`) === 'true' ||
-        localStorage.getItem('pos_welcome_partner_dismissed') === 'true' ||
-        localStorage.getItem(`pos_welcome_partner_dismissed_${tenantId}`) === 'true' ||
-        localStorage.getItem('pos_welcome_dismissed_universal') === 'true'
-      );
-    } catch {
-      return false;
-    }
-  };
-
   const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
-    if (isServerWelcomeDismissed || checkWelcomeDismissedLocally()) {
-      return false;
+    try {
+      if (
+        localStorage.getItem(dismissKey) === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true'
+      ) {
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
     }
-    return true;
   });
-
-  // Automatically keep banner dismissed if server reports welcomeDismissed
-  useEffect(() => {
-    if (companySettings?.welcomeDismissed || companySettings?.welcome_dismissed || currentUser?.welcomeDismissed) {
-      setShowWelcomeBanner(false);
-      try {
-        localStorage.setItem(dismissKey, 'true');
-        localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
-        localStorage.setItem('pos_welcome_partner_dismissed', 'true');
-        localStorage.setItem('pos_welcome_dismissed_universal', 'true');
-      } catch {}
-    }
-  }, [companySettings?.welcomeDismissed, companySettings?.welcome_dismissed, currentUser?.welcomeDismissed, dismissKey, tenantId]);
 
   const [isFirstTime] = useState<boolean>(() => {
     try {
@@ -483,16 +454,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const handleDismissWelcomeBanner = () => {
     try {
       localStorage.setItem('pos_welcome_partner_dismissed', 'true');
-      localStorage.setItem(`pos_welcome_partner_dismissed_${tenantId}`, 'true');
       localStorage.setItem(dismissKey, 'true');
-      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
-      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`, 'true');
-      localStorage.setItem('pos_welcome_dismissed_universal', 'true');
-
-      // Call backend to permanently record tenant welcome dismissal in DB
-      api.notifications.dismissWelcome().catch(() => {});
-      api.notifications.dismiss('welcome', 'WELCOME').catch(() => {});
-
       const welcomeNotices = activeNotices.filter((n) => {
         const titleLower = (n.title || '').toLowerCase();
         const msgLower = (n.message || '').toLowerCase();
@@ -1224,13 +1186,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <LuxuryBadge
-                  tone="purple"
-                  size="xs"
-                  icon={<Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />}
-                >
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 border border-purple-300 dark:border-purple-700/60 text-purple-800 dark:text-purple-300">
+                  <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-300" />
                   {bannerBadge}
-                </LuxuryBadge>
+                </span>
                 <span className="text-xs font-mono text-purple-700 dark:text-purple-300/80">• {storeName}</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-snug">

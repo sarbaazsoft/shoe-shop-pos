@@ -195,18 +195,27 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     companySettings?.invoiceFooter ||
     'Thank you for your business!';
 
-  // Sanitize invoice footer: completely remove any application branding, platform watermarks, or footer credits from inside the receipt box
+  // Sanitize invoice footer: completely remove any application branding, platform watermarks, or footer credits
   const sanitizeInvoiceFooter = (footer?: string): string => {
     if (!footer) return '';
     const trimmed = footer.trim();
-    const sanitized = trimmed
-      .replace(/Powered by\s+SarbaazSoft(\s+Shoe\s+POS)?[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
-      .replace(/Powered by\s+SarbaazSoft(\s+Shoe\s+POS)?/gi, '')
-      .replace(/SarbaazSoft(\s+Shoe\s+POS)?/gi, '')
-      .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
-      .replace(/Powered by[\s\S]*$/gi, '')
-      .trim();
-    return sanitized;
+    if (
+      trimmed === 'Powered by SarbaazSoft Shoe POS • © 2026 All rights reserved.' ||
+      trimmed === 'Powered by SarbaazSoft Shoe POS' ||
+      trimmed === 'SarbaazSoft Shoe POS' ||
+      trimmed.toLowerCase().includes('sarbaazsoft')
+    ) {
+      const sanitized = trimmed
+        .replace(/Powered by\s+SarbaazSoft Shoe POS[\s•·-]*©?\s*20\d\d\s*All rights reserved\.?/gi, '')
+        .replace(/Powered by\s+SarbaazSoft Shoe POS/gi, '')
+        .replace(/SarbaazSoft Shoe POS/gi, '')
+        .replace(/SarbaazSoft POS/gi, '')
+        .replace(/(©|&copy;)?\s*20\d\d\s*All rights reserved\.?/gi, '')
+        .replace(/Powered by[\s\S]*$/gi, '')
+        .trim();
+      return sanitized;
+    }
+    return trimmed;
   };
 
   const cleanInvoiceFooter = sanitizeInvoiceFooter(rawInvoiceFooter);
@@ -754,11 +763,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               </div>
 
               {/* Footer */}
-              <div className="pt-2 text-center space-y-0.5">
+              <div className="pt-2 text-center space-y-1">
                 {invoiceFooter && <p className="text-[8px] text-gray-600 italic px-1">{invoiceFooter}</p>}
-                <p className="text-[7px] text-gray-600 font-normal tracking-tight">
-                  Powered by SarbaazSoft Shoe POS
-                </p>
               </div>
             </div>
           ) : (
@@ -1084,11 +1090,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
               {/* Dual Signatures & Acceptance Footer */}
               <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-0.5">
+                <div>
                   {invoiceFooter && <p className="text-[10px] text-gray-500 max-w-xs">{invoiceFooter}</p>}
-                  <p className="text-[8px] text-gray-500 font-normal tracking-tight max-w-xs">
-                    Powered by SarbaazSoft Shoe POS
-                  </p>
                 </div>
                 <div className="flex justify-end gap-8">
                   <div className="text-center">
@@ -1237,9 +1240,6 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
             <div style={{ textAlign: 'center', paddingTop: '6px', color: '#000000' }}>
               {invoiceFooter && <div style={{ fontSize: '8.5px', fontStyle: 'italic', color: '#333333' }}>{invoiceFooter}</div>}
-              <div style={{ fontSize: '7px', color: '#333333', marginTop: '2px', letterSpacing: '-0.01em' }}>
-                Powered by SarbaazSoft Shoe POS
-              </div>
             </div>
           </div>
         ) : (
@@ -1461,9 +1461,6 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', color: '#000000' }}>
               <div>
                 {invoiceFooter && <div style={{ fontSize: '10px' }}>{invoiceFooter}</div>}
-                <div style={{ fontSize: '8px', color: '#000000', marginTop: '2px' }}>
-                  Powered by SarbaazSoft Shoe POS
-                </div>
               </div>
               <div style={{ display: 'flex', gap: '40px' }}>
                 <div style={{ textAlign: 'center' }}>

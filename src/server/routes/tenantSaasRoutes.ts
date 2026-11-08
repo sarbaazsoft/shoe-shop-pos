@@ -171,8 +171,6 @@ router.get('/saas/resolve', async (req: Request, res: Response) => {
       subscription_status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
       logo_url: string;
       currency: string;
-      business_type?: string;
-      pricing_mode?: string;
       onboarding_completed: boolean;
     }>(
       `SELECT t.id, t.name, t.status, t.subscription_plan::text AS subscription_plan,
@@ -180,9 +178,7 @@ router.get('/saas/resolve', async (req: Request, res: Response) => {
               t.subscription_start_date, t.subscription_end_date, t.subscription_status,
               t.onboarding_completed,
               COALESCE(NULLIF(cs.logo, ''), '/pwa-512x512.png') AS logo_url,
-              COALESCE(cs.currency, 'PKR') AS currency,
-              COALESCE(cs.business_type::text, 'RETAIL') AS business_type,
-              COALESCE(cs.pricing_mode::text, 'FIXED') AS pricing_mode
+              COALESCE(cs.currency, 'PKR') AS currency
        FROM tenants t
        LEFT JOIN company_settings cs ON cs.tenant_id = t.id
        ORDER BY t.id ASC`
@@ -198,8 +194,6 @@ router.get('/saas/resolve', async (req: Request, res: Response) => {
           id: t.id,
           name: t.name,
           status: t.status,
-          businessType: t.business_type || 'RETAIL',
-          pricingMode: t.pricing_mode || 'FIXED',
           subscriptionType: subType,
           subscriptionPlan: subPlan,
           subscriptionStartDate: t.subscription_start_date ? new Date(t.subscription_start_date).toISOString() : '',

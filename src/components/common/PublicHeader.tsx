@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Sparkles, ShieldAlert, Loader2, Cloud, RefreshCw, CheckCheck } from 'lucide-react';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { ShoeIcon } from './ShoeIcon.tsx';
-import { Badge } from './Badge.tsx';
 
 export interface PublicHeaderProps {
   storeName?: string;
@@ -67,48 +66,32 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
     switch (badgeVariant) {
       case 'wizard':
         return (
-          <Badge
-            variant="luxury"
-            tone="purple"
-            size="xs"
-            icon={<Sparkles className="w-3 h-3" />}
-          >
-            {badgeText}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 dark:bg-purple-500/20 border border-indigo-400/30 dark:border-purple-400/40 text-indigo-700 dark:text-purple-200 shadow-2xs">
+            <Sparkles className="w-3 h-3 text-indigo-500 dark:text-purple-300" />
+            <span>{badgeText}</span>
+          </span>
         );
       case 'connecting':
         return (
-          <Badge
-            variant="luxury"
-            tone="amber"
-            size="xs"
-            icon={<Loader2 className="w-3 h-3 animate-spin" />}
-          >
-            {badgeText}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 dark:bg-amber-500/20 border border-amber-400/30 text-amber-700 dark:text-amber-300 shadow-2xs">
+            <Loader2 className="w-3 h-3 animate-spin text-amber-500 dark:text-amber-400" />
+            <span>{badgeText}</span>
+          </span>
         );
       case 'locked':
         return (
-          <Badge
-            variant="luxury"
-            tone="rose"
-            size="xs"
-            icon={<ShieldAlert className="w-3 h-3" />}
-          >
-            {badgeText}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 dark:bg-rose-500/20 border border-rose-400/30 text-rose-700 dark:text-rose-300 shadow-2xs">
+            <ShieldAlert className="w-3 h-3 text-rose-500 dark:text-rose-400" />
+            <span>{badgeText}</span>
+          </span>
         );
       case 'online':
       default:
         return (
-          <Badge
-            variant="luxury"
-            tone="emerald"
-            size="xs"
-            pulse={true}
-          >
-            {badgeText}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-400/30 text-emerald-700 dark:text-emerald-300 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+            <span>{badgeText}</span>
+          </span>
         );
     }
   };
