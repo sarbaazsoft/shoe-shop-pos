@@ -204,6 +204,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
   // Product Search / Catalog quick picker
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [visibleSearchCount, setVisibleSearchCount] = useState<number>(25);
   const [lastScannedFeedback, setLastScannedFeedback] = useState<{
     message: string;
     article: string;
@@ -1541,7 +1542,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   onMouseDown={(e) => e.preventDefault()}
                   className="absolute left-6 right-6 z-40 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-[#0E1628] border border-slate-200 dark:border-[#1A263D] rounded-xl shadow-xl divide-y divide-slate-100 dark:divide-slate-800"
                 >
-                {searchResults.map((prod) => (
+                {searchResults.slice(0, visibleSearchCount).map((prod) => (
                   <div
                     key={prod.id}
                     onMouseDown={(e) => e.preventDefault()}
@@ -1631,6 +1632,22 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     </div>
                   </div>
                 ))}
+
+                {searchResults.length > visibleSearchCount && (
+                  <div className="p-2.5 text-center bg-slate-50/90 dark:bg-[#0B1120] border-t border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVisibleSearchCount((prev) => prev + 25);
+                      }}
+                      className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Show More ({searchResults.length - visibleSearchCount} remaining)
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

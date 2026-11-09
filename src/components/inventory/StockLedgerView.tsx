@@ -8,6 +8,7 @@ export const StockLedgerView: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('');
   const [movementType, setMovementType] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState<number>(25);
 
   useEffect(() => {
     loadProducts();
@@ -218,7 +219,7 @@ export const StockLedgerView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                movements.map((m) => {
+                movements.slice(0, visibleCount).map((m) => {
                   const isPositive = m.quantityDelta > 0;
 
                   return (
@@ -271,6 +272,18 @@ export const StockLedgerView: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {movements.length > visibleCount && (
+          <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 25)}
+              className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+            >
+              Show More Movements ({movements.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

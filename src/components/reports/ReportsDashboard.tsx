@@ -43,6 +43,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   const [dateRange, setDateRange] = useState<'today' | '7days' | '30days' | 'all'>('today');
   const [customStartDate] = useState('');
   const [customEndDate] = useState('');
+  const [visibleSalesCount, setVisibleSalesCount] = useState<number>(25);
 
   const currencySymbol = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
 
@@ -1030,7 +1031,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredSales.map((s) => (
+                  filteredSales.slice(0, visibleSalesCount).map((s) => (
                     <tr key={s.id} className="table-row-hover border-b border-slate-100 dark:border-slate-800/80">
                       <td className="py-2.5 px-3 font-mono font-bold text-blue-600 dark:text-purple-400">
                         {s.invoice_number}
@@ -1070,6 +1071,18 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
               </tbody>
             </table>
           </div>
+
+          {filteredSales.length > visibleSalesCount && (
+            <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+              <button
+                type="button"
+                onClick={() => setVisibleSalesCount((prev) => prev + 25)}
+                className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+              >
+                Show More Invoices ({filteredSales.length - visibleSalesCount} remaining)
+              </button>
+            </div>
+          )}
         </motion.div>
       )}
 

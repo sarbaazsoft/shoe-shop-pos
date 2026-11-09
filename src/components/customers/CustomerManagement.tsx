@@ -19,6 +19,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
   const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'orders' | 'spent'>('recent');
+  const [visibleCount, setVisibleCount] = useState<number>(25);
 
   // Selected customer details modal
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -381,7 +382,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-purple-900/40">
-                {displayedCustomers.map((c) => {
+                {displayedCustomers.slice(0, visibleCount).map((c) => {
                   const initials = (c.name || 'C')
                     .split(' ')
                     .map((n: string) => n[0])
@@ -486,11 +487,23 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
               </tbody>
             </table>
           </div>
+
+          {displayedCustomers.length > visibleCount && (
+            <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 25)}
+                className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+              >
+                Show More Customers ({displayedCustomers.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </motion.div>
       ) : (
         /* GRID / CARD VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedCustomers.map((c, index) => {
+          {displayedCustomers.slice(0, visibleCount).map((c, index) => {
             const initials = (c.name || 'C')
               .split(' ')
               .map((n: string) => n[0])
@@ -557,6 +570,18 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
               </motion.div>
             );
           })}
+
+          {displayedCustomers.length > visibleCount && (
+            <div className="col-span-full p-4 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 25)}
+                className="px-5 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+              >
+                Show More Customers ({displayedCustomers.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
 

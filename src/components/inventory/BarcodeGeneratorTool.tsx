@@ -64,6 +64,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
   const [catalogSearch, setCatalogSearch] = useState('');
   const [filterBrand, setFilterBrand] = useState<string>('all');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState<number>(25);
 
   // Custom Barcode Generator State
   const [customArticle, setCustomArticle] = useState(
@@ -613,7 +614,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((p) => {
+                        filteredProducts.slice(0, visibleCatalogCount).map((p) => {
                           const isSelected = selectedItems[p.id] !== undefined;
                           const currentCopies = selectedItems[p.id] || 2;
 
@@ -714,6 +715,18 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
                       )}
                     </tbody>
                   </table>
+
+                  {filteredProducts.length > visibleCatalogCount && (
+                    <div className="p-2.5 text-center bg-slate-50 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCatalogCount((prev) => prev + 25)}
+                        className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                      >
+                        Show More Products ({filteredProducts.length - visibleCatalogCount} remaining)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

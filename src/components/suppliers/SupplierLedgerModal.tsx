@@ -42,6 +42,12 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
   const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<number | null>(null);
 
+  // Pagination states
+  const [visibleStatementCount, setVisibleStatementCount] = useState<number>(25);
+  const [visiblePaymentsCount, setVisiblePaymentsCount] = useState<number>(25);
+  const [visiblePurchasesCount, setVisiblePurchasesCount] = useState<number>(25);
+  const [visibleReturnsCount, setVisibleReturnsCount] = useState<number>(25);
+
   useEffect(() => {
     if (isOpen && supplierId) {
       loadLedger();
@@ -306,7 +312,7 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      transactions.map((tx, idx) => (
+                      transactions.slice(0, visibleStatementCount).map((tx, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-purple-950/20 transition">
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {tx.date}
@@ -351,6 +357,18 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                     )}
                   </tbody>
                 </table>
+
+                {transactions.length > visibleStatementCount && (
+                  <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleStatementCount((prev) => prev + 25)}
+                      className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Show More Transactions ({transactions.length - visibleStatementCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             ) : activeTab === 'payments' ? (
               /* Payments Only List */
@@ -375,7 +393,7 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      paymentsOnly.map((p, idx) => (
+                      paymentsOnly.slice(0, visiblePaymentsCount).map((p, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-purple-950/20 transition">
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {p.date}
@@ -414,6 +432,18 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                     )}
                   </tbody>
                 </table>
+
+                {paymentsOnly.length > visiblePaymentsCount && (
+                  <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                    <button
+                      type="button"
+                      onClick={() => setVisiblePaymentsCount((prev) => prev + 25)}
+                      className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Show More Payments ({paymentsOnly.length - visiblePaymentsCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             ) : activeTab === 'purchases' ? (
               /* Purchases Only List */
@@ -435,7 +465,7 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      purchasesOnly.map((p, idx) => (
+                      purchasesOnly.slice(0, visiblePurchasesCount).map((p, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-purple-950/20 transition">
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {p.date}
@@ -454,6 +484,18 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                     )}
                   </tbody>
                 </table>
+
+                {purchasesOnly.length > visiblePurchasesCount && (
+                  <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                    <button
+                      type="button"
+                      onClick={() => setVisiblePurchasesCount((prev) => prev + 25)}
+                      className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Show More Purchases ({purchasesOnly.length - visiblePurchasesCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               /* Returns Only List */
@@ -475,7 +517,7 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      returnsOnly.map((r, idx) => (
+                      returnsOnly.slice(0, visibleReturnsCount).map((r, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-purple-950/20 transition">
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {r.date}
@@ -494,6 +536,18 @@ export const SupplierLedgerModal: React.FC<SupplierLedgerModalProps> = ({
                     )}
                   </tbody>
                 </table>
+
+                {returnsOnly.length > visibleReturnsCount && (
+                  <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleReturnsCount((prev) => prev + 25)}
+                      className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Show More Returns ({returnsOnly.length - visibleReturnsCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -46,6 +46,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCatStr);
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState<number>(25);
 
   // Modals
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -602,7 +603,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                   </td>
                 </tr>
               ) : (
-                products.map((p) => {
+                products.slice(0, visibleCount).map((p) => {
                   const isLowStock = p.totalStock <= p.lowStockLimit;
                   const isOutOfStock = p.totalStock <= 0;
                   const isChecked = selectedProductIds.includes(p.id);
@@ -1025,6 +1026,18 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
             </tbody>
           </table>
         </div>
+
+        {products.length > visibleCount && (
+          <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 25)}
+              className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+            >
+              Show More ({products.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* MODALS */}

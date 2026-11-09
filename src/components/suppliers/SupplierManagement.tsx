@@ -26,6 +26,7 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState<number>(25);
 
   // Add / Edit Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -432,7 +433,7 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
                   </td>
                 </tr>
               ) : (
-                suppliers.map((sup) => {
+                suppliers.slice(0, visibleCount).map((sup) => {
                   const totalPurchases = parseInt(sup.total_purchases || 0, 10);
                   const totalAmount = parseFloat(sup.total_purchased_amount || 0);
                   const totalPaid = parseFloat(sup.total_paid_amount || 0);
@@ -594,6 +595,18 @@ export const SupplierManagement: React.FC<SupplierManagementProps> = ({
             </tbody>
           </table>
         </div>
+
+        {suppliers.length > visibleCount && (
+          <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 25)}
+              className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+            >
+              Show More Suppliers ({suppliers.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* ADD / EDIT SUPPLIER MODAL */}

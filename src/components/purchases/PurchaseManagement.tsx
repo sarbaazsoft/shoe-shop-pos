@@ -105,6 +105,7 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
   const [catalogModalSearch, setCatalogModalSearch] = useState('');
   const [catalogModalBrand, setCatalogModalBrand] = useState<string>('ALL');
   const [catalogModalCategory, setCatalogModalCategory] = useState<string>('ALL');
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState<number>(25);
 
   // Direct product creation modal from within purchase management
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -2718,7 +2719,7 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
                       </td>
                     </tr>
                   ) : (
-                    modalFilteredProducts.map((prod) => (
+                    modalFilteredProducts.slice(0, visibleCatalogCount).map((prod) => (
                       <tr key={prod.id} className="table-row-hover transition">
                         <td className="py-2.5 px-3">
                           <div className="flex items-center space-x-2.5">
@@ -2771,6 +2772,18 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
                   )}
                 </tbody>
               </table>
+
+              {modalFilteredProducts.length > visibleCatalogCount && (
+                <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCatalogCount((prev) => prev + 25)}
+                    className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                  >
+                    Show More Products ({modalFilteredProducts.length - visibleCatalogCount} remaining)
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="px-6 py-3 border-t border-slate-200 dark:border-purple-800/80 bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900/90 dark:via-indigo-950/85 dark:to-slate-900 flex justify-end">

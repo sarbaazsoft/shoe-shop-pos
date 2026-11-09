@@ -35,6 +35,7 @@ export const SuperAdminReportsView: React.FC<SuperAdminReportsViewProps> = ({
   const [storeScope, setStoreScope] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
+  const [visibleTransactionsCount, setVisibleTransactionsCount] = useState<number>(25);
 
   const { containerRef: reportsTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeSubTab, {
     padding: 16,
@@ -1394,7 +1395,7 @@ export const SuperAdminReportsView: React.FC<SuperAdminReportsViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((tx) => (
+                  filteredTransactions.slice(0, visibleTransactionsCount).map((tx) => (
                     <tr
                       key={`${tx.tenantId}-${tx.id}`}
                       className="hover:bg-slate-50/80 dark:hover:bg-purple-900/20 transition"
@@ -1434,6 +1435,18 @@ export const SuperAdminReportsView: React.FC<SuperAdminReportsViewProps> = ({
               </tbody>
             </table>
           </div>
+
+          {filteredTransactions.length > visibleTransactionsCount && (
+            <div className="p-3 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+              <button
+                type="button"
+                onClick={() => setVisibleTransactionsCount((prev) => prev + 25)}
+                className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+              >
+                Show More Transactions ({filteredTransactions.length - visibleTransactionsCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

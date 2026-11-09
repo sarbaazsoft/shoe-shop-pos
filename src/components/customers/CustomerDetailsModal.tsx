@@ -31,6 +31,8 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
 
   // Local state for ledger entries and balance to reflect instant payment updates
   const [localCustomer, setLocalCustomer] = useState<any>(customer);
+  const [visibleLedgerCount, setVisibleLedgerCount] = useState<number>(25);
+  const [visibleSalesCount, setVisibleSalesCount] = useState<number>(25);
 
   if (!customer) return null;
 
@@ -396,7 +398,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-purple-900/40">
-                        {ledger.map((entry: any) => {
+                        {ledger.slice(0, visibleLedgerCount).map((entry: any) => {
                           const bill = parseFloat(entry.total_bill ?? entry.totalBill ?? 0);
                           const paid = parseFloat(entry.amount_paid ?? entry.amountPaid ?? 0);
                           const change = parseFloat(entry.balance_change ?? entry.balanceChange ?? 0);
@@ -441,6 +443,18 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                       </tbody>
                     </table>
                   </div>
+
+                  {ledger.length > visibleLedgerCount && (
+                    <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleLedgerCount((prev) => prev + 25)}
+                        className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                      >
+                        Show More Ledger Entries ({ledger.length - visibleLedgerCount} remaining)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -472,7 +486,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-purple-900/40">
-                      {sales.map((s: any) => {
+                      {sales.slice(0, visibleSalesCount).map((s: any) => {
                         const grandTotal = parseFloat(s.total_amount || s.totalAmount || 0);
                         const sub = parseFloat(s.subtotal || grandTotal);
                         const rem = parseFloat(s.remaining_balance || s.remainingBalance || 0);
@@ -509,6 +523,18 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                       })}
                     </tbody>
                   </table>
+
+                  {sales.length > visibleSalesCount && (
+                    <div className="p-2.5 text-center bg-slate-50/70 dark:bg-[#0B1120] border-t border-slate-200 dark:border-purple-900/50">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleSalesCount((prev) => prev + 25)}
+                        className="px-4 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 text-purple-700 dark:text-purple-200 font-bold text-xs border border-purple-200 dark:border-purple-700/60 transition cursor-pointer active:scale-95 shadow-xs"
+                      >
+                        Show More Invoices ({sales.length - visibleSalesCount} remaining)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
