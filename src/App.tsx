@@ -88,18 +88,95 @@ function resolveTargetTab(requestedTab: string | undefined | null, user: any, co
   return clean;
 }
 
+const UNAUTH_TENANT_STORAGE_KEY = 'pos_unauth_scoped_tenant_id';
+
+export function getStoredUnauthTenantId(): string {
+  try {
+    return sessionStorage.getItem(UNAUTH_TENANT_STORAGE_KEY) || localStorage.getItem(UNAUTH_TENANT_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setStoredUnauthTenantId(tenantId: string | number | null | undefined) {
+  try {
+    const val = String(tenantId ?? '').trim();
+    if (val && val !== '0' && val !== 'null' && val !== 'undefined') {
+      sessionStorage.setItem(UNAUTH_TENANT_STORAGE_KEY, val);
+      localStorage.setItem(UNAUTH_TENANT_STORAGE_KEY, val);
+    }
+  } catch {}
+}
+
+export function clearStoredUnauthTenantId() {
+  try {
+    sessionStorage.removeItem(UNAUTH_TENANT_STORAGE_KEY);
+    localStorage.removeItem(UNAUTH_TENANT_STORAGE_KEY);
+  } catch {}
+}
+
+/**
+ * Builds an unauthenticated-scoped URL preserving the current tenantId if present
+ */
+export function buildUnauthScopedUrl(targetUrl: string, currentTenantId?: string | number | null): string {
+  const tid = currentTenantId || getStoredUnauthTenantId();
+  if (!tid) return targetUrl;
+
+  const [baseAndQuery, hash] = targetUrl.split('#');
+  const [base, rawQuery] = baseAndQuery.split('?');
+  const sp = new URLSearchParams(rawQuery || '');
+  if (!sp.has('tenantId')) {
+    sp.set('tenantId', String(tid));
+  }
+  const queryString = sp.toString() ? `?${sp.toString()}` : '';
+  const hashString = hash ? `#${hash}` : '';
+  return `${base || '/'}${queryString}${hashString}`;
+}
+
 function detectInitialRouteFromLocation(): {
   mode: SaasRouteMode;
   tenantIdParam: string;
 } {
   const pathname = window.location.pathname;
   const searchParams = new URLSearchParams(window.location.search);
-  const tenantIdParam =
+
+  // 1. Path segment extraction (e.g. /store/:id, /stores/:id, /tenant/:id, /t/:id, /directory/:id)
+  const pathMatch = pathname.match(/^\/(?:store|stores|tenant|t|directory)\/([a-zA-Z0-9_-]+)/i);
+  const pathTenantId = pathMatch ? pathMatch[1] : '';
+
+  // 2. Query param extraction
+  const queryTenantId =
     searchParams.get('tenantId') ||
     searchParams.get('storeId') ||
     searchParams.get('tenant_id') ||
     searchParams.get('store_id') ||
     '';
+
+  let hasAuthToken = false;
+  try {
+    const token = localStorage.getItem('pos_auth_token') || localStorage.getItem('shoe_pos_jwt_token');
+    hasAuthToken = Boolean(token && token !== 'null' && token !== 'undefined');
+  } catch {}
+
+  // 3. Unauthenticated tenant scope retention
+  let tenantIdParam = queryTenantId || pathTenantId;
+  if (!hasAuthToken) {
+    if (tenantIdParam) {
+      setStoredUnauthTenantId(tenantIdParam);
+    } else {
+      tenantIdParam = getStoredUnauthTenantId();
+    }
+  }
+
+  // If path was a tenant path segment (e.g. /store/1 or /store/1/login), normalize URL with preserved tenantId
+  if (pathMatch) {
+    const subRoute = pathname.replace(/^\/(?:store|stores|tenant|t|directory)\/[a-zA-Z0-9_-]+/i, '') || '/';
+    const canonicalBase = subRoute === '/' || !subRoute ? '/' : subRoute;
+    const cleanUrl = `${canonicalBase}?tenantId=${encodeURIComponent(tenantIdParam)}${window.location.hash || ''}`;
+    try {
+      window.history.replaceState({}, '', cleanUrl);
+    } catch {}
+  }
 
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return { mode: 'SUPERADMIN', tenantIdParam };
@@ -136,7 +213,8 @@ function detectInitialRouteFromLocation(): {
       window.history.replaceState({}, '', `${appPathForTab(requestedTab)}${tenantQuery}`);
     }
   } else if (pathname !== '/') {
-    window.history.replaceState({}, '', `/${window.location.search}`);
+    const tenantQuery = tenantIdParam ? `?tenantId=${encodeURIComponent(tenantIdParam)}` : window.location.search;
+    window.history.replaceState({}, '', `/${tenantQuery}`);
   }
   return { mode: 'LANDING', tenantIdParam };
 }
@@ -685,20 +763,27 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const sp = new URLSearchParams(window.location.search);
+      const pathname = window.location.pathname;
+      const pathMatch = pathname.match(/^\/(?:store|stores|tenant|t|directory)\/([a-zA-Z0-9_-]+)/i);
       const tid =
         sp.get('tenantId') ||
         sp.get('storeId') ||
         sp.get('tenant_id') ||
         sp.get('store_id') ||
+        (pathMatch ? pathMatch[1] : '') ||
+        (!currentUser ? getStoredUnauthTenantId() : '') ||
         '';
       const mode = sp.get('mode');
       const reset = sp.get('resetToken');
-      const pathname = window.location.pathname;
       const isAuthPath =
         pathname === '/auth' ||
         pathname.startsWith('/auth/') ||
         pathname === '/login' ||
         pathname.startsWith('/login/');
+
+      if (tid && !currentUser) {
+        setStoredUnauthTenantId(tid);
+      }
 
       if (isAuthPath) {
         setSaasMode('AUTH');
@@ -712,26 +797,58 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [currentUser]);
 
-  const handleBackToStoreDirectory = useCallback(() => {
-    setStoreLoginTarget(null);
+  // Explicit clearance of unauthenticated tenant scope
+  const handleClearTenantScope = useCallback(() => {
+    clearStoredUnauthTenantId();
     setTenantIdParam('');
-    setIsLoginModalOpen(false);
     setActiveTenant(null);
     setActiveTenantId(null);
+    setStoreLoginTarget(null);
     setTenantIdNotice('');
     setSaasMode('LANDING');
-    try {
-      window.history.pushState({}, '', '/#shops');
-    } catch {}
+    setIsLoginModalOpen(false);
+    window.history.pushState({}, '', '/');
+  }, []);
+
+  // When clicking Store Directory, unauthenticated users retain their tenantId scope
+  const handleBackToStoreDirectory = useCallback(() => {
+    const activeUnauthId = !currentUser ? (tenantIdParam || getStoredUnauthTenantId()) : null;
+    setIsLoginModalOpen(false);
+    setTenantIdNotice('');
+    setSaasMode('LANDING');
+
+    if (activeUnauthId) {
+      // Retain and pass along tenantId rather than stripping it out
+      setTenantIdParam(String(activeUnauthId));
+      setStoredUnauthTenantId(String(activeUnauthId));
+      const match = availableTenants.find((t) => Number(t.id) === Number(activeUnauthId));
+      if (match) {
+        setActiveTenant(match);
+        setStoreLoginTarget(match);
+      }
+      try {
+        window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(activeUnauthId)}#shops`);
+      } catch {}
+    } else {
+      setStoreLoginTarget(null);
+      setTenantIdParam('');
+      setActiveTenant(null);
+      setActiveTenantId(null);
+      clearStoredUnauthTenantId();
+      try {
+        window.history.pushState({}, '', '/#shops');
+      } catch {}
+    }
+
     setTimeout(() => {
       const el = document.getElementById('shops') || document.getElementById('stores');
       if (el) {
         el.scrollIntoView({ behavior: 'smooth' });
       }
     }, 60);
-  }, []);
+  }, [tenantIdParam, currentUser, availableTenants]);
 
   // Navigate between the shared portal and tenant paths.
   const handleNavigateDomain = async (target: {
@@ -741,13 +858,29 @@ export default function App() {
   }) => {
     const isSuperAdmin = String(currentUser?.originalRole || currentUser?.role || '').toUpperCase() === 'SUPERADMIN';
     if (target.mode === 'LANDING') {
+      const activeUnauthId = !currentUser ? (target.tenantId || tenantIdParam || getStoredUnauthTenantId()) : null;
       setSaasMode('LANDING');
+      setIsLoginModalOpen(false);
+      setTenantIdNotice('');
+
+      if (activeUnauthId) {
+        // Retain and pass along tenantId rather than stripping it out
+        setTenantIdParam(String(activeUnauthId));
+        setStoredUnauthTenantId(String(activeUnauthId));
+        const match = availableTenants.find((t) => Number(t.id) === Number(activeUnauthId));
+        if (match) {
+          setActiveTenant(match);
+          setStoreLoginTarget(match);
+        }
+        window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(activeUnauthId)}`);
+        return;
+      }
+
       setActiveTenant(null);
       setActiveTenantId(null);
       setTenantIdParam('');
-      setIsLoginModalOpen(false);
       setStoreLoginTarget(null);
-      setTenantIdNotice('');
+      clearStoredUnauthTenantId();
       window.history.pushState({}, '', '/');
       return;
     }
@@ -958,6 +1091,7 @@ export default function App() {
   }, []);
 
   const handleAuthSuccess = useCallback((user: any) => {
+    clearStoredUnauthTenantId();
     setStoreLoginTarget(null);
     setTenantIdParam('');
     setIsLoginModalOpen(false);
@@ -1271,7 +1405,7 @@ export default function App() {
               </div>
             </PublicLayout>
           )
-        ) : (isLoginModalOpen || Boolean(tenantIdParam)) ? (
+        ) : isLoginModalOpen ? (
           <>
             {tenantIdNotice && (
               <div role="alert" className="mx-auto mt-6 w-[min(92%,40rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
@@ -1293,14 +1427,28 @@ export default function App() {
         ) : (
           <SaasLandingPage
             availableTenants={availableTenants}
+            unauthTenantId={tenantIdParam || getStoredUnauthTenantId()}
+            onClearTenantScope={handleClearTenantScope}
             onGlobalLogin={() => {
-              setTenantIdParam('');
-              setStoreLoginTarget(null);
-              setIsLoginModalOpen(true);
-              setSaasMode('AUTH');
-              window.history.pushState({}, '', '/auth');
+              const activeScopeId = tenantIdParam || getStoredUnauthTenantId();
+              if (activeScopeId) {
+                const targetStore = availableTenants.find((t) => Number(t.id) === Number(activeScopeId)) || null;
+                setStoreLoginTarget(targetStore);
+                setTenantIdParam(String(activeScopeId));
+                setStoredUnauthTenantId(String(activeScopeId));
+                setIsLoginModalOpen(true);
+                setSaasMode('AUTH');
+                window.history.pushState({}, '', `/auth?tenantId=${encodeURIComponent(activeScopeId)}`);
+              } else {
+                setTenantIdParam('');
+                setStoreLoginTarget(null);
+                setIsLoginModalOpen(true);
+                setSaasMode('AUTH');
+                window.history.pushState({}, '', '/auth');
+              }
             }}
             onSelectStore={(selectedStore) => {
+              setStoredUnauthTenantId(String(selectedStore.id));
               setStoreLoginTarget(selectedStore);
               setTenantIdParam(String(selectedStore.id));
               setIsLoginModalOpen(true);
@@ -1319,6 +1467,7 @@ export default function App() {
                   handleNavigateDomain({ mode: 'TENANT', tenantId });
                 }
               } else {
+                setStoredUnauthTenantId(String(tenantId));
                 setTenantIdParam(String(tenantId));
                 setIsLoginModalOpen(true);
                 setSaasMode('AUTH');

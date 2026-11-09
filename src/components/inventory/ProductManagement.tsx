@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Plus, Edit2, Trash2, AlertTriangle, Barcode, SlidersHorizontal, ShoppingBag, Boxes, Layers, DollarSign, Box, RefreshCw, Upload, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, AlertTriangle, Barcode, SlidersHorizontal, ShoppingBag, Boxes, Layers, DollarSign, Box, RefreshCw, Upload, CheckCircle2, Check, X, Loader2 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { ProductFormModal } from './ProductFormModal.tsx';
 import { CsvImportModal } from './CsvImportModal.tsx';
@@ -68,7 +68,83 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
   const rawPricingMode = String(companySettings?.pricingMode || 'FIXED').toUpperCase();
   const isFixedPolicy = rawPricingMode === 'FIXED';
   const isWholesaleStore = String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
-  const isAdmin = currentUser?.role === 'ADMIN';
+  
+  // Store Admin role check
+  const userRole = String(currentUser?.role || currentUser?.originalRole || '').toUpperCase();
+  const isStoreAdmin = userRole === 'ADMIN' || userRole === 'SUPERADMIN' || userRole === 'STORE_ADMIN';
+  const isAdmin = isStoreAdmin;
+
+  // Inline Stock Editing State
+  const [editingStockId, setEditingStockId] = useState<number | null>(null);
+  const [inlineStockValue, setInlineStockValue] = useState<string>('');
+  const [savingStockId, setSavingStockId] = useState<number | null>(null);
+  const [justUpdatedStockId, setJustUpdatedStockId] = useState<number | null>(null);
+  const [inlineStockError, setInlineStockError] = useState<string | null>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus and select text when entering inline edit mode
+  useEffect(() => {
+    if (editingStockId !== null && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+      inlineInputRef.current.select();
+    }
+  }, [editingStockId]);
+
+  const handleStartInlineEdit = (p: any) => {
+    if (!isStoreAdmin || savingStockId !== null) return;
+    setEditingStockId(p.id);
+    setInlineStockValue(String(p.totalStock ?? 0));
+    setInlineStockError(null);
+  };
+
+  const handleCancelInlineEdit = () => {
+    setEditingStockId(null);
+    setInlineStockValue('');
+    setInlineStockError(null);
+  };
+
+  const handleSaveInlineStock = async (p: any) => {
+    const parsed = parseInt(inlineStockValue, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      setInlineStockError('Must be 0 or more');
+      return;
+    }
+
+    if (parsed === Number(p.totalStock)) {
+      handleCancelInlineEdit();
+      return;
+    }
+
+    setSavingStockId(p.id);
+    setInlineStockError(null);
+    try {
+      await api.inventory.updateInlineStock({
+        productId: p.id,
+        newStock: parsed,
+        reason: 'Inline table update by Store Admin',
+      });
+
+      // Optimistically update product in local state
+      setProducts((prev) =>
+        prev.map((prod) => (prod.id === p.id ? { ...prod, totalStock: parsed } : prod))
+      );
+
+      // Trigger visual success pulse
+      setJustUpdatedStockId(p.id);
+      setTimeout(() => {
+        setJustUpdatedStockId((curr) => (curr === p.id ? null : curr));
+      }, 2500);
+
+      // Broadcast inventory update event for headers, POS and report sync
+      window.dispatchEvent(new CustomEvent('inventory:updated', { detail: { productId: p.id, newStock: parsed } }));
+      triggerStatRecount();
+      setEditingStockId(null);
+    } catch (err: any) {
+      setInlineStockError(err?.message || 'Failed to update stock');
+    } finally {
+      setSavingStockId(null);
+    }
+  };
 
   useEffect(() => {
     loadFilterData();
@@ -496,7 +572,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                 <th className="py-3.5 px-3">Brand &amp; Category</th>
                 <th className="py-3.5 px-4">Barcode (Click to Print)</th>
                 <th className="py-3.5 px-3 text-right" title="Product cost price and saved selling price according to pricing policy">Pricing &amp; Cost</th>
-                <th className="py-3.5 px-3 text-center">Total Stock</th>
+                <th className="py-3.5 px-3 text-center" title={isStoreAdmin ? "Click any stock quantity in the table below to edit directly" : "Total inventory stock"}>
+                  <div className="flex flex-col items-center justify-center">
+                    <span>Total Stock</span>
+                    {isStoreAdmin && (
+                      <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-300 tracking-normal flex items-center gap-1 mt-0.5 normal-case">
+                        <Edit2 className="w-2.5 h-2.5 inline" /> Click to edit
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -686,21 +771,110 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                         )}
                       </td>
 
-                      {/* Total Stock */}
+                      {/* Total Stock (with Inline Editing for Store Admins) */}
                       <td className="py-3.5 px-3 text-center">
-                        {isWholesaleStore ? (
+                        {editingStockId === p.id ? (
+                          <div
+                            className="flex flex-col items-center gap-1.5 py-1 px-1 bg-purple-50/70 dark:bg-purple-950/40 rounded-xl border border-purple-300 dark:border-purple-700/70 shadow-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center gap-1">
+                              <input
+                                ref={inlineInputRef}
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={inlineStockValue}
+                                disabled={savingStockId === p.id}
+                                onChange={(e) => {
+                                  setInlineStockValue(e.target.value);
+                                  setInlineStockError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveInlineStock(p);
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    handleCancelInlineEdit();
+                                  }
+                                }}
+                                className="w-20 sm:w-24 px-2 py-1 text-center font-mono font-bold text-xs sm:text-sm rounded-lg border-2 border-purple-500 dark:border-purple-400 bg-white dark:bg-[#0A0E1A] text-slate-900 dark:text-white shadow-inner focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                placeholder="Pairs"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                disabled={savingStockId === p.id}
+                                onClick={() => handleSaveInlineStock(p)}
+                                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white transition cursor-pointer shadow-xs disabled:opacity-50"
+                                title="Save stock quantity (Enter)"
+                              >
+                                {savingStockId === p.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingStockId === p.id}
+                                onClick={handleCancelInlineEdit}
+                                className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition cursor-pointer active:scale-95"
+                                title="Cancel (Esc)"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Live Lots Helper or Validation Error */}
+                            {inlineStockError ? (
+                              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold px-1">
+                                {inlineStockError}
+                              </span>
+                            ) : isWholesaleStore ? (
+                              <span className="text-[10px] text-purple-700 dark:text-purple-300 font-mono font-semibold">
+                                ={Math.floor((parseInt(inlineStockValue, 10) || 0) / (p.pairsPerCarton || 12))} lots ({p.pairsPerCarton || 12} prs/ctn)
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">
+                                Press ↵ to save • Esc to cancel
+                              </span>
+                            )}
+                          </div>
+                        ) : isWholesaleStore ? (
                           <div className="flex flex-col items-center">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                isOutOfStock
-                                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                                  : isLowStock
-                                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                              }`}
-                            >
-                              {p.totalStock} Pairs
-                            </span>
+                            {isStoreAdmin ? (
+                              <button
+                                type="button"
+                                onClick={() => handleStartInlineEdit(p)}
+                                title={`Click to edit stock for ${p.article || p.name} (Current: ${p.totalStock} pairs)`}
+                                className={`group/stock relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-2xs ${
+                                  justUpdatedStockId === p.id
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-2 border-emerald-500 ring-4 ring-emerald-400/30'
+                                    : isOutOfStock
+                                    ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700/80 hover:ring-2 hover:ring-rose-400/40'
+                                    : isLowStock
+                                    ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/80 hover:ring-2 hover:ring-amber-400/40'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/80 hover:ring-2 hover:ring-emerald-400/40'
+                                }`}
+                              >
+                                <span>{p.totalStock} Pairs</span>
+                                <Edit2 className="w-3 h-3 text-purple-600 dark:text-purple-400 opacity-60 group-hover/stock:opacity-100 group-hover/stock:scale-110 transition shrink-0" />
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                  isOutOfStock
+                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                                    : isLowStock
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                                }`}
+                              >
+                                {p.totalStock} Pairs
+                              </span>
+                            )}
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                               ({Math.floor(p.totalStock / (p.pairsPerCarton || 12))} Lots)
                             </span>
@@ -716,18 +890,38 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                             )}
                           </div>
                         ) : (
-                          <>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                isOutOfStock
-                                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                                  : isLowStock
-                                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                              }`}
-                            >
-                              {p.totalStock} pairs
-                            </span>
+                          <div className="flex flex-col items-center">
+                            {isStoreAdmin ? (
+                              <button
+                                type="button"
+                                onClick={() => handleStartInlineEdit(p)}
+                                title={`Click to edit stock for ${p.article || p.name} (Current: ${p.totalStock} pairs)`}
+                                className={`group/stock relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-2xs ${
+                                  justUpdatedStockId === p.id
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-2 border-emerald-500 ring-4 ring-emerald-400/30'
+                                    : isOutOfStock
+                                    ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700/80 hover:ring-2 hover:ring-rose-400/40'
+                                    : isLowStock
+                                    ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/80 hover:ring-2 hover:ring-amber-400/40'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/80 hover:ring-2 hover:ring-emerald-400/40'
+                                }`}
+                              >
+                                <span>{p.totalStock} pairs</span>
+                                <Edit2 className="w-3 h-3 text-purple-600 dark:text-purple-400 opacity-60 group-hover/stock:opacity-100 group-hover/stock:scale-110 transition shrink-0" />
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                  isOutOfStock
+                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                                    : isLowStock
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                                }`}
+                              >
+                                {p.totalStock} pairs
+                              </span>
+                            )}
                             {isLowStock && !isOutOfStock && (
                               <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
                                 Low stock (≤{p.lowStockLimit})
@@ -738,7 +932,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                                 OUT OF STOCK
                               </div>
                             )}
-                          </>
+                          </div>
                         )}
                       </td>
 

@@ -48,16 +48,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const showForgotEmailError =
     (forgotEmailTouched || trimmedEmail.length > 0) && trimmedEmail.length > 0 && !isEmailValid;
 
-  // Check GET payload query parameters (?tenantId=... or ?storeId=...)
+  // Check GET payload query parameters (?tenantId=... or ?storeId=...) or path segments / unauth storage
   const queryTenantId = (() => {
     if (typeof window === 'undefined') return null;
     try {
       const sp = new URLSearchParams(window.location.search);
+      const pathMatch = window.location.pathname.match(/^\/(?:store|stores|tenant|t|directory|auth|login)\/([a-zA-Z0-9_-]+)/i);
       const val =
         sp.get('tenantId') ||
         sp.get('storeId') ||
         sp.get('tenant_id') ||
         sp.get('store_id') ||
+        (pathMatch ? pathMatch[1] : '') ||
+        sessionStorage.getItem('pos_unauth_scoped_tenant_id') ||
+        localStorage.getItem('pos_unauth_scoped_tenant_id') ||
         '';
       const num = Number(val);
       return Number.isSafeInteger(num) && num > 0 ? num : null;

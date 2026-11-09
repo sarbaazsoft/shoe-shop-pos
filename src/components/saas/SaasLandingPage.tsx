@@ -368,6 +368,8 @@ const StoreSliderCard: React.FC<{
 
 interface SaasLandingPageProps {
   availableTenants: TenantInfo[];
+  unauthTenantId?: string | number | null;
+  onClearTenantScope?: () => void;
   onGlobalLogin: () => void;
   onOpenSuperAdmin: () => void;
   onStoreCreated?: (tenantId: number, loginUrl: string, user?: any, token?: string) => void;
@@ -376,6 +378,8 @@ interface SaasLandingPageProps {
 
 export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
   availableTenants,
+  unauthTenantId,
+  onClearTenantScope,
   onGlobalLogin,
   onOpenSuperAdmin,
   onStoreCreated,
@@ -569,6 +573,14 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
 
   const scrollToSection = (id: string, navKey: 'home' | 'features' | 'stores' | 'pricing' | 'about') => {
     setActiveNav(navKey);
+    const searchParams = new URLSearchParams(window.location.search);
+    const currentTid = searchParams.get('tenantId') || searchParams.get('storeId') || unauthTenantId;
+    const hash = id === 'top' ? '' : `#${id}`;
+    if (currentTid) {
+      window.history.replaceState({}, '', `/?tenantId=${encodeURIComponent(currentTid)}${hash}`);
+    } else if (hash) {
+      window.history.replaceState({}, '', `/${hash}`);
+    }
     if (id === 'top') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -688,6 +700,12 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     onStoreCreated?.(tenantId, loginUrl, user, token);
   };
 
+  const matchedScopedStore = React.useMemo(() => {
+    if (!unauthTenantId) return null;
+    const all = [...(storeDirectory || []), ...(availableTenants || [])];
+    return all.find((t) => String(t.id) === String(unauthTenantId)) || null;
+  }, [unauthTenantId, storeDirectory, availableTenants]);
+
   return (
     <div
       data-landing-theme={landingTheme}
@@ -704,6 +722,39 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         landingTheme={landingTheme}
         onToggleTheme={toggleLandingTheme}
       />
+
+      {/* Unauthenticated Store Scope Notification Banner */}
+      {unauthTenantId && (
+        <div id="unauth-tenant-scope-banner" className="bg-purple-950/90 lt:bg-purple-100 border-b border-purple-800/60 lt:border-purple-300 py-2 px-4 text-xs select-none">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-purple-200 lt:text-purple-900 font-medium">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>
+                Active Store Scope: <strong>{matchedScopedStore?.name || `Store #${unauthTenantId}`}</strong> (Tenant #{unauthTenantId})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onGlobalLogin}
+                className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] transition cursor-pointer shadow-xs"
+              >
+                Sign In to {matchedScopedStore?.name || 'Store'}
+              </button>
+              {onClearTenantScope && (
+                <button
+                  type="button"
+                  onClick={onClearTenantScope}
+                  className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 lt:bg-white lt:hover:bg-slate-200 text-purple-200 lt:text-purple-900 font-semibold text-[11px] transition cursor-pointer border border-purple-400/30"
+                  title="Clear tenant scope and view all stores"
+                >
+                  Clear Store Scope
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. HERO */}
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0B0C38_0%,#080A2C_60%,#070A24_100%)] lt:bg-[linear-gradient(180deg,#EEF0FF_0%,#F7F8FF_100%)]">

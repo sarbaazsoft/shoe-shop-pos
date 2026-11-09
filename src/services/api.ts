@@ -1033,10 +1033,12 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : '';
       return apiFetch(`/inventory/ledger${query}`);
     },
-    adjustStock: (data: { productId: number; newStock: number; reason: string }) =>
+    adjustStock: (data: { productId: number; newStock: number; reason?: string }) =>
       apiFetch('/inventory/adjust', { method: 'POST', body: data }),
-    adjust: (data: { productId: number; newStock: number; reason: string }) =>
+    adjust: (data: { productId: number; newStock: number; reason?: string }) =>
       apiFetch('/inventory/adjust', { method: 'POST', body: data }),
+    updateInlineStock: (data: { productId: number; newStock: number; reason?: string }) =>
+      apiFetch('/inventory/inline-stock', { method: 'PATCH', body: data }),
   },
   reports: {
     dashboard: () => apiFetch('/reports/dashboard'),

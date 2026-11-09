@@ -12,6 +12,7 @@ export interface PublicHeaderProps {
   actionText?: string;
   actionIcon?: React.ReactNode;
   onActionClick?: () => void;
+  onBrandClick?: () => void;
 }
 
 /**
@@ -29,6 +30,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   actionText,
   actionIcon,
   onActionClick,
+  onBrandClick,
 }) => {
   const [isCheckingSync, setIsCheckingSync] = useState(false);
   const [syncStatusState, setSyncStatusState] = useState<'idle' | 'checking' | 'just-synced'>('idle');
@@ -102,7 +104,27 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       className="sticky top-0 z-30 w-full min-h-[3.6rem] py-1.5 flex items-center px-4 border-b border-indigo-500/20 bg-white/95 dark:bg-white/10 backdrop-blur-lg shadow-lg transition-colors duration-500 justify-between gap-3 sm:gap-4 md:gap-6 select-none text-slate-800 dark:text-slate-100 no-print"
     >
       {/* Brand identity & titles matching Store Header */}
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <button
+        type="button"
+        onClick={() => {
+          if (onBrandClick) {
+            onBrandClick();
+            return;
+          }
+          try {
+            const sp = new URLSearchParams(window.location.search);
+            const tid = sp.get('tenantId') || sp.get('storeId') || sessionStorage.getItem('pos_unauth_scoped_tenant_id') || localStorage.getItem('pos_unauth_scoped_tenant_id');
+            if (tid) {
+              window.history.pushState({}, '', `/?tenantId=${encodeURIComponent(tid)}`);
+            } else {
+              window.history.pushState({}, '', '/');
+            }
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          } catch {}
+        }}
+        className="flex items-center gap-2.5 sm:gap-3 min-w-0 text-left cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
+        title="Go to Home / Store Portal"
+      >
         <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0">
           <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
         </div>
@@ -120,7 +142,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             <span>{subtitle}</span>
           </span>
         </div>
-      </div>
+      </button>
 
       {/* Right side buttons: Cloud Synced Button, Action Button & Theme Dropdown matching Store Header */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto pl-1">

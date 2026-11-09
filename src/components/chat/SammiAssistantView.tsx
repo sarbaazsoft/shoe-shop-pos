@@ -63,9 +63,9 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
       {
         id: 'init-1',
         role: 'model',
-        text: `**Salam! Main Sammi hoon — ${storeName} POS System ki AI Assistant.**\n\nAap mujhse counter billing, inventory, sales calculations, stock analysis, ya kisi bhi software aur store operation ke mutaliq sawal pooch sakte hain. Main aapki kya madad karoon?`,
+        text: `**Salam! Main Sammi hoon — ${storeName} POS System ki Search-Grounded AI Assistant.**\n\nMain real-time **Google Search Grounding** se juri hoon! Aap mujhse:\n* **📈 Live Retail Trends:** 2026 footwear demand, trending sneaker silhouettes, festive spikes, aur pricing insights.\n* **👞 Professional Shoe Care:** Genuine leather conditioning, suede/nubuck cleaning, white sole un-yellowing, aur waterproofing.\n* **⚡ POS & Store Operations:** Counter billing, barcode label printing, customer khata, aur returns/exchanges.\n\nAap kya daryaft karna chahte hain?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        modelUsed: 'gemini-3.5-flash',
+        modelUsed: 'gemini-3.8-flash',
       },
     ];
   });
@@ -75,6 +75,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
   const [loadingPhase, setLoadingPhase] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [modelMode, setModelMode] = useState<'fast' | 'general' | 'complex'>('general');
+  const [activePromptCategory, setActivePromptCategory] = useState<'all' | 'trends' | 'care' | 'pos'>('all');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -531,30 +532,60 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
       {/* STICKY BOTTOM INPUT: ChatGPT / Gemini Style Centered Dock */}
       <div className="sticky bottom-0 z-30 pt-3 pb-4 sm:pb-6 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent dark:from-[#0A0E1A] dark:via-[#0A0E1A]/95 dark:to-transparent backdrop-blur-xs">
         <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto px-4 sm:px-6">
-          {/* Quick suggested chips with Retail Trends & Shoe Care */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-1 scrollbar-none">
-            {[
-              { label: 'Trending Footwear Styles 2026', icon: TrendingUp },
-              { label: 'Leather Shoe Care & Conditioning Guide', icon: Sparkles },
-              { label: 'How to Clean Suede & Nubuck Shoes', icon: Sparkles },
-              { label: 'White Sneaker Sole Cleaning Tips', icon: Sparkles },
-              { label: 'CSV Bulk Product Import Workflow', icon: Bot },
-              { label: 'Store Pricing Policy & Rules', icon: Bot },
-            ].map((chip, cIdx) => {
-              const IconComp = chip.icon;
-              return (
+          {/* Quick suggested category tabs & chips with Retail Trends & Shoe Care */}
+          <div className="space-y-2 mb-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
+              {[
+                { id: 'all', label: 'All Suggestions', icon: Sparkles },
+                { id: 'trends', label: '📈 Retail Trends', icon: TrendingUp },
+                { id: 'care', label: '👞 Shoe Care Advice', icon: Sparkles },
+                { id: 'pos', label: '⚡ Store Operations', icon: Bot },
+              ].map((cat) => (
                 <button
-                  key={cIdx}
+                  key={cat.id}
                   type="button"
-                  onClick={() => handleSendMessage(chip.label)}
-                  disabled={isLoading}
-                  className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#131B2E] border border-purple-200 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 shadow-2xs transition-colors shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  onClick={() => setActivePromptCategory(cat.id as any)}
+                  className={`px-2.5 py-1 rounded-lg transition-all shrink-0 cursor-pointer border ${
+                    activePromptCategory === cat.id
+                      ? 'bg-purple-600 text-white border-purple-500 shadow-xs'
+                      : 'bg-white/80 dark:bg-[#131B2E] text-slate-600 dark:text-purple-300 border-slate-200/90 dark:border-purple-800/60 hover:bg-purple-50 dark:hover:bg-purple-900/40'
+                  }`}
                 >
-                  <IconComp className="w-3.5 h-3.5 text-purple-500" />
-                  <span>{chip.label}</span>
+                  {cat.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {[
+                { label: 'Trending Footwear Styles 2026', cat: 'trends', icon: TrendingUp },
+                { label: 'Festive & Wedding Shoe Demand Spikes', cat: 'trends', icon: TrendingUp },
+                { label: 'High-Demand Summer Breathable Footwear', cat: 'trends', icon: TrendingUp },
+                { label: 'Leather Shoe Care & Conditioning Guide', cat: 'care', icon: Sparkles },
+                { label: 'How to Clean Suede & Nubuck Shoes', cat: 'care', icon: Sparkles },
+                { label: 'White Sneaker Sole Un-Yellowing Tips', cat: 'care', icon: Sparkles },
+                { label: 'Footwear Waterproofing & Rain Protection', cat: 'care', icon: Sparkles },
+                { label: 'CSV Bulk Product Import Workflow', cat: 'pos', icon: Bot },
+                { label: 'Barcode Label Printing & TSPL Setup', cat: 'pos', icon: Bot },
+                { label: 'Invoice Exchange & Return Policy', cat: 'pos', icon: Bot },
+              ]
+                .filter((chip) => activePromptCategory === 'all' || chip.cat === activePromptCategory)
+                .map((chip, cIdx) => {
+                  const IconComp = chip.icon;
+                  return (
+                    <button
+                      key={cIdx}
+                      type="button"
+                      onClick={() => handleSendMessage(chip.label)}
+                      disabled={isLoading}
+                      className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#131B2E] border border-purple-200 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 shadow-2xs transition-colors shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <IconComp className="w-3.5 h-3.5 text-purple-500" />
+                      <span>{chip.label}</span>
+                    </button>
+                  );
+                })}
+            </div>
           </div>
 
           <div className="bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-800/80 rounded-2xl shadow-lg p-2.5 sm:p-3 transition-shadow focus-within:shadow-xl">

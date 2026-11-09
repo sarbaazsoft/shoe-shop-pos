@@ -482,7 +482,13 @@ export class TenantScopedDb {
         const qtyChange = params.newStock - prevStock;
 
         if (qtyChange === 0) {
-          throw new Error('New stock count is identical to existing stock count.');
+          await pgClient.query('COMMIT');
+          return {
+            product: prod,
+            prevStock,
+            newStock: params.newStock,
+            qtyChange: 0,
+          };
         }
 
         await pgClient.query(
