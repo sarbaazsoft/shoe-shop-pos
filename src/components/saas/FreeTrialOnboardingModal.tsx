@@ -726,6 +726,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
                               autoComplete="new-password"
                               required
                               value={password}
+                              onPaste={(e) => e.preventDefault()}
                               onChange={(e) => {
                                 setPassword(e.target.value);
                                 if (errorMessage) setErrorMessage(null);

@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Fingerprint, Store, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Store, ArrowRight, ArrowLeft } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
 import { ShoeIcon } from '../common/ShoeIcon.tsx';
 import { ShowroomBackground } from '../common/ShowroomBackground.tsx';
 import { PublicHeader } from '../common/PublicHeader.tsx';
 import { PublicFooter } from '../common/PublicFooter.tsx';
-import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
-import { useRememberedAccount } from '../../hooks/useRememberedAccount.ts';
-import { getRememberedEmail, normalizeRememberedEmail } from '../../utils/rememberedAccount.ts';
-import { RememberedEmailField } from './RememberedEmailField.tsx';
+import { getRememberedEmail, saveRememberedEmail, forgetRememberedEmail } from '../../utils/rememberedAccount.ts';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
-import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
-import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 
 interface AuthModalProps {
   onSuccess: (user: any) => void;
@@ -29,22 +24,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [tab, setTab] = useState<'login' | 'forgot' | 'reset'>('login');
-  const { containerRef: authTabContainerRef } = useScrollActiveTab<HTMLDivElement>(tab, {
-    padding: 16,
-    behavior: 'smooth',
-  });
 
-  // Remembered email (email only; never passwords or tokens). Remembered automatically after login.
-  const account = useRememberedAccount('store');
-
-  // Form states
+  // Form states with email retrieval from localStorage
   const [email, setEmail] = useState(() => getRememberedEmail('store') ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(() => Boolean(getRememberedEmail('store')));
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [loginPasteBlocked, setLoginPasteBlocked] = useState(false);
+  const [resetPasteBlocked, setResetPasteBlocked] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -162,7 +153,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    setEmail(account.isShowingRemembered && account.rememberedEmail ? account.rememberedEmail : '');
+    const savedEmail = getRememberedEmail('store') ?? '';
+    setEmail(savedEmail);
+    setRememberMe(Boolean(savedEmail));
     setPassword('');
     setErrorMessage(null);
     setInfoMessage(null);
@@ -170,25 +163,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenantId]);
 
-  // The account being signed in to: the locked remembered account, or whatever was typed.
-  const getLoginEmail = () =>
-    account.isShowingRemembered && account.rememberedEmail ? account.rememberedEmail : email.trim();
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
     setMatchingStores([]);
     try {
-      const loginEmail = getLoginEmail();
+      const loginEmail = email.trim();
       const res = await api.auth.login({
-            email: loginEmail,
-            password,
-            tenantId: activeTenantId,
-            tenant_id: activeTenantId,
-          });
+        email: loginEmail,
+        password,
+        tenantId: activeTenantId,
+        tenant_id: activeTenantId,
+      });
       setAuthSession(res.token, res.user);
-      account.remember(res.user?.email || loginEmail);
+
+      // Save or remove remembered email according to Remember Me checkbox
+      if (rememberMe) {
+        saveRememberedEmail(res.user?.email || loginEmail, 'store');
+      } else {
+        forgetRememberedEmail('store');
+      }
+
       onSuccess(res.user);
     } catch (err: any) {
       setErrorMessage(err.message || 'Login failed. Please verify your store credentials.');
@@ -204,7 +200,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const loginEmail = getLoginEmail();
+      const loginEmail = email.trim();
       const res = await api.auth.login({
         email: loginEmail,
         password,
@@ -212,7 +208,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         tenant_id: store.tenantId,
       });
       setAuthSession(res.token, res.user);
-      account.remember(res.user?.email || loginEmail);
+
+      // Save or remove remembered email according to Remember Me checkbox
+      if (rememberMe) {
+        saveRememberedEmail(res.user?.email || loginEmail, 'store');
+      } else {
+        forgetRememberedEmail('store');
+      }
+
       onSuccess(res.user);
     } catch (err: any) {
       setErrorMessage(err.message || `Login failed for ${store.name}.`);
@@ -270,10 +273,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setResetToken('');
       setNewPassword('');
       setPassword('');
-      // If the reset was for a different account than the remembered one, show the editable form.
-      if (account.rememberedEmail && normalizeRememberedEmail(email) !== account.rememberedEmail) {
-        account.useAnotherAccount();
-      }
       const searchParams = new URLSearchParams(window.location.search);
       if (searchParams.has('resetToken')) {
         searchParams.delete('resetToken');
@@ -348,14 +347,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   ? 'linear-gradient(to bottom, rgba(15,23,42,0.92), rgba(30,27,75,0.86), rgba(15,23,42,0.92))'
                   : 'none',
               }}
-              className={`w-full backdrop-blur-xl border rounded-2xl sm:rounded-3xl p-6 sm:p-8 transition-all duration-200 ${
+              className={`w-full backdrop-blur-xl border rounded-2xl sm:rounded-3xl p-6 sm:p-7 transition-all duration-200 ${
                 isDark
                   ? 'border-purple-800/80 shadow-[0_10px_35px_rgba(15,23,42,0.8),0_0_25px_rgba(147,51,234,0.2)] text-slate-100'
                   : 'bg-white border-purple-200/90 shadow-2xl shadow-purple-950/10 text-slate-800'
               }`}
             >
               {/* Store Icon Header */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-5">
                 <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 dark:border-purple-400/50">
                   <ShoeIcon className="w-6 h-6 stroke-[2.2]" />
                 </div>
@@ -363,7 +362,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   id="auth-card-heading"
                   className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1"
                 >
-                  {isStoreSpecific ? effectiveStoreName : 'SarbaazSoft Shoe POS'}
+                  SarbaazSoft Shoe POS
                 </div>
                 <h2 id="auth-store-name" className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   {effectiveStoreName}
@@ -373,94 +372,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     ? `Sign in to continue to ${effectiveStoreName}`
                     : 'Sign in to continue to store terminal'}
                 </p>
-                {activeTenantId && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200/80 dark:border-purple-800/70 text-[11px] font-mono font-bold text-purple-700 dark:text-purple-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>Store ID: {activeTenantId}</span>
-                  </div>
-                )}
               </div>
 
-              {/* Card Tabs Navigation - Responsive Scrollable Underline Navigation */}
-              <div 
-                ref={authTabContainerRef}
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                className="flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/60 mb-6 overflow-x-auto no-scrollbar scrollbar-none tab-scrollbar-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden"
-              >
-                <button
-                  id="auth-tab-login"
-                  type="button"
-                  data-active={tab === 'login'}
-                  data-tab="login"
-                  onClick={() => {
-                    setTab('login');
-                    setErrorMessage(null);
-                    setInfoMessage(null);
-                    if (account.isShowingRemembered && account.rememberedEmail) {
-                      setEmail(account.rememberedEmail);
-                    }
-                  }}
-                  className={`tab-underline-link relative flex-1 py-3 text-xs sm:text-sm font-semibold transition-colors duration-300 flex items-center justify-center space-x-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
-                    tab === 'login'
-                      ? 'active text-purple-600 dark:text-purple-400 font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300'
-                  }`}
-                >
-                  <Fingerprint className={`w-4 h-4 transition-colors duration-200 ${tab === 'login' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
-                  <span>Sign In</span>
-                  {tab === 'login' && (
-                    <motion.div
-                      layoutId="authActiveUnderline"
-                      className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 shadow-[0_2px_8px_rgba(147,51,234,0.45)] pointer-events-none z-10"
-                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                    />
-                  )}
-                </button>
-
-                <button
-                  id="auth-tab-forgot"
-                  type="button"
-                  data-active={tab === 'forgot' || tab === 'reset'}
-                  data-tab="forgot"
-                  onClick={() => {
-                    setTab('forgot');
-                    setErrorMessage(null);
-                    setInfoMessage(null);
-                  }}
-                  className={`tab-underline-link relative flex-1 py-3 text-xs sm:text-sm font-semibold transition-colors duration-300 flex items-center justify-center space-x-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
-                    tab === 'forgot' || tab === 'reset'
-                      ? 'active text-purple-600 dark:text-purple-400 font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300'
-                  }`}
-                >
-                  <KeyRound className={`w-4 h-4 transition-colors duration-200 ${tab === 'forgot' || tab === 'reset' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
-                  <span>Forgot Password</span>
-                  {(tab === 'forgot' || tab === 'reset') && (
-                    <motion.div
-                      layoutId="authActiveUnderline"
-                      className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 shadow-[0_2px_8px_rgba(147,51,234,0.45)] pointer-events-none z-10"
-                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                    />
-                  )}
-                </button>
-
-                {/* Scroll End Buffer Spacer: Ensures the last tab is 100% visible and never clipped */}
-                <div className="tab-end-spacer shrink-0 w-6 sm:w-8 h-1 pointer-events-none self-stretch" aria-hidden="true" role="presentation" />
-              </div>
-
-              {/* Dynamic Header */}
-              <div className="mb-4">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  {tab === 'login' && 'Sign in to Terminal'}
-                  {tab === 'forgot' && 'Forgot Password — Send Reset Link'}
-                  {tab === 'reset' && 'Create New Password'}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-0.5">
-                  {tab === 'login' && 'Enter your authorized email and password to access POS operations.'}
-                  {tab === 'forgot' && 'Enter your registered email address to receive a password reset link.'}
-                  {tab === 'reset' && 'Enter your reset verification token and choose a new password.'}
-                </p>
-              </div>
+              {/* Dynamic Header for Password Reset Flows */}
+              {(tab === 'forgot' || tab === 'reset') && (
+                <div className="mb-4">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                    {tab === 'forgot' && 'Forgot Password — Send Reset Link'}
+                    {tab === 'reset' && 'Create New Password'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-0.5">
+                    {tab === 'forgot' && 'Enter your registered email address to receive a password reset link.'}
+                    {tab === 'reset' && 'Enter your reset verification token and choose a new password.'}
+                  </p>
+                </div>
+              )}
 
               {/* Alerts */}
               {errorMessage && (
@@ -476,7 +402,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         window.dispatchEvent(
                           new CustomEvent('auth:require-email-verification', {
                             detail: {
-                              email: getLoginEmail(),
+                              email: email.trim(),
                               tenantId: activeTenantId,
                               storeName: effectiveStoreName,
                             },
@@ -522,29 +448,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* TAB 1: LOGIN FORM */}
               {tab === 'login' && (
                 <form onSubmit={handleLogin} className="space-y-4">
-                  <RememberedEmailField
-                    account={account}
-                    email={email}
-                    onEmailChange={(value) => {
-                      setEmail(value);
-                      setMatchingStores([]);
-                    }}
-                    onAccountViewChange={() => {
-                      setPassword('');
-                      setErrorMessage(null);
-                      setInfoMessage(null);
-                      setMatchingStores([]);
-                    }}
-                    inputId="login-email-input"
-                    label="Email or Terminal ID"
-                    placeholder="admin@shoepos.com"
-                    disabled={isLoading}
-                    inputClassName="app-input email-focus-pulse w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-4 transition outline-none"
-                  />
+                  <div>
+                    <label
+                      htmlFor="login-email-input"
+                      className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                    >
+                      Email or Terminal ID
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="login-email-input"
+                        name="email"
+                        type="email"
+                        required
+                        autoComplete="username"
+                        placeholder="admin@shoepos.com"
+                        value={email}
+                        disabled={isLoading}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setMatchingStores([]);
+                        }}
+                        className="app-input email-focus-pulse w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-medium py-2.5 pl-[2.125rem] pr-4 transition outline-none"
+                      />
+                    </div>
+                  </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label
+                        htmlFor="login-password-input"
+                        className="block text-xs font-bold text-slate-700 dark:text-slate-300"
+                      >
                         Counter PIN / Password
                       </label>
                       <button
@@ -557,28 +495,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         }}
                         className="text-xs font-semibold text-purple-600 hover:text-purple-800 dark:text-purple-300 dark:hover:text-purple-200 hover:underline transition cursor-pointer"
                       >
-                        Forgot Password?
+                        Forgot password?
                       </button>
                     </div>
+
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
                         <Lock className="w-4 h-4" />
                       </div>
+
                       <input
                         id="login-password-input"
                         name="password"
                         type={showPassword ? 'text' : 'password'}
                         autoComplete="current-password"
-                        autoFocus={account.isShowingRemembered}
+                        autoFocus={Boolean(email)}
                         required
                         placeholder="••••••••"
                         value={password}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          setLoginPasteBlocked(true);
+                          setTimeout(() => setLoginPasteBlocked(false), 3500);
+                        }}
                         onChange={(e) => {
                           setPassword(e.target.value);
                           setMatchingStores([]);
+                          if (loginPasteBlocked) setLoginPasteBlocked(false);
                         }}
                         className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-12 transition outline-none"
                       />
+
                       <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center">
                         <button
                           type="button"
@@ -591,21 +538,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </button>
                       </div>
                     </div>
+
+                    {/* Paste Blocked Security Notice */}
+                    {loginPasteBlocked && (
+                      <div className="mt-1.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-800/60 text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Pasting is disabled for security verification. Please type your password manually.</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-600 dark:text-purple-200/80 font-medium">
+                  {/* Beneath Password Field: Remember Me & Keep me logged in on a single line (Left-and-Right Split) */}
+                  <div className="flex items-center justify-between pt-0.5 text-xs text-slate-600 dark:text-purple-200/80 font-medium select-none">
+                    <label
+                      htmlFor="remember-me-checkbox"
+                      className="flex items-center gap-2 cursor-pointer hover:text-slate-900 dark:hover:text-purple-100 transition-colors"
+                    >
                       <input
+                        id="remember-me-checkbox"
+                        name="rememberMe"
                         type="checkbox"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
                         className="w-4 h-4 rounded border-purple-300 dark:border-purple-600 dark:bg-[#0E1628] text-purple-600 accent-purple-600 focus:ring-0 cursor-pointer"
                       />
-                      <span>Keep logged in</span>
+                      <span>Remember Me</span>
                     </label>
-                    <span className="text-[11px] text-slate-400 dark:text-purple-300/60 font-mono">
-                      JWT Auth &bull; PBKDF2
-                    </span>
+
+                    <label
+                      htmlFor="keep-logged-in-checkbox"
+                      className="flex items-center gap-2 cursor-pointer hover:text-slate-900 dark:hover:text-purple-100 transition-colors"
+                    >
+                      <input
+                        id="keep-logged-in-checkbox"
+                        name="keepLoggedIn"
+                        type="checkbox"
+                        checked={keepLoggedIn}
+                        onChange={(e) => setKeepLoggedIn(e.target.checked)}
+                        className="w-4 h-4 rounded border-purple-300 dark:border-purple-600 dark:bg-[#0E1628] text-purple-600 accent-purple-600 focus:ring-0 cursor-pointer"
+                      />
+                      <span>Keep me logged in</span>
+                    </label>
                   </div>
 
                   <button
@@ -743,56 +716,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                        New Password
-                      </label>
-                      <PasswordRequirementsTooltip minChars={6} password={newPassword} />
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        type={showResetPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          setResetPasteBlocked(true);
+                          setTimeout(() => setResetPasteBlocked(false), 3500);
+                        }}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          if (resetPasteBlocked) setResetPasteBlocked(false);
+                        }}
+                        className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-12 transition outline-none"
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword(!showResetPassword)}
+                          className="p-1 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
+                          title={showResetPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
-                    {(() => {
-                      const resetStrength = evaluatePasswordStrength(newPassword, 6);
-                      return (
-                        <>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-600 dark:text-purple-400">
-                              <Lock className="w-4 h-4" />
-                            </div>
-                            <input
-                              type={showResetPassword ? 'text' : 'password'}
-                              required
-                              placeholder="Enter new password"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              className={`app-input w-full bg-slate-50 dark:bg-slate-900/80 border focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white text-xs sm:text-sm rounded-xl py-2.5 pl-[2.125rem] pr-16 outline-none font-medium transition ${
-                                newPassword.length > 0
-                                  ? resetStrength.borderColorClass
-                                  : 'border-slate-200 dark:border-purple-800/60 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20'
-                              }`}
-                            />
-                            <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
-                              {newPassword.length > 0 && resetStrength.isStrong && (
-                                <div title="Strong Password" className="flex items-center text-emerald-500 animate-in fade-in zoom-in">
-                                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                </div>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setShowResetPassword(!showResetPassword)}
-                                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition cursor-pointer"
-                                title={showResetPassword ? 'Hide password' : 'Show password'}
-                              >
-                                {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-                          <PasswordStrengthIndicator
-                            password={newPassword}
-                            minChars={6}
-                            showChecklist={true}
-                          />
-                        </>
-                      );
-                    })()}
+
+                    {/* Reset Paste Blocked Security Notice */}
+                    {resetPasteBlocked && (
+                      <div className="mt-1.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-800/60 text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Pasting is disabled for security verification. Please type your password manually.</span>
+                      </div>
+                    )}
+
+                    {/* Password Strength Indicator (non-restrictive, leaves choice to user) */}
+                    {newPassword.length > 0 && (
+                      <PasswordStrengthIndicator password={newPassword} />
+                    )}
                   </div>
 
                   <div className="flex gap-3 pt-2">

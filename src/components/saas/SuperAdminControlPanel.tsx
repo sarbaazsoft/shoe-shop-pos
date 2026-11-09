@@ -1287,6 +1287,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           required
                           placeholder="••••••••"
                           value={password}
+                          onPaste={(e) => e.preventDefault()}
                           onChange={(e) => setPassword(e.target.value)}
                           className="app-input w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-purple-800/60 focus:bg-white dark:focus:bg-slate-900 focus:border-purple-600 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 rounded-xl text-xs sm:text-sm font-sans py-2.5 pl-[2.125rem] pr-12 transition outline-none"
                         />

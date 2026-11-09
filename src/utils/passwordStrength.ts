@@ -21,6 +21,53 @@ export interface PasswordStrengthResult {
   isValid: boolean;
 }
 
+export interface PasswordValidationRule {
+  id: string;
+  label: string;
+  met: boolean;
+}
+
+export function evaluatePasswordRules(password: string, minChars: number = 8): {
+  rules: PasswordValidationRule[];
+  allMet: boolean;
+  metCount: number;
+  totalCount: number;
+} {
+  const safePassword = password || '';
+  const rules: PasswordValidationRule[] = [
+    {
+      id: 'length',
+      label: `At least ${minChars} characters long`,
+      met: safePassword.length >= minChars,
+    },
+    {
+      id: 'uppercase',
+      label: 'Contains at least one uppercase letter',
+      met: /[A-Z]/.test(safePassword),
+    },
+    {
+      id: 'number',
+      label: 'Contains at least one number',
+      met: /\d/.test(safePassword),
+    },
+    {
+      id: 'special',
+      label: 'Contains at least one special character (e.g., !@#$%^&*)',
+      met: /[^A-Za-z0-9]/.test(safePassword),
+    },
+  ];
+
+  const allMet = rules.every((r) => r.met);
+  const metCount = rules.filter((r) => r.met).length;
+
+  return {
+    rules,
+    allMet,
+    metCount,
+    totalCount: rules.length,
+  };
+}
+
 export function evaluatePasswordStrength(
   password: string,
   minCharsOrOptions: number | { minChars?: number } = 8
@@ -41,10 +88,10 @@ export function evaluatePasswordStrength(
       borderColorClass: '',
       barColor: 'bg-slate-200 dark:bg-slate-700',
       requirements: [
-        { id: 'length', label: `At least ${minChars} characters`, met: false },
-        { id: 'casing', label: 'Uppercase & lowercase letters', met: false },
-        { id: 'number', label: 'At least one number (0-9)', met: false },
-        { id: 'symbol', label: 'At least one special character (!@#$%...)', met: false },
+        { id: 'length', label: `At least ${minChars} characters long`, met: false },
+        { id: 'uppercase', label: 'Contains at least one uppercase letter', met: false },
+        { id: 'number', label: 'Contains at least one number', met: false },
+        { id: 'special', label: 'Contains at least one special character (e.g., !@#$%^&*)', met: false },
       ],
       percent: 0,
       isStrong: false,
@@ -52,23 +99,19 @@ export function evaluatePasswordStrength(
     };
   }
 
-  const hasMinLength = safePassword.length >= minChars;
+  const { rules, allMet } = evaluatePasswordRules(safePassword, minChars);
+  const hasMinLength = rules[0].met;
+  const hasUpper = rules[1].met;
+  const hasNumber = rules[2].met;
+  const hasSpecial = rules[3].met;
   const hasLower = /[a-z]/.test(safePassword);
-  const hasUpper = /[A-Z]/.test(safePassword);
-  const hasCasing = hasLower && hasUpper;
-  const hasNumber = /\d/.test(safePassword);
-  const hasSpecial = /[^A-Za-z0-9]/.test(safePassword);
+  const hasCasing = hasUpper && hasLower;
 
-  const requirements: PasswordRequirement[] = [
-    { id: 'length', label: `At least ${minChars} characters`, met: hasMinLength },
-    { id: 'casing', label: 'Uppercase & lowercase letters', met: hasCasing },
-    { id: 'number', label: 'At least one number (0-9)', met: hasNumber },
-    { id: 'symbol', label: 'At least one special character (!@#$%...)', met: hasSpecial },
-  ];
+  const requirements: PasswordRequirement[] = rules;
 
   let rawScore = 0;
   if (hasMinLength) rawScore += 1;
-  if (hasCasing) rawScore += 1;
+  if (hasUpper) rawScore += 1;
   if (hasNumber) rawScore += 1;
   if (hasSpecial) rawScore += 1;
 
