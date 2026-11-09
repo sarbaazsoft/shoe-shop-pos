@@ -20,6 +20,8 @@ import { PushNotificationSoftPrompt } from './components/notifications/PushNotif
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
 import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
+import { SammiDrawer } from './components/chat/SammiDrawer.tsx';
+import { SammiFloatingButton } from './components/chat/SammiFloatingButton.tsx';
 import { UnknownStore404View } from './components/saas/UnknownStore404View.tsx';
 import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
 import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel.tsx';
@@ -299,6 +301,7 @@ export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSammiDrawerOpen, setIsSammiDrawerOpen] = useState(false);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<{ id?: number; name?: string } | null>(null);
 
   // A tenantId/storeId URL is an explicit store switch. Until its ID has been
@@ -1658,6 +1661,7 @@ export default function App() {
                 mobileOpen={mobileMenuOpen}
                 onCloseMobile={() => setMobileMenuOpen(false)}
                 onOpenProfile={() => setIsProfileModalOpen(true)}
+                onOpenAssistantDrawer={() => setIsSammiDrawerOpen(true)}
               />
 
               <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#F8FAFC] dark:bg-[#0A0E1A]">
@@ -1673,6 +1677,7 @@ export default function App() {
                   onToggleMobileMenu={() => setMobileMenuOpen(true)}
                   onOpenProfile={() => setIsProfileModalOpen(true)}
                   onSwitchRole={handleSwitchRole}
+                  onOpenAssistantDrawer={() => setIsSammiDrawerOpen(true)}
                 />
 
                 <main className="flex-1 min-w-0 overflow-x-hidden bg-[#F8FAFC] dark:bg-[#0A0E1A] transition-colors">
@@ -1885,6 +1890,34 @@ export default function App() {
 
       {currentUser && (
         <PushNotificationSoftPrompt currentUser={currentUser} />
+      )}
+
+      {/* Slide-Over Drawer & Floating Quick Button for Sammi AI */}
+      {currentUser && saasMode === 'TENANT_ACTIVE' && (
+        <>
+          <SammiDrawer
+            isOpen={isSammiDrawerOpen}
+            onClose={() => setIsSammiDrawerOpen(false)}
+            onExpandFullScreen={() => {
+              setIsSammiDrawerOpen(false);
+              handleTabChange('assistant');
+            }}
+            storeName={effectiveStoreName}
+            currentUser={currentUser}
+            companySettings={companySettings}
+            onNavigateTab={(tab) => {
+              setIsSammiDrawerOpen(false);
+              handleTabChange(tab);
+            }}
+          />
+
+          {currentTab !== 'assistant' && (
+            <SammiFloatingButton
+              isOpen={isSammiDrawerOpen}
+              onClick={() => setIsSammiDrawerOpen((prev) => !prev)}
+            />
+          )}
+        </>
       )}
     </div>
   );

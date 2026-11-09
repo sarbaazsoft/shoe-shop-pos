@@ -14,6 +14,7 @@ interface SidebarProps {
   mobileOpen: boolean;
   onCloseMobile: () => void;
   onOpenProfile?: () => void;
+  onOpenAssistantDrawer?: () => void;
 }
 
 interface NavItem {
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen,
   onCloseMobile,
   onOpenProfile,
+  onOpenAssistantDrawer,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -155,6 +157,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter((section) => section.items.length > 0);
 
   const handleItemClick = (tabId: string) => {
+    if (tabId === 'assistant' && onOpenAssistantDrawer) {
+      onOpenAssistantDrawer();
+      onCloseMobile();
+      return;
+    }
     onTabChange(tabId);
     onCloseMobile();
   };

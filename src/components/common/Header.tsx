@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame } from 'lucide-react';
+import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame, Bot, Sparkles } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
@@ -20,6 +20,7 @@ interface HeaderProps {
   onToggleMobileMenu: () => void;
   onOpenProfile?: () => void;
   onSwitchRole?: (role: 'ADMIN' | 'CASHIER') => void;
+  onOpenAssistantDrawer?: () => void;
 }
 
 /**
@@ -92,6 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileMenu,
   onOpenProfile,
   onSwitchRole,
+  onOpenAssistantDrawer,
 }) => {
   const headerUserName = String(currentUser?.name || '').trim() || String(currentUser?.email || '').split('@')[0] || 'User';
   const { themeMode } = useTheme();
@@ -1363,6 +1365,20 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* RIGHT: Notifications, Theme Dropdown, and User Profile */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto pl-1">
+        {/* Sammi AI Quick Drawer Button */}
+        {onOpenAssistantDrawer && currentTab !== 'assistant' && (
+          <button
+            type="button"
+            onClick={onOpenAssistantDrawer}
+            className="h-8 sm:h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-purple-300/80 dark:border-purple-700/60 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+            title="Ask Sammi AI Assistant (Alt + S)"
+            aria-label="Open Sammi AI Assistant Drawer"
+          >
+            <Bot className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden md:inline">Sammi AI</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse hidden sm:inline" />
+          </button>
+        )}
 
         {/* Real-time Notifications Menu (Rendered for Admins & SuperAdmins; Cashiers use persistent POS Terminal Banner) */}
         {!isCashierUser && (
