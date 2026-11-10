@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight } from 'lucide-react';
+import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { playAudioFeedback } from '../../utils/audio.ts';
+import { playAudioFeedback, isAudioMuted, toggleAudioMuted } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
 import { ShoeExchangeModal } from './ShoeExchangeModal.tsx';
 import { formatStockPrice, cleanStockPriceInput, getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
@@ -113,6 +113,33 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const checkoutInFlightRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [posToast, setPosToast] = useState<PosToastNotification | null>(null);
+
+  // Terminal Sound Mute State (silences scanner beeps, item chimes, and checkout alerts)
+  const [isMuted, setIsMuted] = useState<boolean>(() => isAudioMuted());
+
+  useEffect(() => {
+    const handleMuteChange = (e: any) => {
+      if (typeof e?.detail?.muted === 'boolean') {
+        setIsMuted(e.detail.muted);
+      }
+    };
+    window.addEventListener('pos_audio_mute_changed', handleMuteChange);
+    return () => window.removeEventListener('pos_audio_mute_changed', handleMuteChange);
+  }, []);
+
+  const handleToggleMute = () => {
+    const nextMuted = toggleAudioMuted();
+    setIsMuted(nextMuted);
+    setPosToast({
+      id: Date.now(),
+      message: nextMuted
+        ? 'All terminal audio cues (barcode scan beeps & product chimes) are now muted.'
+        : 'All terminal audio cues (barcode scan beeps & product chimes) are now active.',
+      type: 'info',
+      title: nextMuted ? 'Sound Muted' : 'Sound Enabled',
+      duration: 3500,
+    });
+  };
 
   // Trigger high-visibility Toast alert notification and sync with errorMessage banner
   const triggerValidationToast = (
@@ -1467,49 +1494,78 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
           <div className="p-4 border-b border-slate-200/90 dark:border-purple-800/80 bg-slate-50/70 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 text-slate-900 dark:text-white transition-colors">
             {/* Mode Switcher and Hardware Scanner Status Header */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div className="inline-flex items-center p-1 bg-slate-200/70 dark:bg-slate-950/80 rounded-xl border border-slate-300/70 dark:border-slate-800 transition-colors">
-                <button
-                  type="button"
-                  id="pos-mode-scanner-btn"
-                  onClick={() => {
-                    setInputMode('SCANNER');
-                    setSearchResults([]);
-                    focusScannerInput();
-                  }}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    inputMode === 'SCANNER'
-                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border border-purple-400/40 shadow-sm shadow-purple-600/25 dark:from-purple-600 dark:to-indigo-600 dark:border-purple-400/50 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/40 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  <ScanLine className="w-3.5 h-3.5" />
-                  <span>Barcode Scanner</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                    inputMode === 'SCANNER' ? 'bg-white/20 text-white' : 'bg-black/10 dark:bg-white/10 text-slate-700 dark:text-slate-300'
-                  }`}>Enter Mode</span>
-                </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="inline-flex items-center p-1 bg-slate-200/70 dark:bg-slate-950/80 rounded-xl border border-slate-300/70 dark:border-slate-800 transition-colors">
+                  <button
+                    type="button"
+                    id="pos-mode-scanner-btn"
+                    onClick={() => {
+                      setInputMode('SCANNER');
+                      setSearchResults([]);
+                      focusScannerInput();
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      inputMode === 'SCANNER'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border border-purple-400/40 shadow-sm shadow-purple-600/25 dark:from-purple-600 dark:to-indigo-600 dark:border-purple-400/50 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/40 dark:hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <ScanLine className="w-3.5 h-3.5" />
+                    <span>Barcode Scanner</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                      inputMode === 'SCANNER' ? 'bg-white/20 text-white' : 'bg-black/10 dark:bg-white/10 text-slate-700 dark:text-slate-300'
+                    }`}>Enter Mode</span>
+                  </button>
 
+                  <button
+                    type="button"
+                    id="pos-mode-manual-btn"
+                    onClick={async () => {
+                      setInputMode('MANUAL');
+                      focusScannerInput();
+                      const cachedList = await searchCachedProductsOffline(
+                        barcodeInput.trim(),
+                        activeTenantId,
+                        30
+                      ).catch(() => []);
+                      setSearchResults(cachedList);
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      inputMode === 'MANUAL'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border border-purple-400/40 shadow-sm shadow-purple-600/25 dark:from-purple-600 dark:to-indigo-600 dark:border-purple-400/50 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/40 dark:hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Manual Search</span>
+                  </button>
+                </div>
+
+                {/* Mute Sound Toggle Button */}
                 <button
                   type="button"
-                  id="pos-mode-manual-btn"
-                  onClick={async () => {
-                    setInputMode('MANUAL');
-                    focusScannerInput();
-                    const cachedList = await searchCachedProductsOffline(
-                      barcodeInput.trim(),
-                      activeTenantId,
-                      30
-                    ).catch(() => []);
-                    setSearchResults(cachedList);
-                  }}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    inputMode === 'MANUAL'
-                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border border-purple-400/40 shadow-sm shadow-purple-600/25 dark:from-purple-600 dark:to-indigo-600 dark:border-purple-400/50 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/40 dark:hover:bg-slate-800/60'
+                  id="pos-mute-sound-btn"
+                  onClick={handleToggleMute}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    isMuted
+                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300/80 dark:border-rose-800/80 shadow-2xs hover:bg-rose-100 dark:hover:bg-rose-900/50'
+                      : 'bg-white dark:bg-slate-950/80 text-slate-700 dark:text-slate-300 border-slate-300/70 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/80 shadow-2xs'
                   }`}
+                  title={isMuted ? 'Terminal audio cues muted (Click to unmute)' : 'Terminal audio cues active (Click to mute)'}
+                  aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+                  aria-pressed={isMuted}
                 >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Manual Search</span>
+                  {isMuted ? (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <span>Muted</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+                      <span>Mute Sound</span>
+                    </>
+                  )}
                 </button>
               </div>
 

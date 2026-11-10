@@ -27,9 +27,43 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', unlock, { once: true, passive: true });
 }
 
+// LocalStorage key for persisting terminal mute state
+const MUTE_STORAGE_KEY = 'pos_audio_muted';
+
+let isMutedState = false;
+
+if (typeof window !== 'undefined') {
+  try {
+    isMutedState = localStorage.getItem(MUTE_STORAGE_KEY) === 'true';
+  } catch {
+    isMutedState = false;
+  }
+}
+
+export const isAudioMuted = (): boolean => isMutedState;
+
+export const setAudioMuted = (muted: boolean): void => {
+  isMutedState = muted;
+  try {
+    localStorage.setItem(MUTE_STORAGE_KEY, String(muted));
+    window.dispatchEvent(new CustomEvent('pos_audio_mute_changed', { detail: { muted } }));
+  } catch {}
+};
+
+export const toggleAudioMuted = (): boolean => {
+  const next = !isMutedState;
+  setAudioMuted(next);
+  return next;
+};
+
 export const playAudioFeedback = {
+  isMuted: isAudioMuted,
+  setMuted: setAudioMuted,
+  toggleMute: toggleAudioMuted,
+
   // Crisp scanner beep on barcode recognition (Zebra / Honeywell laser beep)
   barcodeScan: () => {
+    if (isMutedState) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -50,6 +84,7 @@ export const playAudioFeedback = {
 
   // Pleasant two-tone chime when barcode is accepted and added to the invoice/order
   invoiceItemAdded: () => {
+    if (isMutedState) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -83,6 +118,7 @@ export const playAudioFeedback = {
   },
 
   saleSuccess: () => {
+    if (isMutedState) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -110,6 +146,7 @@ export const playAudioFeedback = {
 
   // Warning tone for minimum price violation or insufficient stock
   warning: () => {
+    if (isMutedState) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;

@@ -103,12 +103,42 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
     } catch {}
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    // 1. Direct scrollIntoView on the end marker
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+
+    // 2. Also scroll any parent scrollable container (.overflow-y-auto e.g. App layout container)
+    try {
+      const scrollParent = messagesEndRef.current?.closest('.overflow-y-auto') as HTMLElement | null;
+      if (scrollParent) {
+        scrollParent.scrollTo({
+          top: scrollParent.scrollHeight,
+          behavior,
+        });
+      }
+    } catch {}
+
+    // 3. Fallback for window / document scrolling
+    try {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior,
+      });
+    } catch {}
   };
 
   const handleScrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const scrollParent = messagesEndRef.current?.closest('.overflow-y-auto') as HTMLElement | null;
+      if (scrollParent) {
+        scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch {}
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {}
   };
 
   const handleSelectQuestion = (msgId: string) => {
@@ -122,9 +152,28 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
     }
   };
 
+  // Inspect the latest message to detect newly generated AI responses
+  const lastMsg = messages[messages.length - 1];
+  const lastMsgRole = lastMsg?.role;
+  const lastMsgId = lastMsg?.id;
+
+  // Auto-scroll automatically whenever a new message or AI response is generated
   useEffect(() => {
-    scrollToBottom();
-  }, [messages.length, isLoading]);
+    scrollToBottom('smooth');
+
+    // When an AI model response message is generated, run staggered scroll updates
+    // to keep the view pinned to the bottom as markdown, grounding cards, and layout settle
+    if (lastMsgRole === 'model') {
+      const t1 = setTimeout(() => scrollToBottom('smooth'), 50);
+      const t2 = setTimeout(() => scrollToBottom('smooth'), 180);
+      const t3 = setTimeout(() => scrollToBottom('smooth'), 400);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [lastMsgId, lastMsgRole, isLoading, messages.length]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const query = (textToSend || inputMessage).trim();
@@ -194,7 +243,8 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
       setMessages((prev) => [...prev, errorReply]);
     } finally {
       setIsLoading(false);
-      setTimeout(scrollToBottom, 100);
+      setTimeout(() => scrollToBottom('smooth'), 60);
+      setTimeout(() => scrollToBottom('smooth'), 220);
     }
   };
 
@@ -579,7 +629,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-6 -mt-2 pointer-events-none" />
       </div>
 
       {/* STICKY BOTTOM INPUT: ChatGPT / Gemini Style Centered Dock */}
