@@ -514,27 +514,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const dashboardContainerRef = useRef<HTMLDivElement | null>(null);
 
 
-  const defaultBusinessMode = (() => {
-    try {
-      const saved = localStorage.getItem(`pos_dashboard_mode_${tenantId}`);
-      if (saved === 'wholesale' || saved === 'retail') return saved;
-      const bType = String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase();
-      return bType === 'WHOLESALE' ? 'wholesale' : 'retail';
-    } catch {
-      return 'retail';
-    }
-  })();
-
-  const [activeDashboardMode, setActiveDashboardMode] = useState<'retail' | 'wholesale'>(defaultBusinessMode);
-  const [selectedAgingBucket, setSelectedAgingBucket] = useState<'all' | '0-30' | '31-60' | '61-90' | '90+'>('all');
   const [activeCatArticleMetric, setActiveCatArticleMetric] = useState<'units' | 'sales' | 'both'>('units');
-
-  const handleToggleDashboardMode = (mode: 'retail' | 'wholesale') => {
-    setActiveDashboardMode(mode);
-    try {
-      localStorage.setItem(`pos_dashboard_mode_${tenantId}`, mode);
-    } catch {}
-  };
 
   // Initial data accurately reflecting metrics from reference design with dynamic fallback
   const [dashboardData, setDashboardData] = useState<{
@@ -932,32 +912,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         { article: 'ART-604', name: 'Trail Pro Runner', category: 'Sports', sizeLabel: 'SZ-44', unitsSold: 18, revenue: 46800, stock: 6 },
       ];
 
-  const rawWholesaleCustomers = dashboardData.wholesaleLedger.wholesaleCustomersTurnover.length > 0
-    ? dashboardData.wholesaleLedger.wholesaleCustomersTurnover
-    : [
-        { id: 101, name: 'Haji Abdul Rehman', shopName: 'Al-Madina Shoe Mart', city: 'Lahore', phone: '0300-4567891', outstandingBalance: 142000, totalSalesTurnover: 840000, ordersCount: 18, lastSaleDate: 'Yesterday' },
-        { id: 102, name: 'Malik Tariq', shopName: 'Crown Footwear Wholesale', city: 'Faisalabad', phone: '0321-9876543', outstandingBalance: 88500, totalSalesTurnover: 520000, ordersCount: 12, lastSaleDate: '3 days ago' },
-        { id: 103, name: 'Sheikh Usman', shopName: 'Usman Brothers Traders', city: 'Gujranwala', phone: '0333-1122334', outstandingBalance: 45000, totalSalesTurnover: 390000, ordersCount: 9, lastSaleDate: '5 days ago' },
-        { id: 104, name: 'Chaudhry Rashid', shopName: 'Bismillah Shoe Agency', city: 'Rawalpindi', phone: '0345-5566778', outstandingBalance: 12500, totalSalesTurnover: 210000, ordersCount: 6, lastSaleDate: '1 week ago' },
-        { id: 105, name: 'Kashif Mehmood', shopName: 'Super Star Shoes', city: 'Multan', phone: '0312-3344556', outstandingBalance: 0, totalSalesTurnover: 185000, ordersCount: 4, lastSaleDate: '2 weeks ago' },
-      ];
-
-  const displayWholesaleCustomers = selectedAgingBucket === 'all'
-    ? rawWholesaleCustomers
-    : selectedAgingBucket === '90+'
-    ? rawWholesaleCustomers.filter((c) => c.outstandingBalance >= 80000)
-    : selectedAgingBucket === '61-90'
-    ? rawWholesaleCustomers.filter((c) => c.outstandingBalance >= 40000 && c.outstandingBalance < 80000)
-    : selectedAgingBucket === '31-60'
-    ? rawWholesaleCustomers.filter((c) => c.outstandingBalance >= 15000 && c.outstandingBalance < 40000)
-    : rawWholesaleCustomers.filter((c) => c.outstandingBalance < 15000);
-
-  const aging = dashboardData.wholesaleLedger.customerAging;
-  const totalAgingBalance = (aging.days0to30 + aging.days31to60 + aging.days61to90 + aging.days90Plus) || dashboardData.wholesaleLedger.totalReceivables || 1;
-  const pct0to30 = Math.round((aging.days0to30 / totalAgingBalance) * 100) || 45;
-  const pct31to60 = Math.round((aging.days31to60 / totalAgingBalance) * 100) || 28;
-  const pct61to90 = Math.round((aging.days61to90 / totalAgingBalance) * 100) || 17;
-  const pct90Plus = Math.max(0, 100 - pct0to30 - pct31to60 - pct61to90);
 
   // Shared Core Component: Top Selling Categories & Articles data for horizontal bar chart
   const categoryArticlesData = dashboardData.categoryArticles.length > 0
@@ -993,55 +947,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Dashboard
             </h1>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
-              activeDashboardMode === 'wholesale'
-                ? 'bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/80 shadow-2xs'
-                : 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-cyan-300 border-blue-200 dark:border-blue-800/80 shadow-2xs'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${activeDashboardMode === 'wholesale' ? 'bg-amber-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
-              <span>{activeDashboardMode === 'wholesale' ? 'Wholesale Mode Active' : 'Retail Mode Active'}</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-cyan-300 border-blue-200 dark:border-blue-800/80 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span>B2C Retail POS</span>
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {activeDashboardMode === 'wholesale'
-              ? "Wholesale B2B Analytics: Financial ledgers, outstanding receivables, customer aging, and supplier payables."
-              : `Welcome back, ${currentUser?.name || 'Store Owner'}! Counter turnover, daily checkout velocity, and foot traffic KPIs.`}
+            Welcome back, {currentUser?.name || 'Store Owner'}! Counter turnover, daily checkout velocity, and foot traffic KPIs.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-          {/* Seamless Mode Switcher Button Group */}
-          <div className="p-1 rounded-xl bg-slate-100 dark:bg-[#0E1628] border border-slate-200/90 dark:border-[#1A263D] flex items-center shadow-2xs">
-            <button
-              type="button"
-              id="dashboard-mode-toggle-retail"
-              onClick={() => handleToggleDashboardMode('retail')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeDashboardMode === 'retail'
-                  ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-              title="Switch to Retail Mode Dashboard (Counter Speed, AOV, Daily Checkouts, Direct Turnover)"
-            >
-              <Store className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-300" />
-              <span>Retail Mode</span>
-            </button>
-            <button
-              type="button"
-              id="dashboard-mode-toggle-wholesale"
-              onClick={() => handleToggleDashboardMode('wholesale')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeDashboardMode === 'wholesale'
-                  ? 'bg-white dark:bg-amber-600 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-              title="Switch to Wholesale Mode Dashboard (Receivables, Payables, Aging Khata, High/Low Balances)"
-            >
-              <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
-              <span>Wholesale Mode</span>
-            </button>
-          </div>
-
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-[#0E1628] border border-slate-200/90 dark:border-[#1A263D] text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-2xs">
             <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>{formattedDate}</span>
@@ -1238,218 +1154,112 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* ROW 1: 5 MODE-SPECIFIC KPI METRIC CARDS (BALANCED RESPONSIVE GRID) */}
-      {activeDashboardMode === 'retail' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-          {/* Card 1: Today's Counter Sales */}
-          <StatCard
-            id="stat-today-sales"
-            title="Today's Counter Sales"
-            value={dashboardData.todaySales}
-            prefix={`${currency} `}
-            icon={ShoppingCart}
-            iconColor="blue"
-            sparkline="blue"
-            className="col-span-2 sm:col-span-1"
-            trendIndicator={
-              dashboardData.todaySales > 0
-                ? { value: `${dashboardData.recentTransactions.filter(t => t.type === 'Sale').length || 'Active'}`, direction: 'up', label: 'today' }
-                : undefined
-            }
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
+      {/* ROW 1: 5 B2C RETAIL KPI METRIC CARDS (BALANCED RESPONSIVE GRID) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+        {/* Card 1: Today's Counter Sales */}
+        <StatCard
+          id="stat-today-sales"
+          title="Today's Counter Sales"
+          value={dashboardData.todaySales}
+          prefix={`${currency} `}
+          icon={ShoppingCart}
+          iconColor="blue"
+          sparkline="blue"
+          className="col-span-2 sm:col-span-1"
+          trendIndicator={
+            dashboardData.todaySales > 0
+              ? { value: `${dashboardData.recentTransactions.filter(t => t.type === 'Sale').length || 'Active'}`, direction: 'up', label: 'today' }
+              : undefined
+          }
+          loading={loading}
+          delay={0}
+          duration={1200}
+        />
 
-          {/* Card 2: Total Sales (12M Rolling) */}
-          <StatCard
-            id="stat-total-sales-12m"
-            title="Total Sales (12M)"
-            value={dashboardData.twelveMonthSales || dashboardData.allTimeRevenue}
-            prefix={`${currency} `}
-            icon={TrendingUp}
-            iconColor="purple"
-            sparkline="purple"
-            className="col-span-1"
-            trendIndicator={{
-              value: `${dashboardData.twelveMonthOrders || '12M'}`,
-              direction: 'up',
-              label: 'annual volume',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
+        {/* Card 2: Total Sales (12M Rolling) */}
+        <StatCard
+          id="stat-total-sales-12m"
+          title="Total Sales (12M)"
+          value={dashboardData.twelveMonthSales || dashboardData.allTimeRevenue}
+          prefix={`${currency} `}
+          icon={TrendingUp}
+          iconColor="purple"
+          sparkline="purple"
+          className="col-span-1"
+          trendIndicator={{
+            value: `${dashboardData.twelveMonthOrders || '12M'}`,
+            direction: 'up',
+            label: 'annual volume',
+          }}
+          loading={loading}
+          delay={0}
+          duration={1200}
+        />
 
-          {/* Card 3: Average Order Value (AOV) */}
-          <StatCard
-            id="stat-average-order-value"
-            title="Average Order Value (AOV)"
-            value={dashboardData.todayAov || dashboardData.overallAov || 0}
-            prefix={`${currency} `}
-            icon={DollarSign}
-            iconColor="cyan"
-            sparkline="cyan"
-            className="col-span-1"
-            trendIndicator={{
-              value: dashboardData.overallAov > 0 ? `Rs. ${dashboardData.overallAov}` : 'Benchmark',
-              direction: 'up',
-              label: '12M avg basket',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
+        {/* Card 3: Average Order Value (AOV) */}
+        <StatCard
+          id="stat-average-order-value"
+          title="Average Order Value (AOV)"
+          value={dashboardData.todayAov || dashboardData.overallAov || 0}
+          prefix={`${currency} `}
+          icon={DollarSign}
+          iconColor="cyan"
+          sparkline="cyan"
+          className="col-span-1"
+          trendIndicator={{
+            value: dashboardData.overallAov > 0 ? `Rs. ${dashboardData.overallAov}` : 'Benchmark',
+            direction: 'up',
+            label: '12M avg basket',
+          }}
+          loading={loading}
+          delay={0}
+          duration={1200}
+        />
 
-          {/* Card 4: Counter Speed & Frequency */}
-          <StatCard
-            id="stat-counter-speed"
-            title="Daily Counter Speed"
-            value={dashboardData.sevenDaySales.reduce((sum, d) => sum + d.txCount, 0)}
-            suffix=" checkouts"
-            icon={Zap}
-            iconColor="indigo"
-            sparkline="indigo"
-            className="col-span-1"
-            trendIndicator={{
-              value: `${Math.round(dashboardData.sevenDaySales.reduce((sum, d) => sum + d.txCount, 0) / 7)}/day`,
-              direction: 'up',
-              label: 'speed index',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
+        {/* Card 4: Counter Speed & Frequency */}
+        <StatCard
+          id="stat-counter-speed"
+          title="Daily Counter Speed"
+          value={dashboardData.sevenDaySales.reduce((sum, d) => sum + d.txCount, 0)}
+          suffix=" checkouts"
+          icon={Zap}
+          iconColor="indigo"
+          sparkline="indigo"
+          className="col-span-1"
+          trendIndicator={{
+            value: `${Math.round(dashboardData.sevenDaySales.reduce((sum, d) => sum + d.txCount, 0) / 7)}/day`,
+            direction: 'up',
+            label: 'speed index',
+          }}
+          loading={loading}
+          delay={0}
+          duration={1200}
+        />
 
-          {/* Card 5: Direct Item Turnover & Stock */}
-          <StatCard
-            id="stat-item-turnover"
-            title="Low Stock / Restock"
-            value={dashboardData.lowStockCount}
-            suffix=" models"
-            icon={AlertTriangle}
-            iconColor="rose"
-            sparkline="rose"
-            className="col-span-2 sm:col-span-1"
-            valueClassName="text-rose-600 dark:text-rose-400"
-            trendIndicator={
-              dashboardData.lowStockCount > 0
-                ? { value: `${dashboardData.lowStockCount}`, direction: 'down', label: 'action needed' }
-                : { value: 'Optimal', direction: 'up', label: 'healthy shelf' }
-            }
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-          {/* Card 1: Total Receivables */}
-          <StatCard
-            id="stat-total-receivables"
-            title="Total Receivables"
-            value={dashboardData.wholesaleLedger.totalReceivables}
-            prefix={`${currency} `}
-            icon={Wallet}
-            iconColor="amber"
-            sparkline="amber"
-            className="col-span-2 sm:col-span-1"
-            valueClassName="text-amber-600 dark:text-amber-400 font-mono"
-            trendIndicator={{
-              value: `${dashboardData.wholesaleLedger.debtorCount}`,
-              direction: 'up',
-              label: 'active debtors',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
+        {/* Card 5: Direct Item Turnover & Stock */}
+        <StatCard
+          id="stat-item-turnover"
+          title="Low Stock / Restock"
+          value={dashboardData.lowStockCount}
+          suffix=" models"
+          icon={AlertTriangle}
+          iconColor="rose"
+          sparkline="rose"
+          className="col-span-2 sm:col-span-1"
+          valueClassName="text-rose-600 dark:text-rose-400"
+          trendIndicator={
+            dashboardData.lowStockCount > 0
+              ? { value: `${dashboardData.lowStockCount}`, direction: 'down', label: 'action needed' }
+              : { value: 'Optimal', direction: 'up', label: 'healthy shelf' }
+          }
+          loading={loading}
+          delay={0}
+          duration={1200}
+        />
+      </div>
 
-          {/* Card 2: Total Payables */}
-          <StatCard
-            id="stat-total-payables"
-            title="Total Payables"
-            value={dashboardData.wholesaleLedger.totalPayables}
-            prefix={`${currency} `}
-            icon={Truck}
-            iconColor="rose"
-            sparkline="rose"
-            className="col-span-1"
-            valueClassName="text-rose-600 dark:text-rose-400 font-mono"
-            trendIndicator={{
-              value: `${dashboardData.wholesaleLedger.creditorCount}`,
-              direction: 'down',
-              label: 'vendors due',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
-
-          {/* Card 3: Net Ledger Balance */}
-          <StatCard
-            id="stat-net-balance"
-            title="Net Working Capital"
-            value={Math.abs(dashboardData.wholesaleLedger.totalReceivables - dashboardData.wholesaleLedger.totalPayables)}
-            prefix={`${currency} `}
-            icon={Building2}
-            iconColor={dashboardData.wholesaleLedger.totalReceivables >= dashboardData.wholesaleLedger.totalPayables ? 'emerald' : 'rose'}
-            sparkline={dashboardData.wholesaleLedger.totalReceivables >= dashboardData.wholesaleLedger.totalPayables ? 'emerald' : 'rose'}
-            className="col-span-1"
-            trendIndicator={{
-              value: dashboardData.wholesaleLedger.totalReceivables >= dashboardData.wholesaleLedger.totalPayables ? '+Surplus' : '-Deficit',
-              direction: dashboardData.wholesaleLedger.totalReceivables >= dashboardData.wholesaleLedger.totalPayables ? 'up' : 'down',
-              label: 'receivables - payables',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
-
-          {/* Card 4: Wholesale Customers Khata */}
-          <StatCard
-            id="stat-wholesale-customers"
-            title="Wholesale Customers"
-            value={dashboardData.wholesaleLedger.totalCustomers || dashboardData.totalCustomers}
-            icon={Users}
-            iconColor="cyan"
-            sparkline="cyan"
-            className="col-span-1"
-            trendIndicator={{
-              value: `${dashboardData.wholesaleLedger.debtorCount} with khata`,
-              direction: 'neutral',
-              label: 'registered',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
-
-          {/* Card 5: Inventory Valuation & Articles */}
-          <StatCard
-            id="stat-wholesale-stock"
-            title="Carton & Pair Stock"
-            value={dashboardData.totalProducts}
-            suffix=" articles"
-            icon={Boxes}
-            iconColor="purple"
-            sparkline="purple"
-            className="col-span-2 sm:col-span-1"
-            trendIndicator={{
-              value: `${dashboardData.lowStockCount} low`,
-              direction: 'neutral',
-              label: 'warehouse lots',
-            }}
-            loading={loading}
-            delay={0}
-            duration={1200}
-          />
-        </div>
-      )}
-
-      {/* MODE-SPECIFIC SECTION: RETAIL SHOE METRICS & FAST-PACED TURNOVER vs WHOLESALE FINANCIAL LEDGER & AGING KHATA */}
-      {activeDashboardMode === 'retail' ? (
-        <div className="space-y-5">
+      {/* B2C RETAIL SHOE METRICS & FAST-PACED TURNOVER */}
+      <div className="space-y-5">
           {/* DYNAMIC RETAIL SHOE METRICS (Sales Target, Category Breakdown, Inventory Clearance) */}
           <RetailShoeMetrics
             metrics={dashboardData.retailShoeMetrics}
@@ -1641,356 +1451,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </button>
               </div>
             </div>
-          </div>
         </div>
-      ) : (
-        <div className="space-y-5">
-          {/* WHOLESALE-SPECIFIC: FINANCIAL LEDGER & BALANCES SUITE */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* Customer Aging Report (Occupies 8 cols) */}
-            <div className="lg:col-span-8 app-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center font-bold">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      Customer Aging Report (Khata Balances)
-                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                        {dashboardData.wholesaleLedger.debtorCount} Active Debtors
-                      </span>
-                    </h2>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Receivables categorized by overdue duration (0-30, 31-60, 61-90, 90+ days)
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('customers')}
-                  className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-                >
-                  Open Khata Ledger &rarr;
-                </button>
-              </div>
-
-              {/* 4 Interactive Aging Bucket Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3.5">
-                {/* Bucket 1: 0-30 Days */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAgingBucket(selectedAgingBucket === '0-30' ? 'all' : '0-30')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                    selectedAgingBucket === '0-30'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-400 ring-2 ring-emerald-400/30'
-                      : 'bg-slate-50/70 dark:bg-[#0E1526]/60 border-slate-200/80 dark:border-purple-900/30 hover:border-emerald-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    <span>0–30 Days</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
-                      Current
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">
-                    {formatCurrency(aging.days0to30 || (dashboardData.wholesaleLedger.totalReceivables * 0.45), currency)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {aging.count0to30 || Math.max(1, Math.round(dashboardData.wholesaleLedger.debtorCount * 0.45))} customers ({pct0to30}%)
-                  </div>
-                </button>
-
-                {/* Bucket 2: 31-60 Days */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAgingBucket(selectedAgingBucket === '31-60' ? 'all' : '31-60')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                    selectedAgingBucket === '31-60'
-                      ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/30'
-                      : 'bg-slate-50/70 dark:bg-[#0E1526]/60 border-slate-200/80 dark:border-purple-900/30 hover:border-amber-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    <span>31–60 Days</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-bold">
-                      Follow-up
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400 truncate">
-                    {formatCurrency(aging.days31to60 || (dashboardData.wholesaleLedger.totalReceivables * 0.28), currency)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {aging.count31to60 || Math.max(1, Math.round(dashboardData.wholesaleLedger.debtorCount * 0.28))} customers ({pct31to60}%)
-                  </div>
-                </button>
-
-                {/* Bucket 3: 61-90 Days */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAgingBucket(selectedAgingBucket === '61-90' ? 'all' : '61-90')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                    selectedAgingBucket === '61-90'
-                      ? 'bg-orange-50 dark:bg-orange-950/50 border-orange-400 ring-2 ring-orange-400/30'
-                      : 'bg-slate-50/70 dark:bg-[#0E1526]/60 border-slate-200/80 dark:border-purple-900/30 hover:border-orange-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    <span>61–90 Days</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-bold">
-                      Escalate
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-orange-600 dark:text-orange-400 truncate">
-                    {formatCurrency(aging.days61to90 || (dashboardData.wholesaleLedger.totalReceivables * 0.17), currency)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {aging.count61to90 || Math.max(1, Math.round(dashboardData.wholesaleLedger.debtorCount * 0.17))} customers ({pct61to90}%)
-                  </div>
-                </button>
-
-                {/* Bucket 4: 90+ Days */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAgingBucket(selectedAgingBucket === '90+' ? 'all' : '90+')}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                    selectedAgingBucket === '90+'
-                      ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-400 ring-2 ring-rose-400/30'
-                      : 'bg-slate-50/70 dark:bg-[#0E1526]/60 border-slate-200/80 dark:border-purple-900/30 hover:border-rose-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    <span>90+ Days</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-bold">
-                      Alert
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
-                    {formatCurrency(aging.days90Plus || (dashboardData.wholesaleLedger.totalReceivables * 0.10), currency)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {aging.count90Plus || Math.max(1, Math.round(dashboardData.wholesaleLedger.debtorCount * 0.10))} customers ({pct90Plus}%)
-                  </div>
-                </button>
-              </div>
-
-              {/* Stacked Visual Distribution Progress Bar */}
-              <div className="space-y-1.5 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>Receivables Aging Portfolio Distribution</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">
-                    Total: {formatCurrency(dashboardData.wholesaleLedger.totalReceivables, currency)}
-                  </span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex shadow-inner">
-                  <div style={{ width: `${pct0to30}%` }} className="h-full bg-emerald-500 transition-all" title={`0-30 Days: ${pct0to30}%`} />
-                  <div style={{ width: `${pct31to60}%` }} className="h-full bg-amber-500 transition-all" title={`31-60 Days: ${pct31to60}%`} />
-                  <div style={{ width: `${pct61to90}%` }} className="h-full bg-orange-500 transition-all" title={`61-90 Days: ${pct61to90}%`} />
-                  <div style={{ width: `${pct90Plus}%` }} className="h-full bg-rose-500 transition-all" title={`90+ Days: ${pct90Plus}%`} />
-                </div>
-                <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 pt-1">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Current 0-30d</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> 31-60d</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> 61-90d</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Critical 90+d</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Customer Balance Tracking: High Balance vs Low Balance (Occupies 4 cols) */}
-            <div className="lg:col-span-4 app-card p-5 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 flex items-center justify-center font-bold">
-                    <PieChart className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                      High vs Low Balance Khata
-                    </h2>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Customer risk exposure breakdown (Threshold: Rs. 25,000)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mt-4">
-                  {/* High Balance Tier */}
-                  <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-200 mb-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        <span>High Balance (&ge; Rs. 25,000)</span>
-                      </span>
-                      <span className="font-mono">
-                        {dashboardData.wholesaleLedger.highLowBalance.highCount || 4} accounts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-300 mt-1">
-                      <span>Total Outstanding:</span>
-                      <span className="font-bold font-mono">
-                        {formatCurrency(dashboardData.wholesaleLedger.highLowBalance.highTotal || (dashboardData.wholesaleLedger.totalReceivables * 0.78), currency)}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
-                      Represents {Math.round(((dashboardData.wholesaleLedger.highLowBalance.highTotal || (dashboardData.wholesaleLedger.totalReceivables * 0.78)) / Math.max(1, dashboardData.wholesaleLedger.totalReceivables)) * 100)}% of store credit exposure
-                    </div>
-                  </div>
-
-                  {/* Low Balance Tier */}
-                  <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-[#0E1526]/60 border border-slate-200/80 dark:border-purple-900/30">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span>Low / Regular Balance (&lt; Rs. 25,000)</span>
-                      </span>
-                      <span className="font-mono">
-                        {dashboardData.wholesaleLedger.highLowBalance.lowCount || 5} accounts
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 mt-1">
-                      <span>Total Outstanding:</span>
-                      <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(dashboardData.wholesaleLedger.highLowBalance.lowTotal || (dashboardData.wholesaleLedger.totalReceivables * 0.22), currency)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Settled / Cleared Accounts */}
-                  <div className="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between text-xs">
-                    <span className="text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Fully Settled (Zero Balance):</span>
-                    </span>
-                    <span className="font-bold font-mono text-emerald-700 dark:text-emerald-400">
-                      {dashboardData.wholesaleLedger.highLowBalance.zeroCount || 6} accounts
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">Vendor payables: {formatCurrency(dashboardData.wholesaleLedger.totalPayables, currency)}</span>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('suppliers')}
-                  className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
-                >
-                  Payables &rarr;
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* TOP WHOLESALE CUSTOMERS TURNOVER VS OUTSTANDING BALANCES TABLE */}
-          <div className="app-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3.5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-300 flex items-center justify-center font-bold">
-                  <Building2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    Top Wholesale Customer Turnover vs Outstanding Balances
-                    {selectedAgingBucket !== 'all' && (
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300">
-                        Filtered: {selectedAgingBucket} Days
-                      </span>
-                    )}
-                  </h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    B2B party accounts, cumulative gross sales volume vs active khata credit
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedAgingBucket !== 'all' && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAgingBucket('all')}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer underline"
-                  >
-                    Clear Filter
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onNavigate('customers')}
-                  className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
-                >
-                  Full Khata Directory &rarr;
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="dark:bg-[#0E1526]/70">
-                  <tr className="border-b border-slate-100 dark:border-purple-900/40 text-slate-400 dark:text-slate-300 font-semibold">
-                    <th className="py-2.5 px-3">Party Name</th>
-                    <th className="py-2.5 px-3">Shop / Firm</th>
-                    <th className="py-2.5 px-3">City / Market</th>
-                    <th className="py-2.5 px-3 text-right">Orders</th>
-                    <th className="py-2.5 px-3 text-right">Total Sales Turnover</th>
-                    <th className="py-2.5 px-3 text-right">Outstanding Khata</th>
-                    <th className="py-2.5 px-3 text-center">Exposure Status</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {displayWholesaleCustomers.map((cust, idx) => (
-                    <tr key={`wholesale-cust-${cust.id || idx}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
-                        {cust.name}
-                        {cust.phone && <div className="text-[10px] text-slate-400 font-mono font-normal">{cust.phone}</div>}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 font-medium">
-                        {cust.shopName || '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                          {cust.city || 'Local'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 dark:text-slate-300">
-                        {cust.ordersCount}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(cust.totalSalesTurnover, currency)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold">
-                        <span className={cust.outstandingBalance > 25000 ? 'text-amber-600 dark:text-amber-400' : cust.outstandingBalance > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-emerald-600 dark:text-emerald-400'}>
-                          {formatCurrency(cust.outstandingBalance, currency)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          cust.outstandingBalance === 0
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                            : cust.outstandingBalance > 50000
-                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                            : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60'
-                        }`}>
-                          {cust.outstandingBalance === 0 ? 'Cleared' : cust.outstandingBalance > 50000 ? 'High Credit' : 'Normal'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onNavigate('customers')}
-                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold transition cursor-pointer"
-                        >
-                          View Khata
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ROW 2: COMPARATIVE REVENUE CHART & COMPANION METRICS (BALANCED RESPONSIVE GRID) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
@@ -2522,7 +1984,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     </span>
                   </h2>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Category demand, model prefix volume &amp; turnover across {activeDashboardMode === 'wholesale' ? 'wholesale lot dispatches' : 'counter checkouts'}
+                    Category demand, model prefix volume &amp; turnover across counter checkouts
                   </p>
                 </div>
               </div>

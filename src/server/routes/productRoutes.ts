@@ -1872,12 +1872,14 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
           }
         }
 
+        const importedPairsPerCarton = parseInt(String(rawItem.pairs_per_carton ?? rawItem.pairsPerCarton ?? 12), 10) || 12;
+
         const insertRes = await pgClient.query<{ id: number }>(
           `INSERT INTO products (
             tenant_id, tenant_product_no, name, brand, category, article, barcode, primary_image_url,
             description, cost_price, min_price, max_price,
-            total_stock, low_stock_limit, active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
+            total_stock, low_stock_limit, pairs_per_carton, active
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, true)
           RETURNING id`,
           [
             tenantId,
@@ -1894,6 +1896,7 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
             finalMaxPrice,
             importedStock,
             importedLowStock,
+            importedPairsPerCarton,
           ]
         );
 

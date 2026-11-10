@@ -3034,30 +3034,26 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 </div>
               </div>
             ) : (
-              /* One shared payment amount field for cash, Khata, card and transfers. */
-              <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#131B2E]">
+              /* Shared payment collection block for cash, Khata, card, and digital transfers */
+              <div className="space-y-2.5 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#131B2E]">
+                {/* Header label and status badge */}
                 <div className="flex items-center justify-between gap-2">
-                  <label htmlFor="pos-amount-received" className="font-bold text-slate-700 dark:text-slate-200 text-xs">
-                    Amount Received (Payment Collected Now)
+                  <label htmlFor="pos-amount-received" className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                    <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Amount Received (Payment Collected Now)</span>
                   </label>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {paymentMethod === 'KHATA' ? 'Enter 0 for full credit' : 'Collected now'}
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    {paymentMethod === 'KHATA'
+                      ? '0 for Full Credit'
+                      : customerOutstandingBalance > 0 && isWholesaleTransaction
+                      ? `Khata Due: ${currencySymbol} ${formatStockPrice(customerOutstandingBalance)}`
+                      : 'Collected Now'}
                   </span>
                 </div>
 
-                {/* Dynamic Quick-Receive Payment Chips for Retail POS Terminal */}
-                {!isWholesaleTransaction && paymentMethod === 'CASH' && netTotalPayable > 0 && !isEvenExchange && !isCustomerRefund && (
-                  <QuickReceiveChips
-                    totalAmount={netTotalPayable}
-                    cashReceived={cashReceived}
-                    currencySymbol={currencySymbol}
-                    onSelectAmount={(amount) => setCashReceived(amount)}
-                    formatPrice={formatStockPrice}
-                  />
-                )}
-
+                {/* Amount Received Input with currency symbol, clear, and exact bill shortcuts */}
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm pointer-events-none select-none">
                     {currencySymbol}
                   </span>
                   <input
@@ -3075,11 +3071,48 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         setCashReceived(isNaN(parsed) ? '' : Math.max(0, Math.round(parsed)));
                       }
                     }}
-                    className="w-full pl-9 pr-3 py-2 text-right font-mono font-bold text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-20 py-2.5 text-right font-mono font-bold text-base bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 shadow-inner transition"
                   />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {cashReceived !== '' && (
+                      <button
+                        type="button"
+                        onClick={() => setCashReceived('')}
+                        className="px-1.5 py-0.5 text-[10px] rounded text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                        title="Clear amount"
+                      >
+                        ✕
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setCashReceived(netTotalPayable)}
+                      className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                      title="Fill exact bill amount"
+                    >
+                      Exact
+                    </button>
+                  </div>
                 </div>
+
+                {/* Dynamic Quick-Receive Amount Chips (Tailored for Wholesale B2B & Retail Cashiers) */}
+                {paymentMethod === 'CASH' && (netTotalPayable > 0 || customerOutstandingBalance > 0) && !isEvenExchange && !isCustomerRefund && (
+                  <div className="pt-0.5">
+                    <QuickReceiveChips
+                      totalAmount={netTotalPayable}
+                      customerLedgerBalance={customerOutstandingBalance}
+                      isWholesale={isWholesaleTransaction}
+                      cashReceived={cashReceived}
+                      currencySymbol={currencySymbol}
+                      onSelectAmount={(amount) => setCashReceived(amount)}
+                      formatPrice={formatStockPrice}
+                    />
+                  </div>
+                )}
+
+                {/* Online / Bank Transfer Transaction Reference */}
                 {(paymentMethod === 'ONLINE' || paymentMethod === 'BANK_TRANSFER') && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 pt-1">
                     <label htmlFor="pos-payment-transaction-id" className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                       {paymentMethod === 'ONLINE' ? 'Online Transaction ID' : 'Bank Transfer Transaction ID'} <span className="text-rose-500">*</span>
                     </label>
@@ -3090,44 +3123,53 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       onChange={(e) => setTransactionId(e.target.value)}
                       placeholder="Enter transaction/reference ID"
                       autoComplete="off"
-                      className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
                   </div>
                 )}
-                {isWholesaleStore && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] font-bold">
-                    {selectedCustomerId && paymentMethod === 'KHATA' && (
-                      <button type="button" onClick={() => setCashReceived(0)} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0E1A] text-slate-700 dark:text-slate-300">
-                        Full Credit (0)
-                      </button>
-                    )}
-                    <button type="button" onClick={() => setCashReceived(netTotalPayable)} className="px-2 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
-                      Bill Only ({formatStockPrice(netTotalPayable)})
+
+                {/* Khata Credit Quick Actions (when Khata payment method is active) */}
+                {paymentMethod === 'KHATA' && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] font-bold pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setCashReceived(0)}
+                      className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0E1A] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                    >
+                      Full Credit (0)
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        const customer = customers.find((c: any) => c.id === selectedCustomerId);
-                        const previousBalance = parseFloat(String(
-                          customer?.outstanding_balance ?? customer?.outstandingBalance ??
-                          customer?.current_balance ?? customer?.currentBalance ?? customer?.balance ?? 0
-                        )) || 0;
-                        setCashReceived(Math.round((netTotalPayable + previousBalance) * 100) / 100);
-                      }}
-                      className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+                      onClick={() => setCashReceived(netTotalPayable)}
+                      className="px-2 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition cursor-pointer"
                     >
-                      Pay All
+                      Bill Only ({formatStockPrice(netTotalPayable)})
                     </button>
+                    {customerOutstandingBalance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCashReceived(Math.round((netTotalPayable + customerOutstandingBalance) * 100) / 100);
+                        }}
+                        className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer"
+                      >
+                        Pay All ({formatStockPrice(netTotalPayable + customerOutstandingBalance)})
+                      </button>
+                    )}
                   </div>
                 )}
-                {!isWholesaleTransaction && (paymentMethod !== 'CASH' || netTotalPayable === 0) && (
-                  <button
-                    type="button"
-                    onClick={() => setCashReceived(netTotalPayable)}
-                    className="inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 shadow-md shadow-purple-600/20 text-[10px] font-bold transition active:scale-[0.98]"
-                  >
-                    Exact Amount ({formatStockPrice(netTotalPayable)})
-                  </button>
+
+                {/* Non-cash tender shortcut */}
+                {paymentMethod !== 'CASH' && paymentMethod !== 'KHATA' && netTotalPayable > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setCashReceived(netTotalPayable)}
+                      className="w-full inline-flex items-center justify-center px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 shadow-sm text-xs font-bold transition active:scale-[0.98] cursor-pointer"
+                    >
+                      Exact Amount ({currencySymbol} {formatStockPrice(netTotalPayable)})
+                    </button>
+                  </div>
                 )}
               </div>
             )}

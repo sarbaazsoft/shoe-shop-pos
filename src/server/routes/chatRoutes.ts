@@ -497,9 +497,9 @@ DO NOT assume global, generic retail or wholesale software behaviors (Shopify, L
      2. In the top action bar, click the **"Import CSV"** button (next to "Export CSV" and "+ Add New Product").
      3. This opens the **Bulk CSV Product Import** modal (\`CsvImportModal\`).
    • STEP-BY-STEP CSV IMPORT PROCESS:
-     1. **Download Sample Template**: Click **"Download Sample CSV"** (\`products_import_sample.csv\`) inside the modal to get the exact 12-column schema template pre-configured for "${storeName}".
-     2. **12 Supported CSV Schema Columns (\`PRODUCT_CSV_SCHEMA_KEYS\`)**:
-        \`article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock, low_stock_limit, primary_image_url, description\`
+     1. **Download Sample Template**: Click **"Download Sample CSV"** (\`products_import_sample.csv\`) inside the modal to get the exact schema template pre-configured for "${storeName}".
+     2. **Supported CSV Schema Columns (\`PRODUCT_CSV_SCHEMA_KEYS\`)**:
+        \`article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock, pairs_per_carton\`
         *(Note: Header aliases like \`title\`, \`product_name\`, \`selling_price\`, \`price\`, \`stock\` are also automatically recognized and mapped!)*
      3. **Smart Auto-Generation for Blank Fields**:
         - If \`brand\` is blank → defaults to \`"Unbranded"\`.

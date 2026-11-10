@@ -162,6 +162,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         max_price: r.max_price,
         total_stock: r.total_stock,
         low_stock_limit: r.low_stock_limit,
+        pairs_per_carton: r.pairs_per_carton,
         primary_image_url: r.primary_image_url,
         description: r.description,
         duplicateAction: r.duplicateAction || duplicateStrategy,
