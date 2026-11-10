@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, CreditCard, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight } from 'lucide-react';
+import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
@@ -102,12 +102,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA' | 'SPLIT'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'ONLINE' | 'KHATA' | 'SPLIT' | 'BANK_TRANSFER'>('CASH');
   const [cashReceived, setCashReceived] = useState<number | ''>('');
   const [transactionId, setTransactionId] = useState('');
   const [splitCashAmount, setSplitCashAmount] = useState<number | ''>('');
   const [splitOnlineAmount, setSplitOnlineAmount] = useState<number | ''>('');
-  const [splitDigitalType, setSplitDigitalType] = useState<'ONLINE' | 'BANK_TRANSFER' | 'CARD'>('ONLINE');
+  const [splitDigitalType, setSplitDigitalType] = useState<'ONLINE' | 'BANK_TRANSFER'>('ONLINE');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const checkoutInFlightRef = useRef(false);
@@ -224,8 +224,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const storeAllowsHalfCarton =
     companySettings?.allowHalfCarton === true ||
     companySettings?.allow_half_carton === true;
-  const selectPaymentMethod = (method: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA' | 'SPLIT') => {
-    if (method === 'CARD') return;
+  const selectPaymentMethod = (method: 'CASH' | 'ONLINE' | 'KHATA' | 'SPLIT' | 'BANK_TRANSFER') => {
     setPaymentMethod(method);
     if (method !== 'BANK_TRANSFER' && method !== 'ONLINE' && method !== 'SPLIT') setTransactionId('');
     if (method === 'SPLIT') {
@@ -1162,8 +1161,8 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     if (paymentMethod === 'SPLIT') {
       if (numSplitOnline > 0 && !transactionId.trim()) {
         playAudioFeedback.warning();
-        setErrorMessage(`Enter the ${splitDigitalType === 'CARD' ? 'Card / POS' : 'Online / Transfer'} transaction or reference ID before checkout.`);
-        triggerValidationToast('Transaction/Reference ID is required for the digital/card split.', 'error', 'Transaction ID Required');
+        setErrorMessage(`Enter the ${splitDigitalType === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Online'} transaction or reference ID before checkout.`);
+        triggerValidationToast('Transaction/Reference ID is required for the digital split payment.', 'error', 'Transaction ID Required');
         return;
       }
     }
@@ -2694,10 +2693,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             </div>
 
             {/* Payment Method Selector */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
+            <div className={`grid ${isWholesaleStore ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-1.5 text-xs`}>
               {(isWholesaleStore
-                ? (['KHATA', 'CASH', 'SPLIT', 'BANK_TRANSFER', 'ONLINE'] as const)
-                : (['CASH', 'ONLINE', 'SPLIT', 'BANK_TRANSFER', 'CARD'] as const)
+                ? (['KHATA', 'CASH', 'ONLINE', 'SPLIT'] as const)
+                : (['CASH', 'ONLINE', 'SPLIT'] as const)
               ).map((method) => (
                 <button
                   key={method}
@@ -2717,27 +2716,19 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     }
                     selectPaymentMethod(method);
                   }}
-                  disabled={method === 'CARD'}
-                  title={method === 'CARD' ? 'Card payments are currently unavailable' : undefined}
-                  className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition text-[11px] ${
-                    method === 'CARD'
-                      ? 'card-no bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 opacity-80 cursor-not-allowed shadow-2xs'
-                      : paymentMethod === method
+                  className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition text-[11px] cursor-pointer ${
+                    paymentMethod === method
                       ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
-                      : 'bg-slate-100 dark:bg-[#131B2E] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 font-semibold cursor-pointer'
+                      : 'bg-slate-100 dark:bg-[#131B2E] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 font-semibold'
                   }`}
                 >
                   {method === 'KHATA' && <BookOpen className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'CASH' && <Banknote className="w-3.5 h-3.5 shrink-0" />}
-                  {method === 'CARD' && <CreditCard className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'ONLINE' && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />}
-                  {method === 'BANK_TRANSFER' && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'SPLIT' && <Coins className="w-3.5 h-3.5 shrink-0" />}
                   <span className="truncate">
                     {method === 'KHATA'
                       ? 'Khata (Udhaar)'
-                      : method === 'BANK_TRANSFER'
-                      ? 'Transfer'
                       : method === 'SPLIT'
                       ? 'Split (Cash+Digital)'
                       : method}
@@ -2760,7 +2751,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         Split Payment Allocation
                       </h4>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        Cash + Online / Card / Bank
+                        Cash + Online / Bank Transfer
                       </p>
                     </div>
                   </div>
@@ -2928,7 +2919,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     <div className="flex items-center justify-between">
                       <label htmlFor="pos-split-online" className="flex items-center gap-1 text-[11px] font-bold text-indigo-800 dark:text-indigo-300">
                         <ArrowLeftRight className="w-3.5 h-3.5" />
-                        <span>Digital / Card Amount</span>
+                        <span>Digital Amount</span>
                       </label>
                       <button
                         type="button"
@@ -2961,19 +2952,19 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       />
                     </div>
                     {/* Digital Channel Selector */}
-                    <div className="grid grid-cols-3 gap-1 pt-0.5">
-                      {(['ONLINE', 'BANK_TRANSFER', 'CARD'] as const).map((channel) => (
+                    <div className="grid grid-cols-2 gap-1 pt-0.5">
+                      {(['ONLINE', 'BANK_TRANSFER'] as const).map((channel) => (
                         <button
                           key={channel}
                           type="button"
                           onClick={() => setSplitDigitalType(channel)}
-                          className={`py-1 px-1 rounded-md text-[9px] font-bold transition text-center truncate ${
+                          className={`py-1 px-1 rounded-md text-[9px] font-bold transition text-center truncate cursor-pointer ${
                             splitDigitalType === channel
                               ? 'bg-indigo-600 text-white shadow-2xs'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                           }`}
                         >
-                          {channel === 'ONLINE' ? 'Raast/Online' : channel === 'BANK_TRANSFER' ? 'Bank' : 'Card Slip'}
+                          {channel === 'ONLINE' ? 'Raast / Online' : 'Bank Transfer'}
                         </button>
                       ))}
                     </div>
@@ -2989,7 +2980,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         <span className="text-rose-500">*</span>
                       </label>
                       <span className="text-[9px] font-normal text-indigo-600 dark:text-indigo-400">
-                        {splitDigitalType === 'ONLINE' ? 'Raast / EasyPaisa / JazzCash Ref' : splitDigitalType === 'BANK_TRANSFER' ? 'Bank Transfer Ref #' : 'POS Card Slip / Approval #'}
+                        {splitDigitalType === 'BANK_TRANSFER' ? 'Bank Transfer Ref #' : 'Raast / EasyPaisa / JazzCash Ref'}
                       </span>
                     </div>
                     <input
@@ -2997,7 +2988,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       type="text"
                       value={transactionId}
                       onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder={splitDigitalType === 'ONLINE' ? 'Enter online transaction / TID / Raast ID' : splitDigitalType === 'BANK_TRANSFER' ? 'Enter bank transfer reference #' : 'Enter POS card slip / approval #'}
+                      placeholder={splitDigitalType === 'BANK_TRANSFER' ? 'Enter bank transfer reference #' : 'Enter online transaction / TID / Raast ID'}
                       autoComplete="off"
                       className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-[#0A0E1A] border border-indigo-300 dark:border-indigo-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
@@ -3373,7 +3364,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         placeholder="Bilty / Cargo # (e.g. LR-4921)"
                         value={biltyNumber}
                         onChange={(e) => setBiltyNumber(e.target.value)}
-                        className="card-no w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-400 outline-none focus:ring-1 focus:ring-blue-500 font-mono font-medium"
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-400 outline-none focus:ring-1 focus:ring-blue-500 font-mono font-medium"
                       />
                     </div>
                     <input

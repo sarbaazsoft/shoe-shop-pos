@@ -13,8 +13,10 @@ import {
   Sparkles,
   TrendingUp,
   Loader2,
+  Bookmark,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
+import { SammiQuestionIndexSidebar } from './SammiQuestionIndexSidebar.tsx';
 
 const TYPING_HINTS = [
   { text: 'Thinking & retrieving knowledge...', icon: Bot },
@@ -76,6 +78,8 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [modelMode, setModelMode] = useState<'fast' | 'general' | 'complex'>('general');
   const [activePromptCategory, setActivePromptCategory] = useState<'all' | 'trends' | 'care' | 'pos'>('all');
+  const [isIndexOpen, setIsIndexOpen] = useState(false);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -101,6 +105,21 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectQuestion = (msgId: string) => {
+    const el = document.getElementById(`msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(msgId);
+      setTimeout(() => {
+        setHighlightedMsgId((prev) => (prev === msgId ? null : prev));
+      }, 2500);
+    }
   };
 
   useEffect(() => {
@@ -246,7 +265,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
   };
 
   return (
-    <div className="w-full min-h-full bg-[#F8FAFC] dark:bg-[#0A0E1A] pt-5 sm:pt-7 pb-10 flex flex-col">
+    <div className="w-full min-h-full bg-[#F8FAFC] dark:bg-[#0A0E1A] pt-5 sm:pt-7 pb-10 flex flex-col relative">
       {/* TOP HEADER: Clean, pristine, minimalist */}
       <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto px-4 sm:px-6 mb-6">
         <div className="bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 border border-slate-200 dark:border-purple-800/80 rounded-2xl p-4 sm:p-5 shadow-xs text-slate-800 dark:text-white flex flex-wrap items-center justify-between gap-4">
@@ -299,6 +318,33 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
               </select>
             </div>
 
+            {/* Question Index Sidebar Drawer Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsIndexOpen((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-xl border transition cursor-pointer text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-2xs ${
+                isIndexOpen
+                  ? 'bg-purple-600 text-white border-purple-500 shadow-purple-600/25'
+                  : 'border-slate-200 dark:border-purple-800/80 bg-white dark:bg-[#131B2E] text-slate-700 dark:text-purple-200 hover:bg-slate-100 dark:hover:bg-purple-900/40'
+              }`}
+              title={isIndexOpen ? 'Collapse Question Index' : 'Open Question Index (Receipt Ledger)'}
+              aria-label="Toggle Question Index"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Index</span>
+              {messages.filter((m) => m.role === 'user').length > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                    isIndexOpen
+                      ? 'bg-white/20 text-white'
+                      : 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
+                  }`}
+                >
+                  {messages.filter((m) => m.role === 'user').length}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleClearHistory}
@@ -317,10 +363,17 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`w-full flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            id={`msg-${msg.id}`}
+            className={`w-full flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} transition-all duration-300 ${
+              highlightedMsgId === msg.id ? 'scale-[1.01]' : ''
+            }`}
           >
             <div
               className={`w-full sm:max-w-[85%] lg:max-w-[80%] rounded-2xl p-4 sm:p-6 transition-all ${
+                highlightedMsgId === msg.id
+                  ? 'ring-2 ring-purple-500 dark:ring-purple-400 shadow-xl shadow-purple-500/20 ring-offset-2 dark:ring-offset-slate-900'
+                  : ''
+              } ${
                 msg.role === 'user'
                   ? 'bg-slate-50 dark:bg-gradient-to-r dark:from-purple-900 dark:via-indigo-950 dark:to-slate-900 border border-slate-200 dark:border-purple-800/80 text-slate-800 dark:text-white shadow-xs rounded-br-xs ml-auto'
                   : 'bg-white dark:bg-[#131B2E] text-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-purple-800/80 shadow-xs rounded-bl-xs'
@@ -635,6 +688,19 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Collapsible Floating Question Index Sidebar Drawer (Sleek Barcode / Receipt-Line Theme) */}
+      <SammiQuestionIndexSidebar
+        isOpen={isIndexOpen}
+        onClose={() => setIsIndexOpen(false)}
+        onToggle={() => setIsIndexOpen((prev) => !prev)}
+        messages={messages}
+        highlightedMsgId={highlightedMsgId}
+        onSelectQuestion={handleSelectQuestion}
+        storeName={storeName}
+        onScrollToTop={handleScrollToTop}
+        onScrollToBottom={scrollToBottom}
+      />
     </div>
   );
 };
