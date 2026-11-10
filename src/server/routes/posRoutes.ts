@@ -154,6 +154,12 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
   if ((normalizedPaymentMethod === 'ONLINE' || normalizedPaymentMethod === 'BANK_TRANSFER') && !transactionId) {
     return res.status(400).json({ error: 'A transaction ID is required for online and bank transfer payments.' });
   }
+  if (normalizedPaymentMethod === 'SPLIT') {
+    const splitOnlineAmount = Math.max(0, parseFloat(String(req.body.splitOnlineAmount ?? req.body.split_online_amount ?? 0)) || 0);
+    if (splitOnlineAmount > 0 && !transactionId) {
+      return res.status(400).json({ error: 'A transaction or reference ID is required for the digital/card portion of split payment.' });
+    }
+  }
   if (!isWholesaleStore && normalizedPaymentMethod === 'KHATA') {
     return res.status(400).json({ error: 'Khata credit is available only for wholesale stores.' });
   }
@@ -542,7 +548,10 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
       }
     }
     const offlineNote = clientTxId ? `[Offline Tx: ${clientTxId.trim()}]` : null;
-    const finalNotes = [notes?.trim(), exchangeNote, offlineNote].filter(Boolean).join(' | ') || null;
+    const splitNote = normalizedPaymentMethod === 'SPLIT'
+      ? `[Split Payment: Cash Rs. ${req.body.splitCashAmount ?? req.body.split_cash_amount ?? 0} + ${req.body.splitDigitalType || 'Digital'} Rs. ${req.body.splitOnlineAmount ?? req.body.split_online_amount ?? 0}${transactionId ? ` (Ref: ${transactionId})` : ''}]`
+      : null;
+    const finalNotes = [notes?.trim(), exchangeNote, offlineNote, splitNote].filter(Boolean).join(' | ') || null;
 
     const effectiveSaleDate = saleDate && typeof saleDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(saleDate)
       ? saleDate.slice(0, 10)

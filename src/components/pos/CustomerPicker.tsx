@@ -26,6 +26,7 @@ interface IndexedCustomer {
   phoneLower: string;
   phoneClean: string;
   balance: number;
+  creditLimit: number;
   totalSpent: number;
   totalOrders: number;
   searchBlob: string;
@@ -133,6 +134,7 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
         phoneLower,
         phoneClean,
         balance: readBalance(c),
+        creditLimit: parseFloat(String(c?.credit_limit ?? c?.creditLimit ?? 0)) || 0,
         totalSpent: parseFloat(String(c.total_spent ?? c.totalSpent ?? 0)) || 0,
         totalOrders: parseInt(String(c.total_orders ?? c.totalOrders ?? 0), 10) || 0,
         searchBlob: `${nameLower} ${shopLower} ${phoneLower} ${phoneClean} #${idStr} ${idStr} ${codeStr}`,
@@ -645,17 +647,24 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
           {selectedCustomer && !showSuggestionsPopup && (
             <div className="mt-2 flex items-center justify-between gap-2 text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80">
               <span className="text-slate-500 dark:text-slate-400 truncate">{selectedCustomer.displayCode}</span>
-              <span
-                className={`font-bold ${
-                  selectedCustomer.balance > 0
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : 'text-emerald-700 dark:text-emerald-300'
-                }`}
-              >
-                {selectedCustomer.balance > 0
-                  ? `Due: ${currencySymbol} ${formatStockPrice(selectedCustomer.balance)}`
-                  : 'No balance due'}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedCustomer.creditLimit > 0 && (
+                  <span className="text-slate-500 dark:text-slate-400 text-[10px]">
+                    Limit: {currencySymbol} {formatStockPrice(selectedCustomer.creditLimit)}
+                  </span>
+                )}
+                <span
+                  className={`font-bold ${
+                    selectedCustomer.balance > 0
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : 'text-emerald-700 dark:text-emerald-300'
+                  }`}
+                >
+                  {selectedCustomer.balance > 0
+                    ? `Due: ${currencySymbol} ${formatStockPrice(selectedCustomer.balance)}`
+                    : 'No dues'}
+                </span>
+              </div>
             </div>
           )}
 

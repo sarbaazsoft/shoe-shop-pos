@@ -69,6 +69,16 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const [isPrintingDirect, setIsPrintingDirect] = useState(false);
   const [directFeedback, setDirectFeedback] = useState<string | null>(null);
 
+  const formatPaymentMethod = (method?: string) => {
+    if (!method) return 'Cash';
+    const m = String(method).toUpperCase();
+    if (m === 'KHATA') return 'Khata';
+    if (m === 'SPLIT') return 'Split (Cash + Digital)';
+    if (m === 'BANK_TRANSFER') return 'Bank Transfer';
+    if (m === 'ONLINE') return 'Online';
+    return method;
+  };
+
   // Identify whether customer is a registered profile customer (not walk-in) with a set phone number
   const customerName = String(sale.customer_name || sale.customer?.name || '').trim();
   const customerPhone = String(sale.customer_phone || sale.customer?.phone || '').trim();
@@ -689,7 +699,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                 )}
                 <div className="flex justify-between">
                   <span>Payment:</span>
-                  <span className="font-semibold">{sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</span>
+                  <span className="font-semibold">{formatPaymentMethod(sale.payment_method)}</span>
                 </div>
               </div>
 
@@ -839,7 +849,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   <p className="text-gray-800">
                     <span className="font-medium">Payment Mode:</span>{' '}
                     <strong className="text-gray-950 font-bold">
-                      {sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}
+                      {formatPaymentMethod(sale.payment_method)}
                     </strong>
                   </p>
                   <p className="text-gray-800 mt-0.5">
@@ -1162,7 +1172,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Payment:</span>
-                <strong>{sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</strong>
+                <strong>{formatPaymentMethod(sale.payment_method)}</strong>
               </div>
             </div>
 
@@ -1286,7 +1296,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                 {dealerNtn && <div>NTN: {dealerNtn}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div><strong>Payment:</strong> {sale.payment_method === 'KHATA' ? 'Khata' : sale.payment_method}</div>
+                <div><strong>Payment:</strong> {formatPaymentMethod(sale.payment_method)}</div>
                 <div><strong>Cashier / Dispatch:</strong> {sale.cashier_name || 'Counter Operator'}</div>
               </div>
             </div>

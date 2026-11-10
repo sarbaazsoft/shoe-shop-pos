@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, CreditCard, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff } from 'lucide-react';
+import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, CreditCard, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
@@ -102,9 +102,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA' | 'SPLIT'>('CASH');
   const [cashReceived, setCashReceived] = useState<number | ''>('');
   const [transactionId, setTransactionId] = useState('');
+  const [splitCashAmount, setSplitCashAmount] = useState<number | ''>('');
+  const [splitOnlineAmount, setSplitOnlineAmount] = useState<number | ''>('');
+  const [splitDigitalType, setSplitDigitalType] = useState<'ONLINE' | 'BANK_TRANSFER' | 'CARD'>('ONLINE');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const checkoutInFlightRef = useRef(false);
@@ -131,12 +134,88 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   // Business Type & Wholesale B2B Cargo / Dispatch State
   const isWholesaleStore =
     String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
-  const selectedCustomer = customers.find((c: any) => c.id === selectedCustomerId);
+  const selectedCustomer = customers.find((c: any) => Number(c.id) === Number(selectedCustomerId));
+
+  const customerOutstandingBalance = parseFloat(
+    String(
+      selectedCustomer?.outstanding_balance ??
+      selectedCustomer?.outstandingBalance ??
+      selectedCustomer?.current_balance ??
+      selectedCustomer?.currentBalance ??
+      selectedCustomer?.balance ??
+      0
+    )
+  ) || 0;
+
+  const customerCreditLimit = parseFloat(
+    String(
+      selectedCustomer?.credit_limit ??
+      selectedCustomer?.creditLimit ??
+      0
+    )
+  ) || 0;
+
+  const rawCustomerType = String(
+    selectedCustomer?.customerType ??
+    selectedCustomer?.customer_type ??
+    ''
+  ).toUpperCase();
+
+  const customerShopName = String(
+    selectedCustomer?.shopName ??
+    selectedCustomer?.shop_name ??
+    ''
+  ).trim();
+
+  const customerOrdersCount = Number(
+    selectedCustomer?.total_orders ??
+    selectedCustomer?.totalOrders ??
+    selectedCustomer?.orders_count ??
+    selectedCustomer?.ordersCount ??
+    0
+  );
+
+  const customerTotalSpent = Number(
+    selectedCustomer?.total_spent ??
+    selectedCustomer?.totalSpent ??
+    0
+  );
+
   const isWholesaleCustomer = Boolean(
     selectedCustomer &&
-    (String(selectedCustomer.customerType || selectedCustomer.customer_type || '').toUpperCase().includes('WHOLESALE') ||
-     String(selectedCustomer.notes || '').toUpperCase().includes('WHOLESALE'))
+    (isWholesaleStore ||
+     rawCustomerType.includes('WHOLESALE') ||
+     String(selectedCustomer?.notes || '').toUpperCase().includes('WHOLESALE') ||
+     customerShopName.length > 0)
   );
+
+  const isRepeatCustomer = Boolean(
+    selectedCustomer &&
+    (customerOrdersCount > 0 ||
+     customerTotalSpent > 0 ||
+     customerOutstandingBalance > 0 ||
+     rawCustomerType.includes('REPEAT') ||
+     rawCustomerType.includes('REGULAR'))
+  );
+
+  const isWholesaleOrRepeatCustomer = Boolean(
+    selectedCustomer && (isWholesaleCustomer || isRepeatCustomer || customerCreditLimit > 0 || customerOutstandingBalance > 0)
+  );
+
+  const isOverCreditLimit = Boolean(
+    customerCreditLimit > 0 && customerOutstandingBalance > customerCreditLimit
+  );
+
+  const isNearCreditLimit = Boolean(
+    customerCreditLimit > 0 &&
+    !isOverCreditLimit &&
+    customerOutstandingBalance >= customerCreditLimit * 0.85
+  );
+
+  const availableCredit = customerCreditLimit > 0
+    ? Math.max(0, customerCreditLimit - customerOutstandingBalance)
+    : null;
+
   const isWholesaleTransaction = isWholesaleStore || isWholesaleCustomer;
   // Dynamic minimum sale quantity & half-carton permission
   // Determination: Half-cartons are allowed if either the store setting is enabled
@@ -145,10 +224,17 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const storeAllowsHalfCarton =
     companySettings?.allowHalfCarton === true ||
     companySettings?.allow_half_carton === true;
-  const selectPaymentMethod = (method: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA') => {
+  const selectPaymentMethod = (method: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA' | 'SPLIT') => {
     if (method === 'CARD') return;
     setPaymentMethod(method);
-    if (method !== 'BANK_TRANSFER' && method !== 'ONLINE') setTransactionId('');
+    if (method !== 'BANK_TRANSFER' && method !== 'ONLINE' && method !== 'SPLIT') setTransactionId('');
+    if (method === 'SPLIT') {
+      if (splitCashAmount === '' && splitOnlineAmount === '' && netTotalPayable > 0) {
+        const half = Math.round(netTotalPayable / 2);
+        setSplitCashAmount(half);
+        setSplitOnlineAmount(netTotalPayable - half);
+      }
+    }
   };
   const selectCustomerForPayment = (customerId: number | null) => {
     setSelectedCustomerId(customerId);
@@ -991,6 +1077,16 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
   const customerRefundAmount = isCustomerRefund ? Math.abs(netDifference) : 0;
   const netTotalPayable = Math.max(0, netDifference);
 
+  // Split payment allocations and live reconciliation
+  const numSplitCash = typeof splitCashAmount === 'number' ? splitCashAmount : (parseFloat(String(splitCashAmount || 0)) || 0);
+  const numSplitOnline = typeof splitOnlineAmount === 'number' ? splitOnlineAmount : (parseFloat(String(splitOnlineAmount || 0)) || 0);
+  const totalSplitTendered = Math.round((numSplitCash + numSplitOnline) * 100) / 100;
+  const splitShortfall = Math.max(0, Math.round((netTotalPayable - totalSplitTendered) * 100) / 100);
+  const splitChangeDue = totalSplitTendered > netTotalPayable
+    ? Math.round((totalSplitTendered - netTotalPayable) * 100) / 100
+    : 0;
+  const isSplitFullyPaid = totalSplitTendered >= netTotalPayable;
+
   const effectiveCashReceived =
     paymentMethod === 'CASH'
       ? isEvenExchange
@@ -998,12 +1094,16 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
         : cashReceived === ''
         ? netTotalPayable
         : cashReceived
+      : paymentMethod === 'SPLIT'
+      ? totalSplitTendered
       : 0;
   const changeDue =
     paymentMethod === 'CASH'
       ? isCustomerRefund
         ? customerRefundAmount
         : Math.max(0, (typeof effectiveCashReceived === 'number' ? effectiveCashReceived : 0) - netTotalPayable)
+      : paymentMethod === 'SPLIT'
+      ? splitChangeDue
       : 0;
 
   // Quick Cash buttons handler
@@ -1059,6 +1159,15 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       return;
     }
 
+    if (paymentMethod === 'SPLIT') {
+      if (numSplitOnline > 0 && !transactionId.trim()) {
+        playAudioFeedback.warning();
+        setErrorMessage(`Enter the ${splitDigitalType === 'CARD' ? 'Card / POS' : 'Online / Transfer'} transaction or reference ID before checkout.`);
+        triggerValidationToast('Transaction/Reference ID is required for the digital/card split.', 'error', 'Transaction ID Required');
+        return;
+      }
+    }
+
     const totalCartonsSum = isWholesaleStore
       ? Number(cart.reduce((acc, i) => acc + (i.quantity / (Number(i.pairsPerCarton) === 16 ? 16 : 12)), 0).toFixed(2))
       : 0;
@@ -1082,9 +1191,13 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     const totalAmountDue = Math.max(0, Math.round((netInvoiceDue + prevBalance) * 100) / 100);
     const effectivePaidAmount = paymentMethod === 'KHATA'
       ? (typeof cashReceived === 'number' ? cashReceived : 0)
+      : paymentMethod === 'SPLIT'
+      ? totalSplitTendered
       : (typeof cashReceived === 'number' ? cashReceived : (cashReceived === '' ? totalAmountDue : parseFloat(String(cashReceived)) || totalAmountDue));
     const remainingBalance = Math.max(0, Math.round((totalAmountDue - effectivePaidAmount) * 100) / 100);
-    const changeGivenDue = effectivePaidAmount > totalAmountDue
+    const changeGivenDue = paymentMethod === 'SPLIT'
+      ? splitChangeDue
+      : effectivePaidAmount > totalAmountDue
       ? Math.round((effectivePaidAmount - totalAmountDue) * 100) / 100
       : (netDifference < 0 ? Math.abs(netDifference) : 0);
 
@@ -1095,7 +1208,13 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     }
     if (!isWholesaleStore && effectivePaidAmount < totalAmountDue) {
       playAudioFeedback.warning();
-      setErrorMessage('Retail checkout requires full payment. Enter the full amount received to complete this sale.');
+      if (paymentMethod === 'SPLIT') {
+        const shortfall = Math.round((totalAmountDue - totalSplitTendered) * 100) / 100;
+        setErrorMessage(`Split payment requires full payment. Tendered: ${currencySymbol} ${formatStockPrice(totalSplitTendered)} of ${currencySymbol} ${formatStockPrice(totalAmountDue)}. Shortfall: ${currencySymbol} ${formatStockPrice(shortfall)}.`);
+        triggerValidationToast(`Split payment short by ${currencySymbol} ${formatStockPrice(shortfall)}`, 'error', 'Split Incomplete');
+      } else {
+        setErrorMessage('Retail checkout requires full payment. Enter the full amount received to complete this sale.');
+      }
       return;
     }
 
@@ -1117,6 +1236,9 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       }),
       customerId: selectedCustomerId,
       paymentMethod,
+      splitCashAmount: paymentMethod === 'SPLIT' ? numSplitCash : undefined,
+      splitOnlineAmount: paymentMethod === 'SPLIT' ? numSplitOnline : undefined,
+      splitDigitalType: paymentMethod === 'SPLIT' ? splitDigitalType : undefined,
       transactionId: transactionId.trim(),
       saleType: isWholesaleStore ? 'WHOLESALE' : 'RETAIL',
       totalCartons: totalCartonsSum,
@@ -1127,7 +1249,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       paidAmount: effectivePaidAmount,
       amountReceived: effectivePaidAmount,
       remainingBalance,
-      cashReceived: effectivePaidAmount,
+      cashReceived: paymentMethod === 'SPLIT' ? numSplitCash : effectivePaidAmount,
       changeGiven: changeGivenDue,
       notes,
       isMinPriceOverridden: Boolean(adminOverrideCreds || currentUser.role === 'ADMIN'),
@@ -2288,6 +2410,172 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
               </motion.span>
             </div>
 
+            {/* Customer Khata Balance Badge: Prominently displayed directly on the checkout pane for Wholesale or Repeat customers */}
+            {isWholesaleOrRepeatCustomer && selectedCustomer && (
+              <motion.div
+                id="pos-customer-khata-badge"
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.25 }}
+                className={`p-3 rounded-xl border transition-all duration-200 shadow-xs ${
+                  isOverCreditLimit
+                    ? 'bg-rose-50/95 dark:bg-rose-950/45 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/25'
+                    : isNearCreditLimit
+                    ? 'bg-amber-50/95 dark:bg-amber-950/45 border-amber-300 dark:border-amber-700 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/25'
+                    : customerOutstandingBalance > 0
+                    ? 'bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-50/20 dark:from-amber-950/35 dark:via-slate-900/40 dark:to-slate-900/30 border-amber-200/90 dark:border-amber-800/60 text-slate-900 dark:text-white'
+                    : 'bg-gradient-to-br from-emerald-50/85 via-slate-50/40 to-emerald-50/20 dark:from-emerald-950/30 dark:via-slate-900/40 dark:to-slate-900/30 border-emerald-200/80 dark:border-emerald-800/60 text-slate-900 dark:text-white'
+                }`}
+              >
+                {/* Header: Customer identity and status badge */}
+                <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-black/5 dark:border-white/10">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                        isOverCreditLimit
+                          ? 'bg-rose-100 dark:bg-rose-900/80 text-rose-700 dark:text-rose-200'
+                          : customerOutstandingBalance > 0
+                          ? 'bg-amber-100 dark:bg-amber-900/80 text-amber-700 dark:text-amber-200'
+                          : 'bg-emerald-100 dark:bg-emerald-900/80 text-emerald-700 dark:text-emerald-200'
+                      }`}
+                    >
+                      {isOverCreditLimit ? (
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                      ) : (
+                        <BookOpen className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-extrabold text-[11px] truncate tracking-tight text-slate-900 dark:text-white block">
+                        {customerShopName ? `${customerShopName} (${selectedCustomer.name})` : selectedCustomer.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-mono truncate">
+                        {selectedCustomer.phone || `CUS-#${selectedCustomer.id}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      id="pos-khata-customer-type-badge"
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                        isWholesaleCustomer
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                          : 'bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                      }`}
+                    >
+                      {isWholesaleCustomer ? 'Wholesale' : 'Repeat'}
+                    </span>
+
+                    {isOverCreditLimit ? (
+                      <span id="pos-khata-status-badge" className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse shadow-xs">
+                        Over Limit
+                      </span>
+                    ) : isNearCreditLimit ? (
+                      <span id="pos-khata-status-badge" className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 shadow-xs">
+                        Near Limit
+                      </span>
+                    ) : customerOutstandingBalance > 0 ? (
+                      <span id="pos-khata-status-badge" className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-200 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                        Pending Dues
+                      </span>
+                    ) : (
+                      <span id="pos-khata-status-badge" className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Khata Clear
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metric Grid: Outstanding Balance & Credit Limit */}
+                <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
+                  <div className="p-2 rounded-lg bg-white/80 dark:bg-black/30 border border-black/5 dark:border-white/5">
+                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block uppercase tracking-wider">
+                      Khata Balance
+                    </span>
+                    <span
+                      id="pos-khata-balance-value"
+                      className={`font-mono font-black text-sm block tracking-tight ${
+                        customerOutstandingBalance > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {currencySymbol} {formatStockPrice(customerOutstandingBalance)}
+                    </span>
+                    <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 block truncate">
+                      {customerOutstandingBalance > 0 ? 'Pending dues' : 'No pending dues'}
+                    </span>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-white/80 dark:bg-black/30 border border-black/5 dark:border-white/5">
+                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block uppercase tracking-wider">
+                      Credit Limit
+                    </span>
+                    <span
+                      id="pos-khata-credit-limit-value"
+                      className="font-mono font-bold text-sm text-slate-800 dark:text-slate-100 block tracking-tight"
+                    >
+                      {customerCreditLimit > 0
+                        ? `${currencySymbol} ${formatStockPrice(customerCreditLimit)}`
+                        : 'No Limit'}
+                    </span>
+                    <span className="text-[9px] font-medium block truncate">
+                      {customerCreditLimit > 0 ? (
+                        isOverCreditLimit ? (
+                          <span className="text-rose-600 dark:text-rose-400 font-bold">
+                            Exceeded by {currencySymbol} {formatStockPrice(customerOutstandingBalance - customerCreditLimit)}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            Avail: {currencySymbol} {formatStockPrice(availableCredit ?? 0)}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500">Discretionary credit</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Real-time Cashier Warning / Alert Banner */}
+                {isOverCreditLimit ? (
+                  <div className="mt-2 p-1.5 rounded-md bg-rose-100 dark:bg-rose-900/60 border border-rose-300 dark:border-rose-700 text-[10px] text-rose-900 dark:text-rose-100 font-semibold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <span>
+                      Credit limit breached! Prior dues should be settled before extending further credit.
+                    </span>
+                  </div>
+                ) : (customerCreditLimit > 0 && (customerOutstandingBalance + netTotalPayable) > customerCreditLimit && paymentMethod === 'KHATA' && netTotalPayable > 0) ? (
+                  <div className="mt-2 p-1.5 rounded-md bg-amber-100 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 text-[10px] text-amber-950 dark:text-amber-100 font-semibold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>
+                      Booking this bill ({currencySymbol} {formatStockPrice(netTotalPayable)}) on Khata will exceed credit limit by {currencySymbol} {formatStockPrice((customerOutstandingBalance + netTotalPayable) - customerCreditLimit)}.
+                    </span>
+                  </div>
+                ) : customerOutstandingBalance > 0 ? (
+                  <div className="mt-2 p-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-[10px] text-amber-900 dark:text-amber-200 font-medium flex items-center justify-between gap-1">
+                    <span className="flex items-center gap-1 truncate">
+                      <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span>Pending dues: <strong>{currencySymbol} {formatStockPrice(customerOutstandingBalance)}</strong></span>
+                    </span>
+                    {netTotalPayable > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCashReceived(Math.round((netTotalPayable + customerOutstandingBalance) * 100) / 100);
+                        }}
+                        className="text-[9px] px-1.5 py-0.5 rounded bg-amber-200/90 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 font-bold text-amber-950 dark:text-amber-100 cursor-pointer shrink-0 transition"
+                        title="Pre-fill cash received with total bill + pending balance"
+                      >
+                        Collect All ({formatStockPrice(netTotalPayable + customerOutstandingBalance)})
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+              </motion.div>
+            )}
+
             {/* Subtotal & Discounts */}
             <div className="space-y-1.5 text-xs border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium items-center">
@@ -2406,10 +2694,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             </div>
 
             {/* Payment Method Selector */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
               {(isWholesaleStore
-                ? (['KHATA', 'CASH', 'BANK_TRANSFER', 'CARD'] as const)
-                : (['CASH', 'CARD', 'BANK_TRANSFER', 'ONLINE'] as const)
+                ? (['KHATA', 'CASH', 'SPLIT', 'BANK_TRANSFER', 'ONLINE'] as const)
+                : (['CASH', 'ONLINE', 'SPLIT', 'BANK_TRANSFER', 'CARD'] as const)
               ).map((method) => (
                 <button
                   key={method}
@@ -2431,7 +2719,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   }}
                   disabled={method === 'CARD'}
                   title={method === 'CARD' ? 'Card payments are currently unavailable' : undefined}
-                  className={`py-2.5 px-3 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition ${
+                  className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition text-[11px] ${
                     method === 'CARD'
                       ? 'card-no bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 opacity-80 cursor-not-allowed shadow-2xs'
                       : paymentMethod === method
@@ -2439,110 +2727,410 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                       : 'bg-slate-100 dark:bg-[#131B2E] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 font-semibold cursor-pointer'
                   }`}
                 >
-                  {method === 'KHATA' && <BookOpen className="w-3.5 h-3.5" />}
-                  {method === 'CASH' && <Banknote className="w-3.5 h-3.5" />}
-                  {method === 'CARD' && <CreditCard className="w-3.5 h-3.5" />}
-                  <span>{method === 'KHATA' ? 'Khata (Udhaar)' : method === 'BANK_TRANSFER' ? 'Transfer' : method}</span>
+                  {method === 'KHATA' && <BookOpen className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'CASH' && <Banknote className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'CARD' && <CreditCard className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'ONLINE' && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'BANK_TRANSFER' && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'SPLIT' && <Coins className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="truncate">
+                    {method === 'KHATA'
+                      ? 'Khata (Udhaar)'
+                      : method === 'BANK_TRANSFER'
+                      ? 'Transfer'
+                      : method === 'SPLIT'
+                      ? 'Split (Cash+Digital)'
+                      : method}
+                  </span>
                 </button>
               ))}
             </div>
 
-            {/* One shared payment amount field for cash, Khata, card and transfers. */}
-            <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#131B2E]">
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor="pos-amount-received" className="font-bold text-slate-700 dark:text-slate-200 text-xs">
-                  Amount Received (Payment Collected Now)
-                </label>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {paymentMethod === 'KHATA' ? 'Enter 0 for full credit' : 'Collected now'}
-                </span>
-              </div>
+            {/* Split Payment Allocation Box OR Single Payment Amount Field */}
+            {paymentMethod === 'SPLIT' ? (
+              <div className="space-y-3 p-3.5 rounded-2xl border border-purple-200 dark:border-purple-900/60 bg-gradient-to-br from-purple-50/70 via-slate-50 to-indigo-50/50 dark:from-[#151226] dark:via-[#131B2E] dark:to-[#0F172A] shadow-xs">
+                {/* Header & Status Indicator */}
+                <div className="flex items-center justify-between gap-2 border-b border-purple-100 dark:border-purple-950/80 pb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="p-1 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                      <Coins className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100">
+                        Split Payment Allocation
+                      </h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Cash + Online / Card / Bank
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    {isSplitFullyPaid ? (
+                      splitChangeDue > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          Cash Change: {currencySymbol} {formatStockPrice(splitChangeDue)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Fully Covered
+                        </span>
+                      )
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
+                        <AlertCircle className="w-3 h-3" />
+                        Short: {currencySymbol} {formatStockPrice(splitShortfall)}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-              {/* Dynamic Quick-Receive Payment Chips for Retail POS Terminal */}
-              {!isWholesaleTransaction && paymentMethod === 'CASH' && netTotalPayable > 0 && !isEvenExchange && !isCustomerRefund && (
-                <QuickReceiveChips
-                  totalAmount={netTotalPayable}
-                  cashReceived={cashReceived}
-                  currencySymbol={currencySymbol}
-                  onSelectAmount={(amount) => setCashReceived(amount)}
-                  formatPrice={formatStockPrice}
-                />
-              )}
+                {/* Split Allocation Progress Bar */}
+                {netTotalPayable > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        Cash: {Math.round((numSplitCash / netTotalPayable) * 100)}% ({currencySymbol} {formatStockPrice(numSplitCash)})
+                      </span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                        Digital: {Math.round((numSplitOnline / netTotalPayable) * 100)}% ({currencySymbol} {formatStockPrice(numSplitOnline)})
+                      </span>
+                      {splitShortfall > 0 ? (
+                        <span className="text-rose-500 font-bold">
+                          Unpaid: {currencySymbol} {formatStockPrice(splitShortfall)}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                          Bill: {currencySymbol} {formatStockPrice(netTotalPayable)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                      <div
+                        className="bg-emerald-500 transition-all duration-300 ease-out h-full"
+                        style={{ width: `${Math.min(100, Math.round((numSplitCash / (netTotalPayable || 1)) * 100))}%` }}
+                        title={`Cash: ${currencySymbol} ${formatStockPrice(numSplitCash)}`}
+                      />
+                      <div
+                        className="bg-indigo-600 transition-all duration-300 ease-out h-full"
+                        style={{ width: `${Math.min(100 - Math.min(100, Math.round((numSplitCash / (netTotalPayable || 1)) * 100)), Math.round((numSplitOnline / (netTotalPayable || 1)) * 100))}%` }}
+                        title={`Digital: ${currencySymbol} ${formatStockPrice(numSplitOnline)}`}
+                      />
+                    </div>
+                  </div>
+                )}
 
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm">
-                  {currencySymbol}
-                </span>
-                <input
-                  id="pos-amount-received"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder={paymentMethod === 'KHATA' ? '0 (Full credit)' : formatStockPrice(netTotalPayable)}
-                  value={cashReceived === '' || isNaN(Number(cashReceived)) ? '' : cashReceived}
-                  onChange={(e) => {
-                    if (e.target.value === '') {
-                      setCashReceived('');
-                    } else {
-                      const parsed = parseFloat(e.target.value);
-                      setCashReceived(isNaN(parsed) ? '' : Math.max(0, Math.round(parsed)));
-                    }
-                  }}
-                  className="w-full pl-9 pr-3 py-2 text-right font-mono font-bold text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                {/* Quick Split Presets */}
+                {netTotalPayable > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mr-0.5">Quick Split:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const half = Math.round(netTotalPayable / 2);
+                        setSplitCashAmount(half);
+                        setSplitOnlineAmount(netTotalPayable - half);
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 transition shadow-2xs cursor-pointer"
+                    >
+                      50 / 50 Split
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rem = Math.max(0, netTotalPayable - numSplitCash);
+                        setSplitOnlineAmount(rem);
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition shadow-2xs cursor-pointer"
+                    >
+                      Balance Digital ({formatStockPrice(Math.max(0, netTotalPayable - numSplitCash))})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rem = Math.max(0, netTotalPayable - numSplitOnline);
+                        setSplitCashAmount(rem);
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition shadow-2xs cursor-pointer"
+                    >
+                      Balance Cash ({formatStockPrice(Math.max(0, netTotalPayable - numSplitOnline))})
+                    </button>
+                  </div>
+                )}
+
+                {/* Dual Amount Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Cash Portion Card */}
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#0A0E1A] border border-emerald-200/80 dark:border-emerald-900/60 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="pos-split-cash" className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                        <Banknote className="w-3.5 h-3.5" />
+                        <span>Cash Tendered</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSplitCashAmount(netTotalPayable)}
+                        className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                      >
+                        100% Cash
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs">
+                        {currencySymbol}
+                      </span>
+                      <input
+                        id="pos-split-cash"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={splitCashAmount === '' || isNaN(Number(splitCashAmount)) ? '' : splitCashAmount}
+                        onChange={(e) => {
+                          if (e.target.value === '') {
+                            setSplitCashAmount('');
+                          } else {
+                            const parsed = parseFloat(e.target.value);
+                            setSplitCashAmount(isNaN(parsed) ? '' : Math.max(0, Math.round(parsed)));
+                          }
+                        }}
+                        className="w-full pl-8 pr-2.5 py-1.5 text-right font-mono font-bold text-sm bg-slate-50 dark:bg-[#131B2E] border border-emerald-200 dark:border-emerald-800 rounded-lg text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    {/* Quick Cash Adders for split */}
+                    <div className="flex items-center gap-1 text-[9px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setSplitCashAmount((prev) => (typeof prev === 'number' ? prev + 500 : 500))}
+                        className="flex-1 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        +500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSplitCashAmount((prev) => (typeof prev === 'number' ? prev + 1000 : 1000))}
+                        className="flex-1 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      >
+                        +1K
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSplitCashAmount(0)}
+                        className="px-1.5 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Digital Portion Card */}
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#0A0E1A] border border-indigo-200/80 dark:border-indigo-900/60 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="pos-split-online" className="flex items-center gap-1 text-[11px] font-bold text-indigo-800 dark:text-indigo-300">
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        <span>Digital / Card Amount</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSplitOnlineAmount(netTotalPayable)}
+                        className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                      >
+                        100% Digital
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-400 font-mono font-bold text-xs">
+                        {currencySymbol}
+                      </span>
+                      <input
+                        id="pos-split-online"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={splitOnlineAmount === '' || isNaN(Number(splitOnlineAmount)) ? '' : splitOnlineAmount}
+                        onChange={(e) => {
+                          if (e.target.value === '') {
+                            setSplitOnlineAmount('');
+                          } else {
+                            const parsed = parseFloat(e.target.value);
+                            setSplitOnlineAmount(isNaN(parsed) ? '' : Math.max(0, Math.round(parsed)));
+                          }
+                        }}
+                        className="w-full pl-8 pr-2.5 py-1.5 text-right font-mono font-bold text-sm bg-slate-50 dark:bg-[#131B2E] border border-indigo-200 dark:border-indigo-800 rounded-lg text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    {/* Digital Channel Selector */}
+                    <div className="grid grid-cols-3 gap-1 pt-0.5">
+                      {(['ONLINE', 'BANK_TRANSFER', 'CARD'] as const).map((channel) => (
+                        <button
+                          key={channel}
+                          type="button"
+                          onClick={() => setSplitDigitalType(channel)}
+                          className={`py-1 px-1 rounded-md text-[9px] font-bold transition text-center truncate ${
+                            splitDigitalType === channel
+                              ? 'bg-indigo-600 text-white shadow-2xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                          }`}
+                        >
+                          {channel === 'ONLINE' ? 'Raast/Online' : channel === 'BANK_TRANSFER' ? 'Bank' : 'Card Slip'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Digital Reference / Transaction ID Input (prominent when digital portion > 0) */}
+                {numSplitOnline > 0 && (
+                  <div className="space-y-1 p-2 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/50">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-indigo-900 dark:text-indigo-200">
+                      <label htmlFor="pos-split-transaction-id" className="flex items-center gap-1">
+                        <span>Digital Reference / Transaction ID</span>
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[9px] font-normal text-indigo-600 dark:text-indigo-400">
+                        {splitDigitalType === 'ONLINE' ? 'Raast / EasyPaisa / JazzCash Ref' : splitDigitalType === 'BANK_TRANSFER' ? 'Bank Transfer Ref #' : 'POS Card Slip / Approval #'}
+                      </span>
+                    </div>
+                    <input
+                      id="pos-split-transaction-id"
+                      type="text"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      placeholder={splitDigitalType === 'ONLINE' ? 'Enter online transaction / TID / Raast ID' : splitDigitalType === 'BANK_TRANSFER' ? 'Enter bank transfer reference #' : 'Enter POS card slip / approval #'}
+                      autoComplete="off"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-[#0A0E1A] border border-indigo-300 dark:border-indigo-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Live Split Reconciliation Summary */}
+                <div className="pt-1.5 border-t border-purple-100 dark:border-purple-950/80 flex items-center justify-between text-[11px] font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400">Total Tendered:</span>
+                    <strong className="text-slate-800 dark:text-slate-200 font-bold">
+                      {currencySymbol} {formatStockPrice(totalSplitTendered)}
+                    </strong>
+                  </div>
+                  {splitChangeDue > 0 ? (
+                    <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-bold">
+                      <span>Cash Change:</span>
+                      <span className="text-xs bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
+                        {currencySymbol} {formatStockPrice(splitChangeDue)}
+                      </span>
+                    </div>
+                  ) : splitShortfall > 0 ? (
+                    <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
+                      <span>Remaining:</span>
+                      <span className="text-xs bg-rose-100 dark:bg-rose-950 px-1.5 py-0.5 rounded border border-rose-300 dark:border-rose-800">
+                        {currencySymbol} {formatStockPrice(splitShortfall)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      ✓ Exact balance
+                    </div>
+                  )}
+                </div>
               </div>
-              {(paymentMethod === 'ONLINE' || paymentMethod === 'BANK_TRANSFER') && (
-                <div className="space-y-1.5">
-                  <label htmlFor="pos-payment-transaction-id" className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                    {paymentMethod === 'ONLINE' ? 'Online Transaction ID' : 'Bank Transfer Transaction ID'} <span className="text-rose-500">*</span>
+            ) : (
+              /* One shared payment amount field for cash, Khata, card and transfers. */
+              <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#131B2E]">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="pos-amount-received" className="font-bold text-slate-700 dark:text-slate-200 text-xs">
+                    Amount Received (Payment Collected Now)
                   </label>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {paymentMethod === 'KHATA' ? 'Enter 0 for full credit' : 'Collected now'}
+                  </span>
+                </div>
+
+                {/* Dynamic Quick-Receive Payment Chips for Retail POS Terminal */}
+                {!isWholesaleTransaction && paymentMethod === 'CASH' && netTotalPayable > 0 && !isEvenExchange && !isCustomerRefund && (
+                  <QuickReceiveChips
+                    totalAmount={netTotalPayable}
+                    cashReceived={cashReceived}
+                    currencySymbol={currencySymbol}
+                    onSelectAmount={(amount) => setCashReceived(amount)}
+                    formatPrice={formatStockPrice}
+                  />
+                )}
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-sm">
+                    {currencySymbol}
+                  </span>
                   <input
-                    id="pos-payment-transaction-id"
-                    type="text"
-                    value={transactionId}
-                    onChange={(e) => setTransactionId(e.target.value)}
-                    placeholder="Enter transaction/reference ID"
-                    autoComplete="off"
-                    className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                    id="pos-amount-received"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder={paymentMethod === 'KHATA' ? '0 (Full credit)' : formatStockPrice(netTotalPayable)}
+                    value={cashReceived === '' || isNaN(Number(cashReceived)) ? '' : cashReceived}
+                    onChange={(e) => {
+                      if (e.target.value === '') {
+                        setCashReceived('');
+                      } else {
+                        const parsed = parseFloat(e.target.value);
+                        setCashReceived(isNaN(parsed) ? '' : Math.max(0, Math.round(parsed)));
+                      }
+                    }}
+                    className="w-full pl-9 pr-3 py-2 text-right font-mono font-bold text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-              )}
-              {isWholesaleStore && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] font-bold">
-                  {selectedCustomerId && paymentMethod === 'KHATA' && (
-                    <button type="button" onClick={() => setCashReceived(0)} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0E1A] text-slate-700 dark:text-slate-300">
-                      Full Credit (0)
+                {(paymentMethod === 'ONLINE' || paymentMethod === 'BANK_TRANSFER') && (
+                  <div className="space-y-1.5">
+                    <label htmlFor="pos-payment-transaction-id" className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {paymentMethod === 'ONLINE' ? 'Online Transaction ID' : 'Bank Transfer Transaction ID'} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      id="pos-payment-transaction-id"
+                      type="text"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      placeholder="Enter transaction/reference ID"
+                      autoComplete="off"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-[#0A0E1A] border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                )}
+                {isWholesaleStore && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] font-bold">
+                    {selectedCustomerId && paymentMethod === 'KHATA' && (
+                      <button type="button" onClick={() => setCashReceived(0)} className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0A0E1A] text-slate-700 dark:text-slate-300">
+                        Full Credit (0)
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setCashReceived(netTotalPayable)} className="px-2 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
+                      Bill Only ({formatStockPrice(netTotalPayable)})
                     </button>
-                  )}
-                  <button type="button" onClick={() => setCashReceived(netTotalPayable)} className="px-2 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
-                    Bill Only ({formatStockPrice(netTotalPayable)})
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const customer = customers.find((c: any) => c.id === selectedCustomerId);
+                        const previousBalance = parseFloat(String(
+                          customer?.outstanding_balance ?? customer?.outstandingBalance ??
+                          customer?.current_balance ?? customer?.currentBalance ?? customer?.balance ?? 0
+                        )) || 0;
+                        setCashReceived(Math.round((netTotalPayable + previousBalance) * 100) / 100);
+                      }}
+                      className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+                    >
+                      Pay All
+                    </button>
+                  </div>
+                )}
+                {!isWholesaleTransaction && (paymentMethod !== 'CASH' || netTotalPayable === 0) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const customer = customers.find((c: any) => c.id === selectedCustomerId);
-                      const previousBalance = parseFloat(String(
-                        customer?.outstanding_balance ?? customer?.outstandingBalance ??
-                        customer?.current_balance ?? customer?.currentBalance ?? customer?.balance ?? 0
-                      )) || 0;
-                      setCashReceived(Math.round((netTotalPayable + previousBalance) * 100) / 100);
-                    }}
-                    className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+                    onClick={() => setCashReceived(netTotalPayable)}
+                    className="inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 shadow-md shadow-purple-600/20 text-[10px] font-bold transition active:scale-[0.98]"
                   >
-                    Pay All
+                    Exact Amount ({formatStockPrice(netTotalPayable)})
                   </button>
-                </div>
-              )}
-              {!isWholesaleTransaction && (paymentMethod !== 'CASH' || netTotalPayable === 0) && (
-                <button
-                  type="button"
-                  onClick={() => setCashReceived(netTotalPayable)}
-                  className="inline-flex items-center justify-center px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 shadow-md shadow-purple-600/20 text-[10px] font-bold transition active:scale-[0.98]"
-                >
-                  Exact Amount ({formatStockPrice(netTotalPayable)})
-                </button>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Khata Credit Ledger Details for Wholesale Dealers */}
             {(paymentMethod === 'KHATA' || (selectedCustomerId && isWholesaleStore)) && (
