@@ -327,7 +327,7 @@ export const SammiAssistantView: React.FC<SammiAssistantViewProps> = ({
                   ? 'bg-purple-600 text-white border-purple-500 shadow-purple-600/25'
                   : 'border-slate-200 dark:border-purple-800/80 bg-white dark:bg-[#131B2E] text-slate-700 dark:text-purple-200 hover:bg-slate-100 dark:hover:bg-purple-900/40'
               }`}
-              title={isIndexOpen ? 'Collapse Question Index' : 'Open Question Index (Receipt Ledger)'}
+              title={isIndexOpen ? 'Collapse Inquiry Index' : 'Open Inquiry History Index'}
               aria-label="Toggle Question Index"
             >
               <Bookmark className="w-3.5 h-3.5" />

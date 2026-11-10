@@ -1,17 +1,14 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Barcode,
   Bookmark,
   X,
   ArrowUpRight,
   ChevronRight,
   Clock,
-  Sparkles,
   ArrowDown,
   ArrowUp,
   MessageSquare,
-  ScanLine,
 } from 'lucide-react';
 import type { ChatMessageItem } from './SammiAssistantView.tsx';
 
@@ -27,14 +24,9 @@ interface SammiQuestionIndexSidebarProps {
   onScrollToBottom: () => void;
 }
 
-// Fixed barcode stripe pattern for consistent realistic rendering
-const BARCODE_STRIPES = [
-  2, 1, 3, 1, 1, 2, 4, 1, 2, 1, 3, 2, 1, 1, 4, 2, 1, 2, 3, 1, 1, 2, 1, 4, 1, 2, 1, 3, 2, 1, 2, 4, 1, 1, 3, 2, 1, 2, 1, 4, 2, 1, 3, 1, 2
-];
-
 /**
  * Extracts a concise, clean question title from user input.
- * Strips markdown and keeps the first 6-8 words or up to 45 characters.
+ * Strips markdown and keeps the first 6-8 words or up to 48 characters.
  */
 export const extractQuestionTitle = (text: string, maxWords: number = 7): string => {
   if (!text) return 'General Inquiry';
@@ -73,44 +65,37 @@ export const SammiQuestionIndexSidebar: React.FC<SammiQuestionIndexSidebarProps>
       }));
   }, [messages]);
 
-  const receiptDate = useMemo(() => {
-    const now = new Date();
-    return now.toISOString().slice(2, 10).replace(/-/g, '');
-  }, []);
-
   return (
     <>
-      {/* Floating Minimized Edge Tab: Always accessible when collapsed */}
+      {/* Floating Minimized Edge Tab (Styled like a modern Toast Pill) */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
             key="collapsed-edge-tab"
             type="button"
             onClick={onToggle}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.2 }}
-            className="fixed right-3 sm:right-5 top-28 sm:top-32 z-30 group flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-white/95 dark:bg-[#0D1527]/95 text-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-purple-800/80 shadow-lg shadow-purple-900/10 hover:shadow-xl hover:border-purple-500/70 transition-all cursor-pointer backdrop-blur-md"
-            title="Open Question Index (Receipt Ledger)"
-            aria-label="Open Question Index"
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="fixed right-3 sm:right-6 top-24 sm:top-28 z-30 group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-[#0D1527]/95 text-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-purple-800/80 shadow-xl shadow-purple-950/10 hover:shadow-2xl hover:border-purple-400 dark:hover:border-purple-500/80 transition-all cursor-pointer backdrop-blur-md"
+            title="Open Inquiry Index"
+            aria-label="Open Inquiry Index"
           >
-            <div className="relative">
-              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 flex items-center justify-center font-bold">
-                <Bookmark className="w-4 h-4" />
-              </div>
-              {userQuestions.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-purple-600 text-white text-[9px] font-mono font-bold flex items-center justify-center shadow-xs">
-                  {userQuestions.length}
-                </span>
-              )}
+            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300 border border-purple-500/20 dark:border-purple-400/30 flex items-center justify-center font-bold shrink-0">
+              <Bookmark className="w-4 h-4" />
             </div>
-            <div className="text-left hidden md:block pr-1">
-              <div className="text-[10px] font-mono tracking-wider font-bold text-purple-600 dark:text-purple-400 uppercase">
-                Inquiry Index
+            <div className="text-left hidden sm:block pr-1">
+              <div className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight flex items-center gap-1.5">
+                <span>Inquiry Index</span>
+                {userQuestions.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-[10px] font-bold font-mono">
+                    {userQuestions.length}
+                  </span>
+                )}
               </div>
-              <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                <span>{userQuestions.length} Question{userQuestions.length === 1 ? '' : 's'}</span>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
+                <span>Quick jump links</span>
                 <ChevronRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
@@ -128,101 +113,70 @@ export const SammiQuestionIndexSidebar: React.FC<SammiQuestionIndexSidebarProps>
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-xs z-40 sm:hidden"
+            className="fixed inset-0 bg-slate-950/30 dark:bg-black/50 backdrop-blur-xs z-40 sm:hidden"
             aria-hidden="true"
           />
         )}
       </AnimatePresence>
 
-      {/* Main Collapsible Floating Sidebar Drawer */}
+      {/* Main Toast-Aligned Floating Popup Window */}
       <AnimatePresence>
         {isOpen && (
           <motion.aside
             key="floating-question-index-drawer"
-            initial={{ opacity: 0, x: 60, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 60, scale: 0.98 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-            className="fixed right-3 sm:right-5 top-20 sm:top-24 bottom-4 sm:bottom-6 w-[92vw] sm:w-84 xl:w-92 z-40 flex flex-col bg-white/95 dark:bg-[#0D1527]/95 border border-slate-200/90 dark:border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl shadow-purple-950/20 dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden font-sans"
-            aria-label="Question History Index"
+            initial={{ opacity: 0, y: -15, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -15, scale: 0.96 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="fixed right-3 sm:right-6 top-20 sm:top-24 bottom-4 sm:bottom-6 w-[92vw] sm:w-84 xl:w-92 z-40 flex flex-col bg-white/95 dark:bg-[#0D1527]/95 border border-purple-200/80 dark:border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl shadow-purple-950/15 dark:shadow-[0_16px_48px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden font-sans ring-1 ring-purple-500/10 dark:ring-purple-400/20"
+            aria-label="Inquiry History Index"
           >
-            {/* Top Thermal Receipt Edge & Header */}
-            <div className="bg-slate-900 text-white dark:bg-black p-3.5 pb-2.5 border-b border-slate-800 dark:border-purple-950/80 relative">
-              {/* Receipt Barcode Graphic */}
-              <div className="flex items-center justify-between gap-2 mb-2 font-mono text-[10px] text-slate-300">
-                <div className="flex items-center gap-1.5">
-                  <Barcode className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span className="font-bold tracking-widest uppercase">POS INQUIRY TICKET</span>
+            {/* Header: Toast Notification Styled (Clean, uncolored, matching PosToast header) */}
+            <div className="p-4 pb-3 border-b border-slate-200/80 dark:border-purple-900/50 flex items-center justify-between gap-3 bg-gradient-to-b from-purple-50/50 via-transparent to-transparent dark:from-purple-950/20">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300 border border-purple-500/20 dark:border-purple-400/30 flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                  <Bookmark className="w-5 h-5 text-purple-600 dark:text-purple-300" />
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-purple-300 font-bold bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-800/60">
-                    REC#{receiptDate}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 dark:hover:bg-purple-900/40 transition cursor-pointer"
-                    title="Close index drawer"
-                    aria-label="Close index"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight truncate">
+                      Inquiry Index
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
+                      {userQuestions.length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-purple-300/80 truncate mt-0.5">
+                    {storeName} • Quick Jump Links
+                  </p>
                 </div>
               </div>
 
-              {/* Barcode Strip Graphic */}
-              <div
-                className="h-5 w-full bg-slate-950 px-2 py-0.5 flex items-center justify-center gap-[2px] rounded-xs select-none overflow-hidden border border-slate-800"
-                aria-hidden="true"
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-purple-900/40 text-slate-400 hover:text-slate-700 dark:hover:text-white transition cursor-pointer shrink-0"
+                title="Dismiss window"
+                aria-label="Close index"
               >
-                {BARCODE_STRIPES.map((w, i) => (
-                  <div
-                    key={i}
-                    className={`h-full bg-slate-200 dark:bg-slate-100 ${
-                      w === 1 ? 'w-[1px]' : w === 2 ? 'w-[2.5px]' : w === 3 ? 'w-[3.5px]' : 'w-[5px]'
-                    } ${i % 5 === 0 ? 'opacity-40' : 'opacity-95'}`}
-                  />
-                ))}
-              </div>
-
-              {/* Metadata Subheader */}
-              <div className="mt-2.5 pt-2 border-t border-dashed border-slate-700/80 text-[10px] font-mono flex items-center justify-between text-slate-400">
-                <span className="truncate max-w-[170px]">STORE: {storeName.toUpperCase()}</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  INDEX ACTIVE
-                </span>
-              </div>
-            </div>
-
-            {/* Receipt Summary Ribbon */}
-            <div className="px-3.5 py-2 bg-purple-50/70 dark:bg-purple-950/40 border-b border-dashed border-purple-200/80 dark:border-purple-900/60 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-purple-900 dark:text-purple-200">
-                <Bookmark className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span>QUESTIONS LOGGED</span>
-              </div>
-              <span className="font-mono text-xs font-bold text-purple-700 dark:text-purple-300 bg-white dark:bg-purple-900/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/80 shadow-2xs">
-                {userQuestions.length} {userQuestions.length === 1 ? 'Entry' : 'Entries'}
-              </span>
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Scrollable Questions Index Stream */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 divide-y-0 scrollbar-thin scrollbar-thumb-purple-200 dark:scrollbar-thumb-purple-900">
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 scrollbar-thin scrollbar-thumb-purple-200 dark:scrollbar-thumb-purple-900">
               {userQuestions.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 font-mono">
-                  <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/60 flex items-center justify-center">
-                    <ScanLine className="w-6 h-6 animate-pulse" />
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/60 flex items-center justify-center shadow-2xs">
+                    <MessageSquare className="w-6 h-6 opacity-75" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                      [ NO QUESTIONS LOGGED ]
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                      No Questions Yet
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-[210px] leading-relaxed">
+                      Ask Sammi any question in chat or select a suggested topic to populate this quick index.
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[200px] leading-relaxed">
-                      Ask Sammi any shoe retail question or click a suggestion to generate instant jump links.
-                    </p>
-                  </div>
-                  <div className="text-[9px] text-slate-400 dark:text-slate-500 border-t border-dashed border-slate-200 dark:border-purple-900/40 pt-2 w-full">
-                    * * * WAITING FOR PROMPT * * *
                   </div>
                 </div>
               ) : (
@@ -234,57 +188,42 @@ export const SammiQuestionIndexSidebar: React.FC<SammiQuestionIndexSidebarProps>
                       key={q.id}
                       type="button"
                       onClick={() => onSelectQuestion(q.id)}
-                      className={`w-full text-left p-2.5 rounded-xl transition-all cursor-pointer group relative overflow-hidden border ${
+                      className={`w-full text-left p-3 rounded-2xl transition-all cursor-pointer group relative border ${
                         isHighlighted
-                          ? 'bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-600/30 ring-2 ring-purple-400'
-                          : 'bg-white dark:bg-[#131B2E] hover:bg-purple-50/80 dark:hover:bg-purple-950/40 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-purple-900/50 shadow-2xs hover:border-purple-300 dark:hover:border-purple-700'
+                          ? 'bg-purple-50 dark:bg-purple-950/60 text-slate-900 dark:text-white border-purple-400 dark:border-purple-500 shadow-md ring-2 ring-purple-400/50'
+                          : 'bg-white dark:bg-[#131B2E] hover:bg-purple-50/50 dark:hover:bg-purple-950/30 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-purple-900/40 shadow-2xs hover:border-purple-300 dark:hover:border-purple-700'
                       }`}
                       title={`Jump to Question #${q.questionIndex}: "${q.text.slice(0, 80)}"`}
                     >
-                      {/* Laser scanner highlight bar on hover */}
-                      <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-600 dark:bg-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                      {/* Header line: Question index + Timestamp */}
-                      <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                      {/* Top Row: Sequential index & Timestamp */}
+                      <div className="flex items-center justify-between text-[11px] mb-1.5">
                         <span
-                          className={`font-bold px-1.5 py-0.2 rounded ${
+                          className={`font-mono font-bold px-2 py-0.5 rounded-md text-[10px] ${
                             isHighlighted
-                              ? 'bg-white/20 text-white'
+                              ? 'bg-purple-600 text-white'
                               : 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
                           }`}
                         >
                           #{String(q.questionIndex).padStart(2, '0')}
                         </span>
-                        <div
-                          className={`flex items-center gap-1 ${
-                            isHighlighted
-                              ? 'text-purple-100'
-                              : 'text-slate-400 dark:text-slate-500'
-                          }`}
-                        >
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
                           <Clock className="w-3 h-3" />
                           <span>{q.timestamp}</span>
                         </div>
                       </div>
 
-                      {/* Question extracted title */}
-                      <div className="font-semibold text-xs leading-snug line-clamp-2 pr-4">
+                      {/* Question Extracted Title */}
+                      <p className="font-semibold text-xs leading-snug line-clamp-2 text-slate-800 dark:text-slate-100 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
                         {q.title}
-                      </div>
+                      </p>
 
-                      {/* Jump action prompt */}
-                      <div
-                        className={`flex items-center justify-between mt-2 pt-1.5 border-t border-dashed text-[10px] font-mono ${
-                          isHighlighted
-                            ? 'border-white/20 text-purple-100'
-                            : 'border-slate-100 dark:border-purple-900/30 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300'
-                        }`}
-                      >
+                      {/* Jump Link Footer */}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-purple-900/30 text-[10px] font-semibold text-purple-600 dark:text-purple-400">
                         <span className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
-                          <span>JUMP TO CHAT</span>
+                          <span>Jump to message</span>
                         </span>
-                        <ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                       </div>
                     </button>
                   );
@@ -292,33 +231,36 @@ export const SammiQuestionIndexSidebar: React.FC<SammiQuestionIndexSidebarProps>
               )}
             </div>
 
-            {/* Bottom Quick Controls & Receipt Footer */}
-            <div className="p-3 bg-slate-50 dark:bg-[#0B1120] border-t border-slate-200/90 dark:border-purple-900/70 space-y-2">
-              <div className="grid grid-cols-2 gap-1.5 text-[11px] font-semibold">
+            {/* Bottom Controls (Aligned with Toast Window Theme) */}
+            <div className="p-3 bg-slate-50/80 dark:bg-[#0B1120] border-t border-slate-200/80 dark:border-purple-900/50 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <button
                   type="button"
                   onClick={onScrollToTop}
-                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-900/50 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-purple-900/30 transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-900/50 text-slate-700 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 transition flex items-center gap-1 cursor-pointer text-xs"
                   title="Scroll to top of chat"
                 >
-                  <ArrowUp className="w-3 h-3 text-purple-500" />
+                  <ArrowUp className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   <span>Top</span>
                 </button>
                 <button
                   type="button"
                   onClick={onScrollToBottom}
-                  className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-900/50 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-purple-900/30 transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-purple-900/50 text-slate-700 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/40 transition flex items-center gap-1 cursor-pointer text-xs"
                   title="Scroll to latest message"
                 >
-                  <ArrowDown className="w-3 h-3 text-purple-500" />
+                  <ArrowDown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   <span>Latest</span>
                 </button>
               </div>
 
-              {/* Faux thermal tear strip */}
-              <div className="text-center font-mono text-[9px] text-slate-400 dark:text-slate-500 tracking-wider select-none pt-1 border-t border-dashed border-slate-200 dark:border-purple-900/40">
-                - - - - SAMMI POS INTELLIGENCE - - - -
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition cursor-pointer shadow-sm shadow-purple-600/20 active:scale-95"
+              >
+                Close
+              </button>
             </div>
           </motion.aside>
         )}
