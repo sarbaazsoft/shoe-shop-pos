@@ -1237,5 +1237,10 @@ export const api = {
         method: 'POST',
         body: typeof payload === 'string' ? { message: payload, history } : payload,
       }),
+    transcribe: (audioBase64: string, mimeType: string = 'audio/webm', language: string = 'auto') =>
+      apiFetch<{ text: string; success: boolean }>('/chat/transcribe', {
+        method: 'POST',
+        body: { audioBase64, mimeType, language },
+      }),
   },
 };

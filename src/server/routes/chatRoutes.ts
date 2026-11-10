@@ -802,5 +802,67 @@ TONE & LANGUAGE RULES:
   }
 });
 
+// Audio transcription endpoint for Voice-to-Text in Sammi AI Assistant
+router.post('/transcribe', async (req: Request, res: Response) => {
+  try {
+    let { audioBase64, mimeType = 'audio/webm', language = 'auto' } = req.body;
+    if (!audioBase64 || typeof audioBase64 !== 'string') {
+      return res.status(400).json({ error: 'Audio data is required' });
+    }
+
+    if (audioBase64.includes(';base64,')) {
+      const parts = audioBase64.split(';base64,');
+      const mimeMatch = parts[0].match(/data:(.*?)$/);
+      if (mimeMatch && mimeMatch[1]) {
+        mimeType = mimeMatch[1];
+      }
+      audioBase64 = parts[1];
+    }
+
+    const cleanMime = mimeType.split(';')[0].trim() || 'audio/webm';
+    const ai = getGeminiClient();
+
+    const langInstruction =
+      language === 'ur'
+        ? 'Transcribe in Urdu (either Roman Urdu or standard Urdu script as spoken).'
+        : language === 'en'
+        ? 'Transcribe in clear English.'
+        : 'The audio may be spoken in Urdu, Roman Urdu, English, or a bilingual mix (e.g., footwear, inventory, khata, pricing, barcode questions).';
+
+    const prompt = `Transcribe this spoken voice message with high precision for retail store assistant Sammi.
+${langInstruction}
+Strict instructions:
+1. Output ONLY the raw transcribed text.
+2. Do not include quotes, timestamps, markdown formatting, or preamble like "Here is the transcription:".
+3. Keep footwear terms, shoe sizes, numbers, brand names, and POS terms accurate.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [
+        {
+          inlineData: {
+            mimeType: cleanMime,
+            data: audioBase64,
+          },
+        },
+        {
+          text: prompt,
+        },
+      ],
+    });
+
+    const text = (response.text || '').trim();
+    return res.json({
+      text,
+      success: true,
+    });
+  } catch (err: any) {
+    console.error('[Chat] Audio transcription failed:', err?.message || err);
+    return res.status(500).json({
+      error: 'Audio transcription failed. Please try again or type manually.',
+    });
+  }
+});
+
 export default router;
 

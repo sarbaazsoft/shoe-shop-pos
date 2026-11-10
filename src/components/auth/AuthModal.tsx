@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Store, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Store, ArrowRight } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
 import { ShoeIcon } from '../common/ShoeIcon.tsx';
 import { ShowroomBackground } from '../common/ShowroomBackground.tsx';
@@ -311,22 +311,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         actionIcon={<Store className="w-3.5 h-3.5" />}
         onActionClick={onBack}
       />
-
-      {onBack && (
-        <button
-          id="back-to-store-directory-btn"
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onBack();
-          }}
-          className="absolute left-4 top-18 sm:top-20 z-30 inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-purple-800/80 bg-white/95 dark:bg-slate-900/95 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-purple-200 shadow-lg backdrop-blur-md hover:bg-white hover:text-purple-700 dark:hover:bg-purple-950/70 dark:hover:text-white transition-all cursor-pointer active:scale-95"
-        >
-          <ArrowLeft className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-          <span>Back to store directory</span>
-        </button>
-      )}
 
       {/* Main Content Area - Centered Login Form Card */}
       <main className="relative z-10 w-full flex-1 flex items-center justify-center px-4 py-8 sm:py-12">

@@ -149,12 +149,15 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         {/* Optional Action Button */}
         {actionText && onActionClick && (
           <button
+            id="public-header-action-btn"
             type="button"
             onClick={onActionClick}
-            className="h-8 sm:h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs font-semibold bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] hover:opacity-95 active:scale-98"
+            title={actionText}
+            aria-label={actionText}
+            className="h-8 sm:h-8.5 flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg transition-all duration-200 cursor-pointer border text-xs font-semibold bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] hover:opacity-95 active:scale-98"
           >
             {actionIcon}
-            <span>{actionText}</span>
+            <span className="hidden sm:inline">{actionText}</span>
           </button>
         )}
 
