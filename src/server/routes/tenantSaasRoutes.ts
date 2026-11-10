@@ -2846,7 +2846,7 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
     const finalWelcomeMsg =
       req.body?.msg ||
       req.body?.welcomeMsg ||
-      `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your wholesale & retail operations seamlessly.`;
+      `Welcome to SarbaazSoft Shoe POS, ${cleanFinalName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${cleanFinalName} and help you streamline your inventory, accelerate counter checkouts, and scale your wholesale operations seamlessly.`;
 
     let welcomeResult: any = null;
     try {

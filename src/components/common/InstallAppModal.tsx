@@ -460,7 +460,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                Genuine compiled Windows x64 binary. Automatically launches the {pwaAppName} retail terminal in borderless app window mode and creates a Desktop shortcut.
+                Genuine compiled Windows x64 binary. Automatically launches the {pwaAppName} terminal in borderless app window mode and creates a Desktop shortcut.
               </p>
 
               <a

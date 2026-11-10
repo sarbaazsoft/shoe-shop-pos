@@ -1137,7 +1137,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-semibold">Editable until setup is finished</span>
                               </label>
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                Select the pricing policy for this retail store:
+                                Select the pricing policy for this store:
                               </p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                 <label

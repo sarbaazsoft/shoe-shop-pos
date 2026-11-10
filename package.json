@@ -1,6 +1,6 @@
 {
   "name": "react-example",
-  "description": "Multi-tenant dual-engine wholesale & retail shoe shop POS and inventory management system",
+  "description": "Multi-tenant dual-engine wholesale shoe shop POS and inventory management system",
   "private": true,
   "version": "0.0.0",
   "type": "module",

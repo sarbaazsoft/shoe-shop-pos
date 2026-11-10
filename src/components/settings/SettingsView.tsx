@@ -1687,7 +1687,7 @@ setFormErrors(errors);
                       </span>
                     </h4>
                     <p className="text-[11px] text-indigo-700 dark:text-indigo-300/90 mt-0.5">
-                      Your store has full access to all wholesale & retail shoe POS, inventory, barcode, and reporting features during your free trial. You can request a 6-month or yearly plan extension at any time.
+                      Your store has full access to all wholesale shoe POS, inventory, barcode, and reporting features during your free trial. You can request a 6-month or yearly plan extension at any time.
                     </p>
                   </div>
                 </div>

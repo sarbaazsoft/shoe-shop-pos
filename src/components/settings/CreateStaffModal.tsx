@@ -569,7 +569,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      Barcode scanning checkout, receipts printing, and sales returns for daily wholesale & retail counter operations.
+                      Barcode scanning checkout, receipts printing, and sales returns for daily wholesale counter operations.
                     </p>
                   </div>
 

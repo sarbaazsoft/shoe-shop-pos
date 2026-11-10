@@ -822,7 +822,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               Everything you need to run your shoe store
             </h2>
             <p className="mt-4 max-w-md text-base leading-relaxed text-slate-300 lt:text-slate-600">
-              From sales to inventory, suppliers to reports — SarbaazSoft POS helps you manage your complete wholesale & retail business in one powerful platform.
+              From sales to inventory, suppliers to reports — SarbaazSoft POS helps you manage your complete wholesale business in one powerful platform.
             </p>
 
             {/* keep-dark:start */}
@@ -953,13 +953,13 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                 className="font-courgette inline-flex items-center gap-2 rounded-full border border-indigo-400/40 lt:border-indigo-200 bg-indigo-500/10 lt:bg-indigo-50 px-3 py-1 text-xs text-violet-200 lt:text-indigo-700 font-semibold mb-2"
                 style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
               >
-                <Store className="w-3.5 h-3.5" aria-hidden="true" /> Live Wholesale & Retail Network
+                <Store className="w-3.5 h-3.5" aria-hidden="true" /> Live Wholesale Network
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white lt:text-slate-900">
                 Shops using SarbaazSoft POS
               </h2>
               <p className="mt-1 text-sm text-slate-300 lt:text-slate-600">
-                Browse the wholesale & retail stores currently registered and running on SarbaazSoft POS.
+                Browse the wholesale stores currently registered and running on SarbaazSoft POS.
               </p>
             </div>
 
@@ -1136,7 +1136,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-center md:text-left">
             <h2
-              className="font-courgette text-xl sm:text-2xl lg:text-[28px] font-extrabold tracking-tight text-white lt:text-slate-900 [text-shadow:0_1px_14px_rgba(8,10,42,0.9)] lt:[text-shadow:none]"
+              className="font-courgette text-xl sm:text-2xl lg:text-[28px] lt:text-2xl lt:sm:text-3xl lt:lg:text-4xl font-extrabold tracking-tight text-purple-400 lt:text-purple-600 dark:text-purple-400 [text-shadow:0_1px_14px_rgba(8,10,42,0.9)] lt:[text-shadow:none]"
               style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
             >
               Ready to Take Your Shoe Business to the Next Level?
@@ -1166,7 +1166,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
               SarbaazSoft Shoe POS
             </strong>
             <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
-            <span className="text-slate-400 lt:text-slate-500">Multi-Tenant Retail Shoe Shop POS &amp; Inventory Management SaaS</span>
+            <span className="text-slate-400 lt:text-slate-500">Multi-Tenant Shoe Shop POS &amp; Inventory Management SaaS</span>
           </div>
             <div className="flex items-center gap-3 font-medium">
               <span

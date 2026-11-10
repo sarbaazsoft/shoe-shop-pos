@@ -101,7 +101,7 @@ export async function sendWelcomeMsg(
 
   const finalWelcomeMsg =
     (welcomeMsg || '').trim() ||
-    `Welcome to SarbaazSoft Shoe POS, ${storeName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${storeName} and help you streamline your inventory, accelerate counter checkouts, and scale your wholesale & retail operations seamlessly.`;
+    `Welcome to SarbaazSoft Shoe POS, ${storeName}!\n\nThank you for choosing SarbaazSoft to power your footwear business. We are thrilled to partner with ${storeName} and help you streamline your inventory, accelerate counter checkouts, and scale your wholesale operations seamlessly.`;
 
   // 3. Ensure platform notification exists for this tenant
   let notificationId: number | undefined;

@@ -162,7 +162,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
                 </span>
               </div>
               <p className="text-slate-500 dark:text-purple-200/80 text-xs mt-0.5">
-                Manage wholesale & retail customer profiles, maintain VIP accounts, and track purchase order histories
+                Manage wholesale customer profiles, maintain VIP accounts, and track purchase order histories
               </p>
             </div>
           </div>
@@ -350,7 +350,7 @@ export const CustomerManagement: React.FC<CustomerManagementProps> = ({ companyS
           <div>
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Customers Found</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {searchTerm ? `No results matching "${searchTerm}".` : 'Get started by adding your first wholesale & retail customer.'}
+              {searchTerm ? `No results matching "${searchTerm}".` : 'Get started by adding your first wholesale customer.'}
             </p>
           </div>
           <button

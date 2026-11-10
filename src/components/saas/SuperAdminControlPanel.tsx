@@ -1102,7 +1102,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           storeName="POS SaaS C-Panel"
           badgeText="Control Plane Online"
           badgeVariant="online"
-          subtitle="Multi-Tenant Retail POS Cloud • SuperAdmin Access"
+          subtitle="Multi-Tenant POS Cloud • SuperAdmin Access"
           dbText="System Secure • Active"
         />
 
@@ -1483,7 +1483,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         {/* Bottom Global Footer */}
         <PublicFooter
           storeName="POS SaaS C-Panel"
-          subtitle="Multi-Tenant Retail POS & Inventory Control Plane"
+          subtitle="Multi-Tenant POS & Inventory Control Plane"
         />
       </div>
     );
@@ -2940,7 +2940,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                         ? Math.min(100, Math.max(18, Math.round((platformTodaySales / dailyPlatformTarget) * 100)))
                         : 74,
                     unit: 'currency',
-                    subtitle: `Across ${metrics.activeStores} active wholesale & retail shoe stores today`,
+                    subtitle: `Across ${metrics.activeStores} active wholesale shoe stores today`,
                     status: 'Live Sync',
                   },
                   {
