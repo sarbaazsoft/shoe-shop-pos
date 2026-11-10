@@ -344,7 +344,7 @@ router.get('/all', async (req: Request, res: Response) => {
 
     // 1. Fetch historical Platform Notices
     let noticeItems: any[] = [];
-    if (tabFilter === 'all' || tabFilter === 'notices' || tabFilter === 'urgent') {
+    if (tabFilter === 'all' || tabFilter === 'notices' || tabFilter === 'announcements' || tabFilter === 'urgent') {
       const noticesQuery = await pgClient.query<{
         id: number;
         tenant_id: number | null;
@@ -602,6 +602,44 @@ router.get('/all', async (req: Request, res: Response) => {
       pagination: { page: 1, limit: 15, total: 0, totalPages: 1 },
       stats: { totalNotices: 0, totalOperational: 0, unreadNotices: 0, unreadOperational: 0 },
     });
+  }
+});
+
+/**
+ * 2.5. DISMISS WELCOME BANNER ENDPOINT (POST /api/notifications/dismiss-welcome)
+ * Permanently marks the welcome banner as dismissed in the PostgreSQL database (tenants.welcome_dismissed = true)
+ * and records read status for any platform welcome notices so they never reappear.
+ */
+router.post('/dismiss-welcome', async (req: Request, res: Response) => {
+  try {
+    await ensurePlatformNotificationsSchema();
+    const { tenantId, userId } = resolveRequestIdentity(req);
+    const cleanTenantId = tenantId || 1;
+
+    // 1. Permanently update tenants table
+    await pgClient.query(
+      `UPDATE tenants SET welcome_dismissed = true WHERE id = $1`,
+      [cleanTenantId]
+    ).catch(() => {});
+
+    // 2. Mark any welcome notices in platform_notifications as read for this tenant/user
+    await pgClient.query(
+      `INSERT INTO platform_notification_reads (notification_id, tenant_id, user_id, read_at)
+       SELECT pn.id, $1, $2, NOW()
+       FROM platform_notifications pn
+       WHERE (pn.tenant_id IS NULL OR pn.tenant_id = $1)
+         AND (
+           pn.title ILIKE '%welcome%'
+           OR pn.message ILIKE '%welcome%'
+           OR pn.message ILIKE '%thank you for choosing%'
+         )
+       ON CONFLICT (notification_id, tenant_id, user_id) DO UPDATE SET read_at = NOW()`,
+      [cleanTenantId, userId]
+    ).catch(() => {});
+
+    return res.json({ success: true, message: 'Welcome message dismissed permanently.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to dismiss welcome banner: ' + err.message });
   }
 });
 

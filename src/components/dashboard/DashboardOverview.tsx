@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle, TrendingUp, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Layers, PieChart, Activity, Zap, CheckCircle, Package, Receipt, ArrowRight, Clock, CreditCard, FileText, Check } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { api } from '../../services/api.ts';
@@ -269,19 +269,43 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     }
   };
 
-  const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
+  const isWelcomePermanentlyDismissed = useCallback(() => {
     try {
       if (
-        localStorage.getItem(dismissKey) === 'true' ||
-        localStorage.getItem('pos_welcome_partner_dismissed') === 'true'
+        companySettings?.welcome_dismissed ||
+        companySettings?.welcomeDismissed ||
+        localStorage.getItem('pos_welcome_banner_dismissed') === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true' ||
+        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}`) === 'true' ||
+        localStorage.getItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`) === 'true'
       ) {
-        return false;
+        return true;
       }
-      return true;
-    } catch {
-      return true;
-    }
+    } catch {}
+    return false;
+  }, [companySettings?.welcome_dismissed, companySettings?.welcomeDismissed, tenantId, userId]);
+
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState<boolean>(() => {
+    return !isWelcomePermanentlyDismissed();
   });
+
+  // Keep state synchronized whenever settings or user identifiers change
+  useEffect(() => {
+    if (isWelcomePermanentlyDismissed()) {
+      setShowWelcomeBanner(false);
+    }
+  }, [isWelcomePermanentlyDismissed]);
+
+  // Listen to cross-component welcome dismissed events
+  useEffect(() => {
+    const handleDismissedEvent = () => {
+      setShowWelcomeBanner(false);
+    };
+    window.addEventListener('welcome:dismissed', handleDismissedEvent);
+    return () => {
+      window.removeEventListener('welcome:dismissed', handleDismissedEvent);
+    };
+  }, []);
 
   const [isFirstTime] = useState<boolean>(() => {
     try {
@@ -451,10 +475,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     }
   }
 
-  const handleDismissWelcomeBanner = () => {
+  const handleDismissWelcomeBanner = async () => {
+    // 1. Instantly hide the banner in the UI
+    setShowWelcomeBanner(false);
+
+    // 2. Persist dismissal across all localStorage fallback keys
     try {
       localStorage.setItem('pos_welcome_partner_dismissed', 'true');
+      localStorage.setItem('pos_welcome_banner_dismissed', 'true');
+      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}`, 'true');
+      localStorage.setItem(`pos_welcome_banner_dismissed_${tenantId}_${userId}`, 'true');
       localStorage.setItem(dismissKey, 'true');
+    } catch {}
+
+    // 3. Notify other views (POS counter, settings, etc.) to dismiss immediately
+    window.dispatchEvent(new CustomEvent('welcome:dismissed'));
+
+    // 4. Persist permanently to PostgreSQL database
+    try {
+      await api.notifications.dismissWelcome();
+    } catch (err) {
+      console.warn('Failed to sync welcome banner dismissal to database:', err);
+    }
+
+    // 5. Dismiss any active welcome notices
+    try {
       const welcomeNotices = activeNotices.filter((n) => {
         const titleLower = (n.title || '').toLowerCase();
         const msgLower = (n.message || '').toLowerCase();
@@ -481,7 +526,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         })
       );
     } catch {}
-    setShowWelcomeBanner(false);
   };
 
   const handleRequestUpgrade = async (e?: React.FormEvent) => {

@@ -310,7 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Platform Announcements from SuperAdmin
   const [platformAnnouncements, setPlatformAnnouncements] = useState<PlatformNotification[]>([]);
   const [isDismissingAnnouncement, setIsDismissingAnnouncement] = useState<number | null>(null);
-  const [notifDropdownTab, setNotifDropdownTab] = useState<'notices' | 'notifications'>('notices');
+  const [notifDropdownTab, setNotifDropdownTab] = useState<'announcements' | 'notifications'>('announcements');
 
   // Web Push API & Live POS Push Notification State
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
@@ -774,6 +774,46 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadAnnouncementsCount = visibleAnnouncements.filter((a) => !a.isRead).length;
   const unreadCount = unreadPosCount + unreadAnnouncementsCount;
   const activeUrgentNotice = visibleAnnouncements.find((a) => !a.isRead && a.type === 'URGENT');
+
+  // Dynamic active tab determination: whichever tab contains the latest incoming message or timestamp
+  const latestAnnouncementTimestamp = useMemo(() => {
+    if (visibleAnnouncements.length === 0) return 0;
+    const first = visibleAnnouncements[0];
+    return new Date(first.createdAt || 0).getTime();
+  }, [visibleAnnouncements]);
+
+  const latestOperationalTimestamp = useMemo(() => {
+    if (notifications.length === 0) return 0;
+    const first = notifications[0];
+    return new Date(first.createdAt || first.timestamp || (first as any).time || 0).getTime();
+  }, [notifications]);
+
+  // Track if user has explicitly selected a tab during the current open session
+  const userManuallySelectedNotifTabRef = useRef<boolean>(false);
+
+  // Automatically update default active tab dynamically to whichever tab contains the latest incoming message
+  useEffect(() => {
+    if (!userManuallySelectedNotifTabRef.current) {
+      if (latestOperationalTimestamp > 0 && latestOperationalTimestamp > latestAnnouncementTimestamp) {
+        setNotifDropdownTab('notifications');
+      } else if (latestAnnouncementTimestamp > 0) {
+        setNotifDropdownTab('announcements');
+      }
+    }
+  }, [latestAnnouncementTimestamp, latestOperationalTimestamp]);
+
+  // When dropdown opens, if user hasn't manually clicked, dynamically default to the tab with newest message
+  useEffect(() => {
+    if (!showNotifications) {
+      userManuallySelectedNotifTabRef.current = false;
+    } else if (!userManuallySelectedNotifTabRef.current) {
+      if (latestOperationalTimestamp > 0 && latestOperationalTimestamp > latestAnnouncementTimestamp) {
+        setNotifDropdownTab('notifications');
+      } else {
+        setNotifDropdownTab('announcements');
+      }
+    }
+  }, [showNotifications, latestAnnouncementTimestamp, latestOperationalTimestamp]);
 
   const handleActivityClick = (item: any) => {
     const raw = item.raw || item;
@@ -1577,17 +1617,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="flex items-center gap-1 p-1 mb-2 bg-slate-100 dark:bg-purple-950/60 rounded-xl border border-slate-200/80 dark:border-purple-800/40">
                   <button
                     type="button"
-                    onClick={() => setNotifDropdownTab('notices')}
+                    onClick={() => {
+                      userManuallySelectedNotifTabRef.current = true;
+                      setNotifDropdownTab('announcements');
+                    }}
                     className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                      notifDropdownTab === 'notices'
+                      notifDropdownTab === 'announcements'
                         ? 'bg-purple-600 text-white shadow-xs'
                         : 'text-slate-600 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white'
                     }`}
                   >
-                    <span>Notices</span>
+                    <span>Announcements</span>
                     {unreadAnnouncementsCount > 0 && (
                       <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
-                        notifDropdownTab === 'notices'
+                        notifDropdownTab === 'announcements'
                           ? 'bg-purple-800 text-white'
                           : 'bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
                       }`}>
@@ -1598,7 +1641,10 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setNotifDropdownTab('notifications')}
+                    onClick={() => {
+                      userManuallySelectedNotifTabRef.current = true;
+                      setNotifDropdownTab('notifications');
+                    }}
                     className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       notifDropdownTab === 'notifications'
                         ? 'bg-purple-600 text-white shadow-xs'
@@ -1620,11 +1666,11 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Tab Content Container - Strictly Capped at Max 5 Visible Items */}
                 <div className="max-h-[300px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
-                  {notifDropdownTab === 'notices' ? (
+                  {notifDropdownTab === 'announcements' ? (
                     visibleAnnouncements.length === 0 ? (
                       <div className="py-8 text-center text-slate-400 dark:text-purple-300/60">
                         <Info className="w-5 h-5 mx-auto mb-1.5 opacity-40 stroke-[1.8] text-purple-500 dark:text-purple-300" />
-                        <p className="text-xs font-semibold dark:text-purple-200">No active notices</p>
+                        <p className="text-xs font-semibold dark:text-purple-200">No active announcements</p>
                         <p className="text-[10px] mt-0.5 dark:text-purple-300/60">Platform announcements and system alerts are all caught up</p>
                       </div>
                     ) : (

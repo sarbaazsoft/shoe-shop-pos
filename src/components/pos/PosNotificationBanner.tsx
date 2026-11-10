@@ -70,11 +70,35 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
 
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(welcomeDismissedKey) === 'true';
+      return (
+        Boolean(companySettings?.welcome_dismissed) ||
+        Boolean(companySettings?.welcomeDismissed) ||
+        localStorage.getItem(welcomeDismissedKey) === 'true' ||
+        localStorage.getItem('pos_welcome_banner_dismissed') === 'true' ||
+        localStorage.getItem('pos_welcome_partner_dismissed') === 'true'
+      );
     } catch {
       return false;
     }
   });
+
+  // Sync with companySettings when available
+  useEffect(() => {
+    if (companySettings?.welcome_dismissed || companySettings?.welcomeDismissed) {
+      setIsWelcomeDismissed(true);
+    }
+  }, [companySettings?.welcome_dismissed, companySettings?.welcomeDismissed]);
+
+  // Listen for welcome dismissal from other components
+  useEffect(() => {
+    const handleDismissedEvent = () => {
+      setIsWelcomeDismissed(true);
+    };
+    window.addEventListener('welcome:dismissed', handleDismissedEvent);
+    return () => {
+      window.removeEventListener('welcome:dismissed', handleDismissedEvent);
+    };
+  }, []);
 
   const isFetchingRef = useRef(false);
 
@@ -249,12 +273,16 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
       return next;
     });
 
-    // If welcome message, mark welcome dismissed
+    // If welcome message, mark welcome dismissed permanently across storage and server
     if (notice.isWelcome) {
       setIsWelcomeDismissed(true);
       try {
         localStorage.setItem(welcomeDismissedKey, 'true');
+        localStorage.setItem('pos_welcome_banner_dismissed', 'true');
+        localStorage.setItem('pos_welcome_partner_dismissed', 'true');
       } catch {}
+      window.dispatchEvent(new CustomEvent('welcome:dismissed'));
+      api.notifications.dismissWelcome().catch(() => {});
     }
 
     // If server notice, inform backend to mark dismissed/read
@@ -274,7 +302,11 @@ export const PosNotificationBanner: React.FC<PosNotificationBannerProps> = ({
     setIsWelcomeDismissed(true);
     try {
       localStorage.setItem(welcomeDismissedKey, 'true');
+      localStorage.setItem('pos_welcome_banner_dismissed', 'true');
+      localStorage.setItem('pos_welcome_partner_dismissed', 'true');
     } catch {}
+    window.dispatchEvent(new CustomEvent('welcome:dismissed'));
+    api.notifications.dismissWelcome().catch(() => {});
 
     const allIds = activeNotices.map((n) => n.id);
     setDismissedIds((prev) => {

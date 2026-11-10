@@ -34,7 +34,7 @@ interface NotificationsViewProps {
   onNavigateTab: (tab: string) => void;
 }
 
-type TabCategory = 'all' | 'notices' | 'operational' | 'sales' | 'returns' | 'urgent';
+type TabCategory = 'all' | 'announcements' | 'notices' | 'operational' | 'sales' | 'returns' | 'urgent';
 
 export const NotificationsView: React.FC<NotificationsViewProps> = ({
   currentUser,
@@ -44,6 +44,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const isSuperAdmin = String(currentUser?.role || '').toUpperCase() === 'SUPERADMIN';
   const [items, setItems] = useState<HistoricalNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const userSelectedTabRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -94,6 +95,32 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       setLoading(false);
     }
   };
+
+  // Dynamically set default active tab to whichever tab contains the latest incoming message or timestamp
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const grouped = await api.notifications.grouped(1);
+        if (!isMounted || userSelectedTabRef.current) return;
+        const latestNoticeTime = grouped.notices?.[0]?.createdAt
+          ? new Date(grouped.notices[0].createdAt).getTime()
+          : 0;
+        const latestOperationalTime = grouped.notifications?.[0]?.createdAt
+          ? new Date(grouped.notifications[0].createdAt).getTime()
+          : 0;
+
+        if (latestOperationalTime > 0 && latestOperationalTime > latestNoticeTime) {
+          setActiveTab('operational');
+        } else if (latestNoticeTime > 0) {
+          setActiveTab('announcements');
+        }
+      } catch {}
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchHistory();
@@ -244,14 +271,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       switch (t) {
         case 'URGENT':
           return {
-            label: 'Urgent Notice',
+            label: 'Urgent Announcement',
             badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border-rose-300 dark:border-rose-700',
             cardBg: 'border-rose-300 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20',
             icon: <Flame className="w-3 h-3 text-rose-600 dark:text-rose-400" />,
           };
         case 'WARNING':
           return {
-            label: 'Warning',
+            label: 'Advisory Warning',
             badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border-amber-300 dark:border-amber-700',
             cardBg: 'border-amber-300 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20',
             icon: <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />,
@@ -265,7 +292,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           };
         default:
           return {
-            label: 'Notice • Info',
+            label: 'System Announcement',
             badgeClass: 'bg-indigo-100 text-indigo-800 dark:bg-purple-900/60 dark:text-purple-300 border-indigo-300 dark:border-purple-700',
             cardBg: 'border-indigo-200 dark:border-purple-900/40 bg-indigo-50/30 dark:bg-purple-950/20',
             icon: <Info className="w-3 h-3 text-indigo-600 dark:text-purple-400" />,
@@ -390,7 +417,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
         <div className="p-3.5 rounded-2xl bg-white dark:bg-[#120726]/60 border border-slate-200/80 dark:border-purple-900/40 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-purple-300/70 mb-1">
-            <span className="font-medium">Platform Notices</span>
+            <span className="font-medium">Announcements</span>
             <Globe className="w-3.5 h-3.5 text-indigo-500" />
           </div>
           <div className="text-xl font-bold text-slate-900 dark:text-white font-heading">
@@ -435,40 +462,44 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           {(
             [
               { key: 'all', label: 'All Items', count: stats.totalNotices + stats.totalOperational },
-              { key: 'notices', label: 'Platform Notices', count: stats.totalNotices },
+              { key: 'announcements', label: 'Announcements', count: stats.totalNotices },
               { key: 'operational', label: 'POS Activity', count: stats.totalOperational },
               { key: 'sales', label: 'Sales' },
               { key: 'returns', label: 'Returns' },
               { key: 'urgent', label: 'Urgent Only' },
             ] as const
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.key);
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === tab.key
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-purple-950/40 text-slate-600 dark:text-purple-200 hover:text-purple-700 dark:hover:text-white'
-              }`}
-            >
-              <span>{tab.label}</span>
-              {'count' in tab && tab.count !== undefined && (
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                    activeTab === tab.key
-                      ? 'bg-purple-800 text-purple-100'
-                      : 'bg-slate-200 dark:bg-purple-900/60 text-slate-700 dark:text-purple-300'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+          ).map((tab) => {
+            const isTabActive = activeTab === tab.key || (tab.key === 'announcements' && activeTab === 'notices');
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  userSelectedTabRef.current = true;
+                  setActiveTab(tab.key);
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  isTabActive
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-purple-950/40 text-slate-600 dark:text-purple-200 hover:text-purple-700 dark:hover:text-white'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {'count' in tab && tab.count !== undefined && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                      isTabActive
+                        ? 'bg-purple-800 text-purple-100'
+                        : 'bg-slate-200 dark:bg-purple-900/60 text-slate-700 dark:text-purple-300'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Search, Status & Sorting Controls */}
