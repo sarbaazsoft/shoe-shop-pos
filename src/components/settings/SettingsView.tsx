@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Bell, Cpu, KeyRound, Save, Send, Check, BellRing, CreditCard, ArrowUpCircle, ShoppingBag, AlertTriangle, Layers, Flame } from 'lucide-react';
+import { Store, Users, Globe, Trash2, CheckCircle2, AlertCircle, ExternalLink, Printer, Building2, Phone, Mail, MapPin, Coins, Hash, Link, ShieldCheck, ShieldAlert, Lock, Server, RefreshCw, Sparkles, Eye, EyeOff, Unlock, UserPlus, X, TrendingUp, Camera, Upload, Image as ImageIcon, Calendar, Sliders, Cpu, KeyRound, Save, Send, Check, BellRing, CreditCard, ShoppingBag, AlertTriangle, Layers, Flame } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { PrinterHardwareSettings } from './PrinterHardwareSettings.tsx';
 import { DataBackupRestore } from './DataBackupRestore.tsx';
@@ -357,10 +357,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     gmail_from_name: companySettings?.gmail_from_name || companySettings?.gmailFromName || 'SarbaazSoft Store Alerts',
     active_alert_provider: (companySettings?.active_alert_provider || companySettings?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
   });
-
-  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
-  const [telegramTestResult, setTelegramTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [revealedTelegramToken, setRevealedTelegramToken] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -747,70 +743,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } finally {
       setIsSendingTestEmail(false);
-    }
-  };
-
-  const handleTestTelegramAlert = async (customBotToken?: string, customChatId?: string) => {
-    const tokenToUse = (customBotToken !== undefined ? customBotToken : formData.telegram_bot_token).trim();
-    const chatIdToUse = (customChatId !== undefined ? customChatId : formData.telegram_chat_id).trim();
-
-    if (!chatIdToUse) {
-      setTelegramTestResult({
-        success: false,
-        message: 'Telegram Chat ID is required. In Telegram, search @userinfobot to see your numeric Chat ID.',
-      });
-      return;
-    }
-
-    setIsTestingTelegram(true);
-    setTelegramTestResult(null);
-    try {
-      const res = await api.settings.testTelegram({
-        botToken: tokenToUse,
-        chatId: chatIdToUse,
-      });
-      setTelegramTestResult({
-        success: Boolean(res.success),
-        message: res.message || (res.success ? 'Test alert sent successfully! Check your Telegram app.' : 'Failed to send alert.'),
-      });
-    } catch (err: any) {
-      setTelegramTestResult({
-        success: false,
-        message: err.message || 'Could not connect to Telegram API.',
-      });
-    } finally {
-      setIsTestingTelegram(false);
-    }
-  };
-
-  // Store Settings Email Alert Test
-  const [isSendingStoreTestEmail, setIsSendingStoreTestEmail] = useState(false);
-  const [storeTestEmailResult, setStoreTestEmailResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  const handleSendStoreTestEmail = async () => {
-    const target = formData.company_email.trim();
-    if (!target || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(target)) {
-      setStoreTestEmailResult({
-        success: false,
-        message: 'Please enter a valid company email address in the field above before sending a test email.',
-      });
-      return;
-    }
-    setIsSendingStoreTestEmail(true);
-    setStoreTestEmailResult(null);
-    try {
-      const res = await api.settings.testEmail(target);
-      setStoreTestEmailResult({
-        success: Boolean(res.delivered || res.success),
-        message: res.message || (res.delivered ? '✓ Test email delivered! Check your Gmail / Phone Mail app.' : 'Failed to deliver test email.'),
-      });
-    } catch (err: any) {
-      setStoreTestEmailResult({
-        success: false,
-        message: err.message || 'Failed to dispatch test email.',
-      });
-    } finally {
-      setIsSendingStoreTestEmail(false);
     }
   };
 

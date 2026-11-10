@@ -4,7 +4,8 @@ import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensureFcmTokensSchema } from '../db/schemaInit.ts';
 import { getCachedAppSetting, getAppSetting, loadAppSettingsCache, registerSettingsUpdateListener } from './services/appSettingsService.ts';
-import { sendTelegramMessage } from './services/telegramService.ts';
+import { sendTelegramMessage, dispatchPosTelegramAlert } from './services/telegramService.ts';
+import { dispatchPosEmailAlert } from './services/emailAlertService.ts';
 
 // ============================================================================
 // FIREBASE ADMIN SDK SINGLETON & DYNAMIC INITIALIZATION
@@ -480,6 +481,14 @@ export async function notifyPosAction(
   } catch (err) {
     console.error('Error during FCM POS push dispatch:', err);
   }
+
+  // 3. Multi-channel store owner alerts: Telegram & Email
+  dispatchPosTelegramAlert(cleanTenantId, enrichedPayload).catch((err) => {
+    console.warn('[pushNotificationService] Error in dispatchPosTelegramAlert:', err?.message || err);
+  });
+  dispatchPosEmailAlert(cleanTenantId, enrichedPayload).catch((err) => {
+    console.warn('[pushNotificationService] Error in dispatchPosEmailAlert:', err?.message || err);
+  });
 }
 
 // ============================================================================

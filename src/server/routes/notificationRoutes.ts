@@ -6,16 +6,15 @@ import {
   registerSseClient,
   savePushSubscription,
   removePushSubscription,
-  notifyPosAction,
   saveFcmToken,
   removeFcmToken,
   getFcmStats,
   testFcmPush,
 } from '../pushNotificationService.ts';
-import { getCachedAppSetting, getAppSetting, loadAppSettingsCache } from '../services/appSettingsService.ts';
+import { getAppSetting, loadAppSettingsCache } from '../services/appSettingsService.ts';
 import { extractTokenFromRequest } from '../auth.ts';
 import { pgClient } from '../../db/index.ts';
-import { ensurePlatformNotificationsSchema, ensureFcmTokensSchema } from '../../db/schemaInit.ts';
+import { ensurePlatformNotificationsSchema } from '../../db/schemaInit.ts';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';

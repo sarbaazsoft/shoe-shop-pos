@@ -12,7 +12,6 @@ import {
   ExternalLink,
   Sparkles,
   TrendingUp,
-  Loader2,
   Bookmark,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';

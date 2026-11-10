@@ -8,7 +8,7 @@ import { ClickableMessage } from './ClickableMessage.tsx';
 import { api } from '../../services/api.ts';
 import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
-import { lookupCachedProductOffline, searchCachedProductsOffline, getAllCachedProductsOffline } from '../../utils/offlineDb.ts';
+import { getAllCachedProductsOffline } from '../../utils/offlineDb.ts';
 import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream, initNativeNotificationPrompt } from '../../services/pushNotificationClient.ts';
 
 interface HeaderProps {

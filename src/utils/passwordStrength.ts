@@ -99,7 +99,7 @@ export function evaluatePasswordStrength(
     };
   }
 
-  const { rules, allMet } = evaluatePasswordRules(safePassword, minChars);
+  const { rules } = evaluatePasswordRules(safePassword, minChars);
   const hasMinLength = rules[0].met;
   const hasUpper = rules[1].met;
   const hasNumber = rules[2].met;

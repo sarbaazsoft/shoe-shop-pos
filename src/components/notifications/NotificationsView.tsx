@@ -21,7 +21,6 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  Sliders,
 } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import type { HistoricalNotificationItem } from '../../types.ts';

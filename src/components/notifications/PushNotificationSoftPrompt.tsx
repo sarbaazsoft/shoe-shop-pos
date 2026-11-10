@@ -10,7 +10,6 @@ import {
   X,
   Loader2,
   ShieldCheck,
-  Volume2,
 } from 'lucide-react';
 import {
   shouldShowSoftPushPrompt,

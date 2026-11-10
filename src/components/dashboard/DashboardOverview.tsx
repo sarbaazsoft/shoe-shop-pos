@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, ChevronDown, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Settings, Store, Sparkles, X, CheckCircle2, AlertCircle, TrendingUp, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Layers, PieChart, Activity, Zap, CheckCircle, Package, Receipt, ArrowRight, Clock, CreditCard, FileText, Check } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { ShoppingCart, Boxes, Users, AlertTriangle, Calendar, Truck, RefreshCw, RotateCcw, BarChart3, Building2, Store, Sparkles, X, CheckCircle2, AlertCircle, TrendingUp, DollarSign, Zap, Package, Clock } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { api } from '../../services/api.ts';
 import { formatCurrency } from '../../utils/priceFormat.ts';
 import { isFreeTrial, calculateDaysLeft, normalizeSubscriptionPlan, getAvailableTemplateChips, getRenewalMessageTemplate, resolveDefaultRenewalTemplateType, type RenewalTemplateType } from '../../utils/subscription.ts';
@@ -552,7 +552,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   };
 
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState<'7days' | 'month' | 'year'>('7days');
   const [activeChartMetric, setActiveChartMetric] = useState<'all' | 'sales' | 'orders'>('all');
   const [activeTrendTab, setActiveTrendTab] = useState<'weekly' | 'monthly'>('weekly');
   const dashboardContainerRef = useRef<HTMLDivElement | null>(null);
@@ -873,10 +872,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     (sum, d) => sum + (Number(d.amount) || 0),
     0
   );
-  const sevenDayTxTotal = dashboardData.sevenDaySales.reduce(
-    (sum, d) => sum + (Number(d.txCount) || 0),
-    0
-  );
   const averageDailySales = Math.round(
     sevenDaySalesTotal / Math.max(1, dashboardData.sevenDaySales.length)
   );
@@ -888,10 +883,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Derived 6-Month Monthly Performance Metrics
   const monthlySalesTotal = dashboardData.monthlySales.reduce(
     (sum, m) => sum + (Number(m.amount) || 0),
-    0
-  );
-  const monthlyTxTotal = dashboardData.monthlySales.reduce(
-    (sum, m) => sum + (Number(m.txCount) || 0),
     0
   );
   const averageMonthlySales = Math.round(

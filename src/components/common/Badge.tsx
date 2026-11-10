@@ -2,7 +2,6 @@ import React from 'react';
 import {
   getLuxuryBadgeClass,
   getLuxuryBadgeStyle,
-  LuxuryBadgeOptions,
   LuxuryBadgeTone,
   BadgeVariant,
   BadgeSize,

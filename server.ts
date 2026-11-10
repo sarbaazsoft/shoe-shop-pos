@@ -2,7 +2,6 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
-import AdmZip from 'adm-zip';
 import dotenv from 'dotenv';
 
 // Load environment variables

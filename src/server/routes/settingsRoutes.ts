@@ -7,11 +7,10 @@ import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptio
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
-import nodemailer from 'nodemailer';
 import { getAllAppSettings, updateAppSettings } from '../services/appSettingsService.ts';
 import { notifyPlatformAnnouncement, testFcmPush } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
-import { testEmailConfiguration, getDynamicGmailCredentials } from '../utils/email.ts';
+import { testEmailConfiguration } from '../utils/email.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shoe-pos-super-secure-jwt-secret-key-2026';
 
@@ -635,14 +634,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const showReceiptLogo = Boolean(req.body.show_receipt_logo ?? req.body.showReceiptLogo ?? false);
     const invoiceFooter = req.body.invoice_footer || req.body.invoiceFooter || '';
     const lowStockLimit = parseInt(req.body.low_stock_limit || req.body.lowStockLimit, 10) || 5;
-
-    const telegramBotToken = String(req.body.telegram_bot_token ?? req.body.telegramBotToken ?? '').trim();
-    const telegramChatId = String(req.body.telegram_chat_id ?? req.body.telegramChatId ?? '').trim();
-    const telegramAlertsEnabled = Boolean(req.body.telegram_alerts_enabled ?? req.body.telegramAlertsEnabled ?? false);
-    const gmailUser = String(req.body.gmail_user ?? req.body.gmailUser ?? '').trim();
-    const gmailAppPassword = String(req.body.gmail_app_password ?? req.body.gmailAppPassword ?? '').trim();
-    const gmailFromName = String(req.body.gmail_from_name ?? req.body.gmailFromName ?? '').trim();
-    const activeAlertProvider = String(req.body.active_alert_provider ?? req.body.activeAlertProvider ?? '').trim().toLowerCase();
 
     const [currentSettingsRes, tenantRes] = await Promise.all([
       pgClient.query<{
