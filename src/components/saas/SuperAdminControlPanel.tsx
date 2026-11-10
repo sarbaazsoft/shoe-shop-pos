@@ -5257,14 +5257,9 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
           <span>
             &copy; 2026{' '}
-            <a
-              href="https://portpolio-eight-pi.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline transition-colors"
-            >
+            <strong className="font-bold text-slate-900 dark:text-white">
               SarbaazSoft
-            </a>
+            </strong>
             . All rights reserved.
           </span>
         </footer>

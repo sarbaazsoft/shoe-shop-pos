@@ -32,27 +32,22 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
               </span>
               <span className="text-slate-300 dark:text-slate-600">&bull;</span>
               <span className="text-slate-600 dark:text-slate-300 font-medium">
-                Powered by <a
-                id="sarbaazsoft-credit-link"
-                href="https://portpolio-eight-pi.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline font-bold transition"
-              >
-                SarbaazSoft Shoe POS
-              </a>
+                Powered by{' '}
+                <strong
+                  id="sarbaazsoft-credit-text"
+                  className="font-bold text-slate-900 dark:text-white"
+                >
+                  SarbaazSoft Shoe POS
+                </strong>
               </span>
             </>
           ) : (
-            <a
-                id="sarbaazsoft-credit-link"
-                href="https://portpolio-eight-pi.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-slate-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline font-bold transition"
-              >
-                SarbaazSoft Shoe POS
-              </a>
+            <strong
+              id="sarbaazsoft-credit-text"
+              className="font-bold text-slate-900 dark:text-white"
+            >
+              SarbaazSoft Shoe POS
+            </strong>
           )}
           {showSubtitle && (
             <>
