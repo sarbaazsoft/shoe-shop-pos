@@ -56,7 +56,12 @@ function resolvePort(): number {
       if (!isNaN(p) && p > 0) return p;
     }
   }
-  // In AI Studio, 3000 is the designated port; ignore any ambient container PORT like 8080
+  // When running in deployed production container (Cloud Run), respect ambient PORT
+  if (process.env.PORT) {
+    const p = Number(process.env.PORT);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  // In AI Studio dev environment, default to port 3000
   return 3000;
 }
 
@@ -182,8 +187,8 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
       name: 'Shoe POS',
       short_name: 'ShoePOS',
       description: 'Multi-tenant dual-engine wholesale shoe shop POS and inventory management system',
-      theme_color: '#4F46E5',
-      background_color: '#4F46E5',
+      theme_color: '#FFFFFF',
+      background_color: '#FFFFFF',
       display: 'standalone',
       display_override: ['standalone', 'minimal-ui'],
       orientation: 'any',
@@ -288,8 +293,8 @@ app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => 
     display: 'standalone',
     display_override: ['standalone', 'minimal-ui'],
     orientation: 'any',
-    background_color: '#0F172A',
-    theme_color: '#0F172A',
+    background_color: '#FFFFFF',
+    theme_color: '#FFFFFF',
     categories: ['business', 'finance', 'productivity'],
     icons: [
       {

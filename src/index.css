@@ -127,7 +127,7 @@ nav button.font-courgette *,
 html,
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #4F46E5;
+  background-color: #ffffff;
 }
 
 body,
@@ -991,7 +991,7 @@ body,
 
 html,
 body {
-  background-color: #4F46E5;
+  background-color: #ffffff;
 }
 
 #root {

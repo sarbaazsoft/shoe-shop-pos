@@ -98,7 +98,7 @@ self.addEventListener('fetch', (event) => {
           const indexFallback = (await caches.match('/index.html')) || (await caches.match('/'));
           if (indexFallback) return indexFallback;
           return new Response(
-            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline - SarbaazSoft Shoe POS</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#4F46E5;color:#fff;text-align:center;padding:20px;}</style></head><body><div><h2>SarbaazSoft Shoe POS</h2><p>You are currently offline. Please reconnect to the internet or launch the installed app to use cached POS functions.</p></div></body></html>',
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline - SarbaazSoft Shoe POS</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#FFFFFF;color:#0F172A;text-align:center;padding:20px;}</style></head><body><div><h2>SarbaazSoft Shoe POS</h2><p>You are currently offline. Please reconnect to the internet or launch the installed app to use cached POS functions.</p></div></body></html>',
             { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
           );
         })
