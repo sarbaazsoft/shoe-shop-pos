@@ -1,45 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-export interface ShoeIconProps extends React.SVGProps<SVGSVGElement> {
+export interface ShoeIconProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   className?: string;
   size?: number | string;
   strokeWidth?: number | string;
+  src?: string | null;
+  alt?: string;
+  title?: string;
+  id?: string;
 }
 
 /**
- * ShoeIcon
- * Crisp, modern shoe/sneaker icon designed on a 24x24 grid matching Lucide icon aesthetics.
+ * ShoeIcon / StoreIcon
+ * Standardized store icon component rendering the official professional PWA icon
+ * (/icon.svg and /pwa-192x192.png) across all headers, navigation bars, modals,
+ * and login screens. Supports optional custom store branding logo with graceful fallback.
  */
 export const ShoeIcon: React.FC<ShoeIconProps> = ({
-  className = 'w-4.5 h-4.5',
+  className = 'w-5 h-5',
   size,
-  strokeWidth = 2,
+  strokeWidth: _unusedStrokeWidth,
+  src,
+  alt = 'SarbaazSoft Shoe POS',
+  title,
+  id,
+  style,
   ...props
 }) => {
+  const [useFallbackPng, setUseFallbackPng] = useState(false);
+  const [customError, setCustomError] = useState(false);
+
+  // If a custom store logo is provided and hasn't errored, use it;
+  // otherwise, use the official professional PWA icon (/icon.svg -> /pwa-192x192.png)
+  const resolvedSrc =
+    !customError && src && src.trim()
+      ? src.trim()
+      : useFallbackPng
+      ? '/pwa-192x192.png'
+      : '/icon.svg';
+
+  const handleError = () => {
+    if (!customError && src && src.trim()) {
+      setCustomError(true);
+    } else if (!useFallbackPng) {
+      setUseFallbackPng(true);
+    }
+  };
+
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <img
+      id={id}
+      src={resolvedSrc}
+      alt={alt}
+      title={title || alt}
       width={size}
       height={size}
-      className={className}
-      aria-hidden="true"
+      loading="eager"
+      decoding="async"
+      onError={handleError}
+      className={`object-contain shrink-0 select-none ${className}`}
+      style={style}
       {...props}
-    >
-      {/* Outer shoe silhouette */}
-      <path d="M4 7h4.5a1.5 1.5 0 0 1 1.2.6l3.3 4.4h4.5a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 1-2.5 2.5H6a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1z" />
-      {/* Sole boundary */}
-      <path d="M3 14.5h16.5" />
-      {/* Laces */}
-      <path d="M8 11.5l1.5-2.5" />
-      <path d="M10.5 12l1.5-2.5" />
-    </svg>
+    />
   );
 };
 
+export const StoreIcon = ShoeIcon;
 export default ShoeIcon;

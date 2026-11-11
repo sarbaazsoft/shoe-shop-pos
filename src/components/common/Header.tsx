@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Settings, ChevronDown, Menu, Sun, Moon, Monitor, UserCog, LogOut, AlertTriangle, CheckCircle2, ShoppingBag, ArrowLeftRight, Truck, RefreshCw, CheckCheck, Check, Boxes, X, ShieldCheck, User, ShoppingCart, Copy, Coins, Loader2, ImageIcon, Edit3, PackagePlus, Printer, BellRing, Radio, ExternalLink, Globe, Store, Info, Flame } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
+import { ShoeIcon } from './ShoeIcon.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { ClickableMessage } from './ClickableMessage.tsx';
@@ -1055,6 +1056,11 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Menu className="w-5 h-5 stroke-[2.2]" />
         </button>
+
+        {/* Mobile Store Icon (< lg) */}
+        <div className="lg:hidden w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-indigo-500/25 p-1 shrink-0 flex items-center justify-center overflow-hidden shadow-2xs">
+          <ShoeIcon src={companySettings?.logo} alt="Store Icon" className="w-full h-full object-contain rounded-sm" />
+        </div>
 
         {/* Quick Price Retrieval Search Bar */}
         <div ref={searchRef} className="relative w-44 sm:w-56 md:w-68 lg:w-80 min-w-0">

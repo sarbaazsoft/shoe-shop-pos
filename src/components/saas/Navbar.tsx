@@ -169,8 +169,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label={`${storeName} Home`}
             >
               {/* Brand Emblem matching PublicHeader */}
-              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105">
-                <ShoeIcon className="w-4.5 h-4.5 stroke-[2.2]" />
+              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105 p-1 overflow-hidden">
+                <ShoeIcon className="w-full h-full object-contain rounded-md" />
               </div>
 
               {/* Brand Typography (Roboto font for brand name & subtitle) */}
@@ -182,10 +182,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {renderBrandName(storeName)}
                 </div>
                 <div
-                  className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1 truncate mt-0.5 tracking-normal"
+                  className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5 tracking-normal"
                   style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
                 >
-                  <span className="text-purple-600 dark:text-purple-400">👟</span>
+                  <ShoeIcon className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-roboto brand-subtitle-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
                     {subtitle}
                   </span>

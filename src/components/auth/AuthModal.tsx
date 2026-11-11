@@ -350,8 +350,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               {/* Store Icon Header */}
               <div className="text-center mb-5">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 dark:border-purple-400/50">
-                  <ShoeIcon className="w-6 h-6 stroke-[2.2]" />
+                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] border border-purple-300 dark:border-purple-500/50 p-2 overflow-hidden">
+                  <ShoeIcon className="w-full h-full object-contain rounded-xl" />
                 </div>
                 <div
                   id="auth-card-heading"

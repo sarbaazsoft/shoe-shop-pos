@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShoeIcon } from './ShoeIcon.tsx';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -49,8 +50,8 @@ export const TenantWorkspaceSkeleton: React.FC<TenantWorkspaceSkeletonProps> = (
         {/* Top: Store Brand Header aligned with top Header bar (exact h-[3.6rem]) */}
         <div className="h-[3.6rem] px-4 flex items-center justify-between border-b border-indigo-500/20 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600/30 to-indigo-600/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs border border-purple-400/20 animate-pulse">
-              👟
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs border border-indigo-500/25 p-1 overflow-hidden">
+              <ShoeIcon className="w-full h-full object-contain rounded-md" />
             </div>
             <div className="min-w-0 flex-1">
               {storeName ? (

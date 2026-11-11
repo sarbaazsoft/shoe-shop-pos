@@ -24,6 +24,7 @@ import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.t
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
+import { ShoeIcon } from '../common/ShoeIcon.tsx';
 
 interface FreeTrialOnboardingModalProps {
   isOpen: boolean;
@@ -352,14 +353,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center font-bold shadow-2xs shrink-0 ${
-                    isDark
-                      ? 'bg-purple-500/20 text-purple-300 border-purple-400/30'
-                      : 'bg-purple-500/10 text-purple-600 border-purple-500/20'
-                  }`}
-                >
-                  <Sparkles className="w-5 h-5" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-purple-400/40 bg-white dark:bg-slate-900 flex items-center justify-center font-bold shadow-2xs shrink-0 p-1.5 overflow-hidden">
+                  <ShoeIcon className="w-full h-full object-contain rounded-md" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

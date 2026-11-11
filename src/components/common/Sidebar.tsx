@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutDashboard, ShoppingCart, Boxes, Truck, RotateCcw, Users, TrendingUp, Settings, Printer, BookOpen, X, Building2, Check, Cloud, Keyboard, Sun, Moon, Download, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
+import { ShoeIcon } from './ShoeIcon.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { InstallAppModal } from './InstallAppModal.tsx';
 
@@ -176,17 +177,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           {/* Brand Banner */}
           <div className={`flex items-center gap-2.5 min-w-0 ${collapsed ? 'justify-center w-full' : ''}`}>
-            {companySettings?.logo ? (
-              <img
-                src={companySettings.logo}
-                alt="Logo"
-                className="w-8 h-8 rounded-lg object-cover bg-white p-0.5 border border-indigo-500/20 shrink-0 shadow-xs"
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs p-1 flex items-center justify-center overflow-hidden">
+              <ShoeIcon
+                src={companySettings?.logo}
+                alt={`${storeName} Logo`}
+                className="w-full h-full object-contain rounded-md"
               />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-purple-400/30">
-                👟
-              </div>
-            )}
+            </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">
                 <h1 className="text-xs font-bold text-slate-900 dark:text-white truncate tracking-tight leading-tight">

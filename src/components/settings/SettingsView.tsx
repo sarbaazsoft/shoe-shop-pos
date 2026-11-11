@@ -4,6 +4,7 @@ import { api } from '../../services/api.ts';
 import { PrinterHardwareSettings } from './PrinterHardwareSettings.tsx';
 import { DataBackupRestore } from './DataBackupRestore.tsx';
 import { UserAvatar } from '../common/UserAvatar.tsx';
+import { ShoeIcon } from '../common/ShoeIcon.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { CreateStaffModal } from './CreateStaffModal.tsx';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
@@ -1992,7 +1993,7 @@ setFormErrors(errors);
                           className="w-full h-full object-contain p-1"
                         />
                       ) : (
-                        <Store className="w-5 h-5 text-slate-400 dark:text-slate-600" />
+                        <ShoeIcon className="w-8 h-8 object-contain p-1 opacity-70" />
                       )}
                     </div>
                     <div className="text-xs">

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Download, Monitor, Smartphone, Apple, Check, X, ShieldCheck, Zap, Share2, PlusSquare, Sparkles } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
+import { ShoeIcon } from './ShoeIcon.tsx';
 
 interface InstallAppModalProps {
   isOpen: boolean;
@@ -86,8 +87,8 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
 
         {/* Header */}
         <div className="flex items-center gap-3.5 pr-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 p-2 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0">
-            <Smartphone className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 p-1.5 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden">
+            <ShoeIcon className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
             <div className="flex items-center gap-2">
