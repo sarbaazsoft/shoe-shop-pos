@@ -1359,12 +1359,12 @@ export default function App() {
             )}
             <AuthModal
               companySettings={storeLoginTarget
-                ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name }
+                ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name, logo: (storeLoginTarget as any).logo || (storeLoginTarget as any).logo_url || storeLoginTarget.logoUrl || '/pwa-192x192.png' }
                 : (activeTenant
-                    ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name }
+                    ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name, logo: (activeTenant as any).logo || (activeTenant as any).logo_url || activeTenant.logoUrl || '/pwa-192x192.png' }
                     : (tenantIdParam
-                        ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '' }
-                        : { name: 'SarbaazSoft Shoe POS' }))}
+                        ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '', logo: '/pwa-192x192.png' }
+                        : { name: 'SarbaazSoft Shoe POS', logo: '/pwa-192x192.png' }))}
               onBack={handleBackToStoreDirectory}
               onSuccess={handleAuthSuccess}
             />
@@ -1414,12 +1414,12 @@ export default function App() {
             )}
             <AuthModal
               companySettings={storeLoginTarget
-                ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name }
+                ? { ...storeLoginTarget, tenant_id: storeLoginTarget.id, name: storeLoginTarget.name, logo: (storeLoginTarget as any).logo || (storeLoginTarget as any).logo_url || storeLoginTarget.logoUrl || '/pwa-192x192.png' }
                 : (activeTenant
-                    ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name }
+                    ? { ...activeTenant, tenant_id: activeTenant.id, name: activeTenant.name, logo: (activeTenant as any).logo || (activeTenant as any).logo_url || activeTenant.logoUrl || '/pwa-192x192.png' }
                     : (tenantIdParam
-                        ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '' }
-                        : { name: 'SarbaazSoft Shoe POS' }))}
+                        ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '', logo: '/pwa-192x192.png' }
+                        : { name: 'SarbaazSoft Shoe POS', logo: '/pwa-192x192.png' }))}
               onBack={handleBackToStoreDirectory}
               onSuccess={handleAuthSuccess}
             />

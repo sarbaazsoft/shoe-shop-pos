@@ -403,7 +403,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         try {
           new Notification('🔔 SuperAdmin Test Alert', {
             body: 'SuperAdmin push alert test confirmed on this device.',
-            icon: '/pwa-192x192.png',
+            icon: '/admin/pwa-192x192.png',
             tag: `superadmin-test-${Date.now()}`,
           });
         } catch {}
@@ -1172,6 +1172,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           badgeVariant="online"
           subtitle="Multi-Tenant POS Cloud • SuperAdmin Access"
           dbText="System Secure • Active"
+          isSuperAdmin={true}
         />
 
         {/* Main Content Area - Centered Login Form Card */}
@@ -2083,8 +2084,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
         {/* STICKY TOP HEADER BAR (Exact h-[3.6rem] aligned with Store Header.tsx) */}
         <header className="h-[3.6rem] sticky top-0 z-20 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-lg border-b border-indigo-500/20 px-3 sm:px-6 flex items-center justify-between gap-3 shrink-0 shadow-2xs transition-colors">
-          {/* Left: Mobile Menu Button */}
-          <div className="flex items-center gap-3 min-w-0">
+          {/* Left: Mobile Menu Button & Mobile Brand Identity */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
@@ -2093,6 +2094,14 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             >
               <Menu className="w-5 h-5 stroke-[2.2]" />
             </button>
+            <div className="lg:hidden flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm border border-purple-400/30">
+                <Shield className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                POS SaaS C-Panel
+              </span>
+            </div>
           </div>
 
           {/* Center: Quick Filter Search Input (aligned with Store Header Quick Search) */}

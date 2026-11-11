@@ -353,8 +353,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-purple-400/40 bg-white dark:bg-slate-900 flex items-center justify-center font-bold shadow-2xs shrink-0 p-1.5 overflow-hidden">
-                  <ShoeIcon className="w-full h-full object-contain rounded-md" />
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-purple-400/40 bg-white dark:bg-slate-900 flex items-center justify-center font-bold shadow-2xs shrink-0 overflow-hidden">
+                  <ShoeIcon className="w-full h-full object-cover rounded-xl" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

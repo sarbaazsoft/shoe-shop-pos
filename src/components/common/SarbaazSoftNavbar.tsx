@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react';
-import { ShoeIcon } from './ShoeIcon.tsx';
+import { ShoeIcon, TinyShoeIcon } from './ShoeIcon.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
 
@@ -85,9 +85,9 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
               className="group flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-0.5 sm:p-1 min-w-0"
               aria-label="SarbaazSoft Shoe POS Home"
             >
-              {/* Brand Emblem matching PublicHeader */}
-              <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 transition-transform duration-200 group-hover:scale-105 p-1 overflow-hidden">
-                <ShoeIcon className="w-full h-full object-contain rounded-md" />
+              {/* Brand Emblem matching store sidebars top */}
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs flex items-center justify-center overflow-hidden transition-transform duration-200 group-hover:scale-105">
+                <ShoeIcon src="/pwa-192x192.png" alt="SarbaazSoft Shoe POS Logo" className="w-full h-full object-cover rounded-xl" />
               </div>
 
               {/* Brand Typography (Roboto font for brand name & subtitle) */}
@@ -102,7 +102,7 @@ export const SarbaazSoftNavbar: React.FC<SarbaazSoftNavbarProps> = ({
                   className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5 tracking-normal"
                   style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
                 >
-                  <ShoeIcon className="w-3.5 h-3.5 shrink-0" />
+                  <TinyShoeIcon className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
                   <span className="font-roboto brand-subtitle-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
                     Dual-Engine Wholesale &amp; Retail
                   </span>

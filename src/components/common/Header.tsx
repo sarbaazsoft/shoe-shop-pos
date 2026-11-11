@@ -1057,9 +1057,9 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5 stroke-[2.2]" />
         </button>
 
-        {/* Mobile Store Icon (< lg) */}
-        <div className="lg:hidden w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-indigo-500/25 p-1 shrink-0 flex items-center justify-center overflow-hidden shadow-2xs">
-          <ShoeIcon src={companySettings?.logo} alt="Store Icon" className="w-full h-full object-contain rounded-sm" />
+        {/* Store PWA Icon */}
+        <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 flex items-center justify-center overflow-hidden shadow-2xs">
+          <ShoeIcon src={companySettings?.logo || '/pwa-192x192.png'} alt="Store Icon" className="w-full h-full object-cover rounded-xl" />
         </div>
 
         {/* Quick Price Retrieval Search Bar */}

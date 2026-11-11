@@ -314,6 +314,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* Top Application Bar with backdrop blur */}
       <PublicHeader
         storeName={storeName}
+        logoSrc={companySettings?.logo || companySettings?.logo_url || '/pwa-192x192.png'}
         actionText={onBack ? 'Store Directory' : undefined}
         actionIcon={<Store className="w-3.5 h-3.5" />}
         onActionClick={onBack}
@@ -348,10 +349,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'bg-white border-purple-200/90 shadow-2xl shadow-purple-950/10 text-slate-800'
               }`}
             >
-              {/* Store Icon Header */}
+              {/* Store Icon Header matching store sidebar top */}
               <div className="text-center mb-5">
-                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] border border-purple-300 dark:border-purple-500/50 p-2 overflow-hidden">
-                  <ShoeIcon className="w-full h-full object-contain rounded-xl" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-lg shadow-purple-600/20 dark:shadow-[0_0_20px_rgba(147,51,234,0.35)] border border-indigo-500/25 overflow-hidden">
+                  <ShoeIcon src={companySettings?.logo || companySettings?.logo_url || '/pwa-192x192.png'} alt={`${effectiveStoreName} Logo`} className="w-full h-full object-cover rounded-2xl" />
                 </div>
                 <div
                   id="auth-card-heading"

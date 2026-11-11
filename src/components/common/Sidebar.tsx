@@ -177,11 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           {/* Brand Banner */}
           <div className={`flex items-center gap-2.5 min-w-0 ${collapsed ? 'justify-center w-full' : ''}`}>
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs p-1 flex items-center justify-center overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs flex items-center justify-center overflow-hidden">
               <ShoeIcon
                 src={companySettings?.logo}
                 alt={`${storeName} Logo`}
-                className="w-full h-full object-contain rounded-md"
+                className="w-full h-full object-cover rounded-xl"
               />
             </div>
             {!collapsed && (

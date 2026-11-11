@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Sparkles, ShieldAlert, Loader2, Cloud, RefreshCw, CheckCheck } from 'lucide-react';
+import { Sparkles, ShieldAlert, Loader2, Cloud, RefreshCw, CheckCheck, Shield } from 'lucide-react';
 import { ThemeDropdown } from './ThemeDropdown.tsx';
-import { ShoeIcon } from './ShoeIcon.tsx';
+import { ShoeIcon, TinyShoeIcon } from './ShoeIcon.tsx';
 
 export interface PublicHeaderProps {
   storeName?: string;
@@ -13,6 +13,8 @@ export interface PublicHeaderProps {
   actionIcon?: React.ReactNode;
   onActionClick?: () => void;
   onBrandClick?: () => void;
+  isSuperAdmin?: boolean;
+  logoSrc?: string | null;
 }
 
 /**
@@ -31,9 +33,16 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   actionIcon,
   onActionClick,
   onBrandClick,
+  isSuperAdmin = false,
+  logoSrc,
 }) => {
   const [isCheckingSync, setIsCheckingSync] = useState(false);
   const [syncStatusState, setSyncStatusState] = useState<'idle' | 'checking' | 'just-synced'>('idle');
+
+  const isSuperAdminView =
+    isSuperAdmin ||
+    storeName.toLowerCase().includes('c-panel') ||
+    storeName.toLowerCase().includes('superadmin');
 
   // Normalize status text (e.g. Cloud Synchronized -> Cloud Synced)
   const rawStatus = (dbText || 'Cloud Synced')
@@ -125,9 +134,15 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         className="flex items-center gap-2.5 sm:gap-3 min-w-0 text-left cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
         title="Go to Home / Store Portal"
       >
-        <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0 p-1 overflow-hidden">
-          <ShoeIcon className="w-full h-full object-contain rounded-md" />
-        </div>
+        {isSuperAdminView ? (
+          <div className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 shrink-0">
+            <Shield className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+          </div>
+        ) : (
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs flex items-center justify-center overflow-hidden">
+            <ShoeIcon src={logoSrc || '/pwa-192x192.png'} alt={`${storeName} Logo`} className="w-full h-full object-cover rounded-xl" />
+          </div>
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
@@ -138,7 +153,11 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             </div>
           </div>
           <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5">
-            <ShoeIcon className="w-3.5 h-3.5 shrink-0" />
+            {isSuperAdminView ? (
+              <Shield className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+            ) : (
+              <TinyShoeIcon className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+            )}
             <span>{subtitle}</span>
           </span>
         </div>

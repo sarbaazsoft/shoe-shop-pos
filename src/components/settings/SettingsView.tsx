@@ -1993,7 +1993,7 @@ setFormErrors(errors);
                           className="w-full h-full object-contain p-1"
                         />
                       ) : (
-                        <ShoeIcon className="w-8 h-8 object-contain p-1 opacity-70" />
+                        <ShoeIcon className="w-full h-full object-cover rounded-lg opacity-80" />
                       )}
                     </div>
                     <div className="text-xs">

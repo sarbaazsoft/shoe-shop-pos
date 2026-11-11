@@ -1731,8 +1731,8 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
                                       className="w-9 h-9 rounded object-cover border border-slate-200 dark:border-purple-800/60 shrink-0 bg-white"
                                     />
                                   ) : (
-                                    <div className="w-9 h-9 rounded bg-white dark:bg-[#131D33] flex items-center justify-center p-1.5 shrink-0 border border-slate-200 dark:border-purple-800/60 shadow-2xs">
-                                      <ShoeIcon className="w-full h-full object-contain" />
+                                    <div className="w-9 h-9 rounded bg-white dark:bg-[#131D33] flex items-center justify-center shrink-0 border border-slate-200 dark:border-purple-800/60 shadow-2xs overflow-hidden">
+                                      <ShoeIcon className="w-full h-full object-cover" />
                                     </div>
                                   )}
 
@@ -1786,8 +1786,8 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
                                 className="w-11 h-11 rounded-lg object-cover border border-blue-200 dark:border-purple-800 bg-white shadow-2xs"
                               />
                             ) : (
-                              <div className="w-11 h-11 rounded-lg bg-white dark:bg-purple-950/60 border border-blue-200 dark:border-purple-800 flex items-center justify-center p-1.5 shadow-2xs">
-                                <ShoeIcon className="w-full h-full object-contain" />
+                              <div className="w-11 h-11 rounded-lg bg-white dark:bg-purple-950/60 border border-blue-200 dark:border-purple-800 flex items-center justify-center shadow-2xs overflow-hidden">
+                                <ShoeIcon className="w-full h-full object-cover" />
                               </div>
                             )}
 
@@ -2731,8 +2731,8 @@ export const PurchaseManagement: React.FC<PurchaseManagementProps> = ({
                                 className="w-8 h-8 rounded object-cover border border-slate-200 dark:border-purple-800/60 shrink-0 bg-white"
                               />
                             ) : (
-                              <div className="w-8 h-8 rounded bg-white dark:bg-purple-950/40 flex items-center justify-center p-1 shrink-0 border border-slate-200 dark:border-purple-900/50 shadow-2xs">
-                                <ShoeIcon className="w-full h-full object-contain" />
+                              <div className="w-8 h-8 rounded bg-white dark:bg-purple-950/40 flex items-center justify-center shrink-0 border border-slate-200 dark:border-purple-900/50 shadow-2xs overflow-hidden">
+                                <ShoeIcon className="w-full h-full object-cover" />
                               </div>
                             )}
                             <span className="font-bold text-slate-900 dark:text-white">{prod.article || prod.name}</span>

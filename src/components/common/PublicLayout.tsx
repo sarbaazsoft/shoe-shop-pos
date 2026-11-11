@@ -21,6 +21,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
   subtitle,
   dbText,
   contentClassName = '',
+  ...rest
 }) => {
   return (
     <div className="min-h-screen w-full flex flex-col justify-between relative overflow-x-hidden bg-slate-200 dark:bg-[#0A0E1A] text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
@@ -34,6 +35,7 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
         badgeVariant={badgeVariant}
         subtitle={subtitle}
         dbText={dbText}
+        {...rest}
       />
 
       {/* Centered Main Viewport */}

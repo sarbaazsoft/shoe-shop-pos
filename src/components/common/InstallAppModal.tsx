@@ -87,8 +87,8 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
 
         {/* Header */}
         <div className="flex items-center gap-3.5 pr-8">
-          <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 p-1.5 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden">
-            <ShoeIcon className="w-full h-full object-contain rounded-lg" />
+          <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden">
+            <ShoeIcon className="w-full h-full object-cover rounded-2xl" />
           </div>
           <div>
             <div className="flex items-center gap-2">
