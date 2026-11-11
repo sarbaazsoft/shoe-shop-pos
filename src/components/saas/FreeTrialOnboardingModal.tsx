@@ -23,6 +23,7 @@ import { useTheme } from '../../context/ThemeContext.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
 
 interface FreeTrialOnboardingModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
   onToggleTheme: _onToggleTheme,
 }) => {
   const globalTheme = useTheme();
+
+  useDocumentTitle(isOpen ? 'SarbaazSoft Shoe POS | Register' : '', [isOpen]);
 
   // Dark mode resolution: supports propTheme, global ThemeContext, localStorage, and DOM
   const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>(() => {

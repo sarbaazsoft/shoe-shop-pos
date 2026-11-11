@@ -30,6 +30,7 @@ import { NotificationsView } from './components/notifications/NotificationsView.
 import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
+import { getStandardDocumentTitle } from './utils/documentTitle.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
 type SaasRouteMode =
@@ -373,15 +374,14 @@ export default function App() {
       ? 'POSAdmin'
       : 'ShoePOS';
 
-  // Direct, clean page title without prepending or appending duplicate store names, slogans, or platform credits
-  const pageTitle =
-    saasMode === 'SUPERADMIN'
-      ? 'POS Admin'
-      : saasMode === 'AUTH'
-      ? (effectiveStoreName ? `Sign In | ${effectiveStoreName}` : 'Store Sign In')
-      : saasMode === 'LANDING' || !effectiveStoreName
-      ? 'Shoe POS'
-      : effectiveStoreName;
+  // Standardized document/browser title across SaaS landing, login, and authenticated store routes
+  const pageTitle = getStandardDocumentTitle({
+    saasMode,
+    storeName: effectiveStoreName,
+    currentTab,
+    isAuthModalOpen: isLoginModalOpen,
+    modalTitle: isProfileModalOpen ? 'User Profile' : undefined,
+  });
 
   // Dynamically update <link rel="manifest">, Apple meta tags, and <meta name="theme-color">
   useEffect(() => {

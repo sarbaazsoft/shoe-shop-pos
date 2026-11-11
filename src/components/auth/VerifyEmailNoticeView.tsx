@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { PublicLayout } from '../common/PublicLayout.tsx';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
 
 interface VerifyEmailNoticeViewProps {
   initialEmail?: string;
@@ -20,6 +21,8 @@ export const VerifyEmailNoticeView: React.FC<VerifyEmailNoticeViewProps> = ({
   onNavigateLogin,
   onNavigateHome,
 }) => {
+  useDocumentTitle('SarbaazSoft Shoe POS | Verify Email');
+
   const [email] = useState(() => {
     if (initialEmail) return initialEmail;
     try {

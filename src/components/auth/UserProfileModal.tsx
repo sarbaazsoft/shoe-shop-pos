@@ -9,6 +9,7 @@ import { toTitleCaseLive, toTitleCaseTrimmed, formatPhoneNumber, isValidPhoneNum
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -77,6 +78,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const roleUpper = String(currentUser?.role || '').toUpperCase();
   const isSuperAdmin = roleUpper === 'SUPERADMIN';
   const isAdmin = roleUpper === 'ADMIN';
+
+  useDocumentTitle(
+    isOpen ? `${(storeName || '').trim() || 'Store'} | User Profile` : '',
+    [isOpen, storeName]
+  );
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
   const { containerRef: profileTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeTab, {
