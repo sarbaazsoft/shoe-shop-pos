@@ -48,59 +48,58 @@ export const OfflineToastNotification: React.FC<OfflineToastNotificationProps> =
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 no-print pointer-events-auto"
           >
-            <div className="bg-slate-900/95 backdrop-blur-md border border-amber-500/50 rounded-2xl shadow-2xl shadow-amber-950/40 p-4 text-white ring-1 ring-amber-500/30">
-              <div className="flex items-start justify-between gap-3">
-                {/* Icon indicator */}
-                <div className="relative shrink-0 mt-0.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                    <WifiOff className="w-5 h-5" />
-                  </div>
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
-                  </span>
-                </div>
+            <div className="relative w-full bg-white dark:bg-[#0E1628] rounded-2xl border border-slate-200 dark:border-purple-900/60 shadow-2xl overflow-hidden">
+              {/* Header Accent Bar */}
+              <div className="h-1.5 w-full bg-amber-500" />
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-                      Offline Mode Active
-                    </h4>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      No Internet
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    POS operations are running in offline mode. Sales will queue safely and sync automatically when reconnected.
-                  </p>
-
-                  {/* Pending transactions badge & action trigger */}
-                  <div className="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                      <Cloud className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span>
-                        Queue:{' '}
-                        <strong className="text-white font-semibold">
-                          {pendingCount} sale{pendingCount === 1 ? '' : 's'}
-                        </strong>
-                      </span>
-                      {isSyncing && (
-                        <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin ml-1 shrink-0" />
-                      )}
+              <div className="p-4 sm:p-5 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {/* Icon container matching NotificationStatusModal */}
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
+                      <WifiOff className="w-6 h-6 stroke-[2.2]" />
                     </div>
 
-                    <button
-                      type="button"
-                      id="offline-toast-view-queue-btn"
-                      onClick={() => setIsModalOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30 transition-colors cursor-pointer"
-                    >
-                      <span>View Queue</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                          Offline Node Active
+                        </h4>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                          No Internet
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        Local IndexedDB Ready
+                      </span>
+                    </div>
                   </div>
+                </div>
+
+                <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p>
+                    POS operations are currently running offline. Sales will queue safely and synchronize automatically when reconnected.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    <Cloud className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>
+                      Queue: <strong className="text-slate-900 dark:text-white font-mono font-bold">{pendingCount}</strong>
+                    </span>
+                    {isSyncing && <RefreshCw className="w-3 h-3 text-purple-600 animate-spin ml-1 shrink-0" />}
+                  </div>
+
+                  <button
+                    type="button"
+                    id="offline-toast-view-queue-btn"
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500"
+                  >
+                    <span>View Node Queue</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </div>

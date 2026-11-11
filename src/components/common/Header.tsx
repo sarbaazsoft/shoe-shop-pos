@@ -10,6 +10,7 @@ import { PlatformNotification, PlatformNotificationType } from '../../types.ts';
 import { getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
 import { getAllCachedProductsOffline } from '../../utils/offlineDb.ts';
 import { isWebPushSupported, getNotificationPermissionState, isDeviceSubscribedToPush, subscribeDeviceToWebPush, resyncPushSubscriptionIfEnabled, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream, initNativeNotificationPrompt } from '../../services/pushNotificationClient.ts';
+import { NotificationStatusModal, type NotificationModalData } from '../notifications/NotificationStatusModal.tsx';
 
 interface HeaderProps {
   currentTab: string;
@@ -317,7 +318,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isTogglingPush, setIsTogglingPush] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => getNotificationPermissionState());
   const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
-  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
+  const [notificationModalData, setNotificationModalData] = useState<NotificationModalData | null>(null);
   const [livePushToast, setLivePushToast] = useState<{
     id: string;
     type: 'SALE' | 'RETURN' | 'EXCHANGE' | 'PLATFORM_ANNOUNCEMENT' | 'ANNOUNCEMENT' | string;
@@ -472,8 +473,18 @@ export const Header: React.FC<HeaderProps> = ({
       fetchLiveNotifications();
     };
 
+    const handleShowNotificationModal = (event: any) => {
+      if (event?.detail) {
+        setNotificationModalData({
+          isOpen: true,
+          ...event.detail,
+        });
+      }
+    };
+
     window.addEventListener('pos:action-notification', handleInAppPushAlert);
     window.addEventListener('platform:announcement', handleInAppPushAlert);
+    window.addEventListener('pos:show-notification-modal', handleShowNotificationModal);
 
     return () => {
       cleanupNativePrompt();
@@ -481,6 +492,7 @@ export const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('pos:push-status-changed', handlePushStatusChanged);
       window.removeEventListener('pos:action-notification', handleInAppPushAlert);
       window.removeEventListener('platform:announcement', handleInAppPushAlert);
+      window.removeEventListener('pos:show-notification-modal', handleShowNotificationModal);
       if (bellPulseTimeoutRef.current) {
         clearTimeout(bellPulseTimeoutRef.current);
       }
@@ -490,20 +502,30 @@ export const Header: React.FC<HeaderProps> = ({
   const handleTogglePushNotifications = async () => {
     if (isTogglingPush) return;
     setIsTogglingPush(true);
-    setPushStatusMessage(null);
     try {
       if (isPushSubscribed) {
         await unsubscribeDeviceFromWebPush();
         setIsPushSubscribed(false);
         setPushPermission(getNotificationPermissionState());
-        setPushStatusMessage('Push notifications disabled on this device.');
-        setTimeout(() => setPushStatusMessage(null), 4000);
+        setNotificationModalData({
+          isOpen: true,
+          type: 'info',
+          title: 'Notifications Disabled',
+          message: 'Push notifications have been turned off for this browser session.',
+        });
       } else {
         const currentPerm = getNotificationPermissionState();
         if (currentPerm === 'denied') {
           setPushPermission('denied');
-          setPushStatusMessage('⚠️ Notifications are blocked in browser settings. Click the lock/site settings icon in your address bar to allow alerts.');
-          setTimeout(() => setPushStatusMessage(null), 8000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'warning',
+            title: 'Notifications Blocked in Browser',
+            message: 'Notifications are currently blocked by your browser settings for this store. Please allow notifications in your browser address bar so you do not miss live sales, returns, and inventory alerts.',
+            showBrowserGuide: true,
+            actionText: 'Check Permission',
+            onAction: () => handleTogglePushNotifications(),
+          });
           return;
         }
 
@@ -511,20 +533,44 @@ export const Header: React.FC<HeaderProps> = ({
         if (res.success) {
           setIsPushSubscribed(true);
           setPushPermission('granted');
-          setPushStatusMessage('✅ Push alerts active! Real-time alerts enabled on this device.');
-          setTimeout(() => setPushStatusMessage(null), 5000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'success',
+            title: res.mode === 'fcm' ? 'Push Notifications Active' : 'Real-Time Alerts Enabled',
+            message: res.warning || 'Real-time notifications are active! You will now receive instant desktop and sound alerts for sales, returns, and inventory movements.',
+          });
         } else if (res.permission === 'denied') {
           setPushPermission('denied');
-          setPushStatusMessage('⚠️ Notification permission was blocked. You can unblock it via your browser address bar.');
-          setTimeout(() => setPushStatusMessage(null), 7000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'warning',
+            title: 'Notification Permission Blocked',
+            message: 'Notification permission was denied. You can unblock notifications anytime in your browser address bar.',
+            showBrowserGuide: true,
+            actionText: 'Check Again',
+            onAction: () => handleTogglePushNotifications(),
+          });
         } else if (res.error) {
-          setPushStatusMessage(res.error);
-          setTimeout(() => setPushStatusMessage(null), 7000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'error',
+            title: 'Notification Setup Notice',
+            message: res.error,
+            details: res.error,
+            actionText: 'Retry',
+            onAction: () => handleTogglePushNotifications(),
+          });
         }
       }
     } catch (err: any) {
-      setPushStatusMessage('Error updating push notification settings: ' + (err?.message || err));
-      setTimeout(() => setPushStatusMessage(null), 6000);
+      setNotificationModalData({
+        isOpen: true,
+        type: 'error',
+        title: 'Notification Error',
+        message: 'Could not update notification settings: ' + (err?.message || err),
+        actionText: 'Try Again',
+        onAction: () => handleTogglePushNotifications(),
+      });
     } finally {
       setIsTogglingPush(false);
       setPushPermission(getNotificationPermissionState());
@@ -536,20 +582,35 @@ export const Header: React.FC<HeaderProps> = ({
       setTestPushStatus('sending');
       const res = await api.notifications.testPush();
       setTestPushStatus(res.success ? 'success' : 'error');
-      setPushStatusMessage('🔔 Test alert sent to your registered devices.');
       if (res.success) {
         triggerBellPulse();
+        setNotificationModalData({
+          isOpen: true,
+          type: 'success',
+          title: 'Test Notification Delivered',
+          message: 'A test alert has been delivered to your active store devices. Real-time counter alerts are functioning properly.',
+        });
+      } else {
+        setNotificationModalData({
+          isOpen: true,
+          type: 'error',
+          title: 'Test Alert Failed',
+          message: res.message || 'Could not deliver test notification to registered devices.',
+        });
       }
       setTimeout(() => {
         setTestPushStatus(null);
-        setPushStatusMessage(null);
       }, 4000);
     } catch (err: any) {
       setTestPushStatus('error');
-      setPushStatusMessage('Test alert failed: ' + (err?.message || err));
+      setNotificationModalData({
+        isOpen: true,
+        type: 'error',
+        title: 'Test Alert Failed',
+        message: 'Test alert failed: ' + (err?.message || err),
+      });
       setTimeout(() => {
         setTestPushStatus(null);
-        setPushStatusMessage(null);
       }, 5000);
     }
   };
@@ -976,20 +1037,11 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
 
-      {/* Push Status Feedback Notification */}
-      {pushStatusMessage && (
-        <div className="bg-indigo-900/95 text-indigo-100 px-3 sm:px-4 py-1.5 text-xs flex items-center justify-between border-b border-indigo-700/50 no-print z-40 relative">
-          <span className="truncate">{pushStatusMessage}</span>
-          <button
-            type="button"
-            onClick={() => setPushStatusMessage(null)}
-            className="text-indigo-200 hover:text-white ml-2 cursor-pointer p-0.5"
-            aria-label="Close status message"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
+      {/* Notification Status Modal Window (Pop-up Window for warnings, errors, and success confirmations) */}
+      <NotificationStatusModal
+        modal={notificationModalData}
+        onClose={() => setNotificationModalData(null)}
+      />
 
       <header className="px-4 border border-indigo-500/20 bg-white/95 dark:bg-white/10 backdrop-blur-lg shadow-lg transition-colors duration-500 sticky top-0 z-30 select-none text-slate-800 dark:text-slate-100 flex items-center justify-between gap-2.5 sm:gap-4 min-h-[3.6rem] py-1.5 no-print">
       {/* LEFT: Mobile Menu Toggle Button & Global Search Bar (No dynamic route title displayed when logged in as SuperAdmin or store user) */}

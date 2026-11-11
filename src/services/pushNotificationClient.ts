@@ -40,12 +40,15 @@ export async function isDeviceSubscribedToPush(): Promise<boolean> {
   if (typeof window === 'undefined' || !('Notification' in window)) return false;
   if (Notification.permission !== 'granted') return false;
   if (localStorage.getItem('pos_push_notifications_enabled') === 'false') return false;
-  return Boolean(localStorage.getItem('pos_fcm_token'));
+  return localStorage.getItem('pos_push_notifications_enabled') === 'true' || Boolean(localStorage.getItem('pos_fcm_token'));
 }
 
 export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
   success: boolean;
+  token?: string;
   error?: string;
+  warning?: string;
+  mode?: 'fcm' | 'realtime';
   permission?: NotificationPermission;
 }> {
   if (typeof window === 'undefined') {
@@ -60,7 +63,7 @@ export async function subscribeDeviceToWebPush(overrideRole?: string): Promise<{
     };
   }
 
-// Delegate directly to Firebase Cloud Messaging (FCM)
+  // Delegate directly to Firebase Cloud Messaging (FCM) with graceful Real-time Stream fallback
   return requestFcmPermissionAndToken(overrideRole);
 }
 

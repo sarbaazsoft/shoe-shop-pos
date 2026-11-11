@@ -110,6 +110,8 @@ export async function acquireAndSyncFcmToken(overrideRole?: string): Promise<{
   success: boolean;
   token?: string;
   error?: string;
+  warning?: string;
+  mode?: 'fcm' | 'realtime';
 }> {
   if (typeof window === 'undefined') {
     return { success: false, error: 'Notifications are only available in a browser environment.' };
@@ -129,83 +131,155 @@ export async function acquireAndSyncFcmToken(overrideRole?: string): Promise<{
       };
     }
 
-    // 2. Register or locate the Service Worker
-    let swReg: ServiceWorkerRegistration | undefined;
+    // 2. Ensure Service Worker is registered AND active
+    let activeSwReg: ServiceWorkerRegistration | undefined;
     if ('serviceWorker' in navigator) {
-      swReg =
-        (await navigator.serviceWorker.getRegistration('/')) ||
-        (await navigator.serviceWorker.getRegistration('/sw.js')) ||
-        (await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js'));
-      if (!swReg) {
-        swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      try {
+        // First check existing registration
+        let reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) {
+          reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        }
+
+        // If a waiting worker exists, tell it to activate immediately
+        if (reg?.waiting) {
+          try {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          } catch {}
+        }
+
+        // Await navigator.serviceWorker.ready to guarantee active worker state
+        const readyReg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<ServiceWorkerRegistration | null>((resolve) => setTimeout(() => resolve(null), 3000)),
+        ]);
+        if (readyReg?.active) {
+          reg = readyReg;
+        }
+
+        // If worker is still installing or waiting, wait for it to transition to activated
+        if (reg && (!reg.active || reg.active.state !== 'activated')) {
+          await new Promise<void>((resolve) => {
+            if (reg?.active && reg.active.state === 'activated') return resolve();
+            const timer = setTimeout(resolve, 2500);
+            const worker = reg?.installing || reg?.waiting;
+            if (worker) {
+              worker.addEventListener('statechange', (e: any) => {
+                if (e.target?.state === 'activated' || reg?.active?.state === 'activated') {
+                  clearTimeout(timer);
+                  resolve();
+                }
+              });
+            }
+          });
+        }
+
+        // Re-check active state on the registration
+        if (reg?.active) {
+          activeSwReg = reg;
+        } else {
+          const freshReg = await navigator.serviceWorker.getRegistration();
+          if (freshReg?.active) {
+            activeSwReg = freshReg;
+          }
+        }
+      } catch (swErr) {
+        console.warn('[firebaseConfig] Service worker readiness notice:', swErr);
       }
-      await navigator.serviceWorker.ready;
     }
 
-    if (!swReg) {
-      return { success: false, error: 'Service Worker could not be registered for push messages.' };
-    }
+    // 3. Attempt FCM Token acquisition if messaging client is initialized
+    let token: string | undefined;
+    if (messaging) {
+      try {
+        const config = await fetchFcmConfig();
+        const rawVapid = config?.vapidKey?.trim();
+        const vapidKey = rawVapid && !rawVapid.includes('@') && rawVapid.length > 30 ? rawVapid : undefined;
 
-    // 3. Get FCM Token using optional VAPID certificate key
-    const config = await fetchFcmConfig();
-    const rawVapid = config?.vapidKey?.trim();
-    // VAPID keys are Base64URL strings (typically ~87 chars, no '@'). Ignore if an email was accidentally entered.
-    const vapidKey = rawVapid && !rawVapid.includes('@') && rawVapid.length > 30 ? rawVapid : undefined;
-
-    const token = await getToken(messaging, {
-      serviceWorkerRegistration: swReg,
-      vapidKey,
-    });
-
-    if (!token) {
-      return { success: false, error: 'Failed to generate Firebase device push token.' };
-    }
-
-    // 4. Send token to backend
-    let userRole = overrideRole || 'ADMIN';
-    let tenantId = getActiveTenantId() || 1;
-    let userId = 0;
-    try {
-      const stored = localStorage.getItem('pos_current_user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u.role) userRole = String(u.role).toUpperCase();
-        if (u.tenantId || u.tenant_id) tenantId = Number(u.tenantId || u.tenant_id);
-        if (u.id) userId = Number(u.id);
+        // ONLY pass serviceWorkerRegistration if we have a verified active worker.
+        // Passing an inactive registration causes Firebase to throw 'Failed to register user. No service workers.'
+        if (activeSwReg?.active) {
+          token = await getToken(messaging, {
+            serviceWorkerRegistration: activeSwReg,
+            vapidKey,
+          });
+        } else {
+          // Attempt default token acquisition without passing an unconfirmed worker
+          token = await getToken(messaging, { vapidKey });
+        }
+      } catch (fcmErr) {
+        console.warn('[firebaseConfig] Background push token notice (activating real-time alert stream fallback):', fcmErr);
       }
-    } catch {}
+    }
 
-    const deviceName = `${navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop/Laptop'} (${navigator.platform || 'Web'})`;
+    // 4. Send token to backend if obtained
+    if (token) {
+      let userRole = overrideRole || 'ADMIN';
+      let tenantId = getActiveTenantId() || 1;
+      let userId = 0;
+      try {
+        const stored = localStorage.getItem('pos_current_user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.role) userRole = String(u.role).toUpperCase();
+          if (u.tenantId || u.tenant_id) tenantId = Number(u.tenantId || u.tenant_id);
+          if (u.id) userId = Number(u.id);
+        }
+      } catch {}
 
-    await api.notifications.registerFcmToken({
-      token,
-      tenantId,
-      userId,
-      userRole,
-      userAgent: navigator.userAgent,
-      deviceName,
-    });
+      const deviceName = `${navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop/Laptop'} (${navigator.platform || 'Web'})`;
 
-    localStorage.setItem('pos_fcm_token', token);
+      await api.notifications.registerFcmToken({
+        token,
+        tenantId,
+        userId,
+        userRole,
+        userAgent: navigator.userAgent,
+        deviceName,
+      });
+
+      localStorage.setItem('pos_fcm_token', token);
+    }
+
+    // Mark notifications as enabled in localStorage and clear denial flag
     localStorage.setItem('pos_push_notifications_enabled', 'true');
     localStorage.removeItem('pos_push_permission_denied');
 
-    // Notify other components (Header, Settings, Soft Prompt) that push state updated
+    // Notify other components that notification state updated
     window.dispatchEvent(
       new CustomEvent('pos:push-status-changed', {
-        detail: { token, permission: 'granted', isSubscribed: true },
+        detail: { token, permission: 'granted', isSubscribed: true, mode: token ? 'fcm' : 'realtime' },
       })
     );
 
     return {
       success: true,
       token,
+      mode: token ? 'fcm' : 'realtime',
+      warning: !token
+        ? 'Real-time desktop alerts are active! (Live counter & sales alerts will pop up while POS is open).'
+        : undefined,
     };
   } catch (err: any) {
     console.error('[firebaseConfig] Exception in acquireAndSyncFcmToken:', err);
+    // If notification permission was already granted by user, don't break - enable real-time notifications
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      localStorage.setItem('pos_push_notifications_enabled', 'true');
+      localStorage.removeItem('pos_push_permission_denied');
+      window.dispatchEvent(
+        new CustomEvent('pos:push-status-changed', {
+          detail: { permission: 'granted', isSubscribed: true, mode: 'realtime' },
+        })
+      );
+      return {
+        success: true,
+        mode: 'realtime',
+        warning: 'Real-time notifications are enabled! You will receive live desktop and counter alerts while POS is open.',
+      };
+    }
     return {
       success: false,
-      error: err?.message || 'Failed to acquire and register FCM push token.',
+      error: err?.message || 'Failed to complete notification registration.',
     };
   }
 }
@@ -237,6 +311,8 @@ export async function requestFcmPermissionAndToken(overrideRole?: string): Promi
   success: boolean;
   token?: string;
   error?: string;
+  warning?: string;
+  mode?: 'fcm' | 'realtime';
   permission?: NotificationPermission;
 }> {
   if (typeof window === 'undefined') {
@@ -280,6 +356,8 @@ export async function requestFcmPermissionAndToken(overrideRole?: string): Promi
       success: acquireRes.success,
       token: acquireRes.token,
       permission: 'granted',
+      mode: acquireRes.mode,
+      warning: acquireRes.warning,
       error: acquireRes.error,
     };
   } catch (err: any) {
@@ -298,6 +376,8 @@ export async function requestFcmDeviceToken(overrideRole?: string): Promise<{
   success: boolean;
   token?: string;
   error?: string;
+  warning?: string;
+  mode?: 'fcm' | 'realtime';
   permission?: NotificationPermission;
 }> {
   return requestFcmPermissionAndToken(overrideRole);

@@ -97,6 +97,16 @@ export const PushNotificationSoftPrompt: React.FC<PushNotificationSoftPromptProp
 
         onPermissionChange?.('granted', true);
 
+        window.dispatchEvent(
+          new CustomEvent('pos:show-notification-modal', {
+            detail: {
+              type: 'success',
+              title: res.mode === 'fcm' ? 'Push Notifications Active' : 'Real-Time Alerts Enabled',
+              message: res.warning || 'Real-time notifications are active! You will now receive instant desktop and sound alerts for sales, returns, and inventory movements.',
+            },
+          })
+        );
+
         // Auto-dismiss after brief celebration
         setTimeout(() => {
           setIsVisible(false);
@@ -108,6 +118,19 @@ export const PushNotificationSoftPrompt: React.FC<PushNotificationSoftPromptProp
         });
 
         onPermissionChange?.('denied', false);
+
+        window.dispatchEvent(
+          new CustomEvent('pos:show-notification-modal', {
+            detail: {
+              type: 'warning',
+              title: 'Notifications Blocked in Browser',
+              message: 'Notifications are currently blocked by your browser settings for this store. Please allow notifications in your browser address bar so you do not miss live sales, returns, and inventory alerts.',
+              showBrowserGuide: true,
+              actionText: 'Check Permission',
+              onAction: () => handleAllowClick(),
+            },
+          })
+        );
 
         // Dismiss soft prompt and remember denial
         setTimeout(() => {
@@ -124,6 +147,19 @@ export const PushNotificationSoftPrompt: React.FC<PushNotificationSoftPromptProp
         type: 'error',
         message: err?.message || 'Could not enable notifications. Please check your browser permissions.',
       });
+
+      window.dispatchEvent(
+        new CustomEvent('pos:show-notification-modal', {
+          detail: {
+            type: 'error',
+            title: 'Notification Setup Notice',
+            message: err?.message || 'Could not enable notifications. Please check your browser permissions.',
+            actionText: 'Retry',
+            onAction: () => handleAllowClick(),
+          },
+        })
+      );
+
       setTimeout(() => {
         dismissSoftPushPrompt(2);
         setIsVisible(false);

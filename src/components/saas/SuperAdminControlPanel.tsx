@@ -21,6 +21,7 @@ import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator';
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import { initNativeNotificationPrompt, isDeviceSubscribedToPush, getNotificationPermissionState, subscribeDeviceToWebPush, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient';
+import { NotificationStatusModal, type NotificationModalData } from '../notifications/NotificationStatusModal';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -70,7 +71,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
   const [isTogglingPush, setIsTogglingPush] = useState(false);
   const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
-  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
+  const [notificationModalData, setNotificationModalData] = useState<NotificationModalData | null>(null);
 
   // SuperAdmin Platform Tools Dropdown state (Send Notification, Import Data, Export Platform Backup)
   const [showToolsDropdown, setShowToolsDropdown] = useState(false);
@@ -306,31 +307,82 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
     };
   }, [isSuperAdmin, loadNotifications]);
 
+  // Listen for global notification modal trigger events
+  useEffect(() => {
+    const handleShowModal = (e: any) => {
+      if (e.detail) {
+        setNotificationModalData({
+          isOpen: true,
+          type: e.detail.type || 'info',
+          title: e.detail.title || 'Notification Notice',
+          message: e.detail.message || '',
+          details: e.detail.details,
+          actionText: e.detail.actionText,
+          onAction: e.detail.onAction,
+          showBrowserGuide: e.detail.showBrowserGuide,
+        });
+      }
+    };
+    window.addEventListener('pos:show-notification-modal', handleShowModal);
+    return () => window.removeEventListener('pos:show-notification-modal', handleShowModal);
+  }, []);
+
   const handleTogglePushNotifications = async () => {
     if (isTogglingPush) return;
     setIsTogglingPush(true);
-    setPushStatusMessage(null);
     try {
       if (isPushSubscribed) {
         await unsubscribeDeviceFromWebPush();
         setIsPushSubscribed(false);
-        setPushStatusMessage('Push notifications disabled on this device.');
-        setTimeout(() => setPushStatusMessage(null), 4000);
+        setNotificationModalData({
+          isOpen: true,
+          type: 'info',
+          title: 'Notifications Disabled',
+          message: 'Push notifications have been disabled on this browser device.',
+        });
       } else {
         const res = await subscribeDeviceToWebPush('SUPERADMIN');
         if (res.success) {
           setIsPushSubscribed(true);
           setPushPermission('granted');
-          setPushStatusMessage('✅ SuperAdmin push alerts active! Real-time alerts enabled on this device.');
-          setTimeout(() => setPushStatusMessage(null), 5000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'success',
+            title: res.mode === 'fcm' ? 'SuperAdmin Push Notifications Active' : 'Real-Time Alerts Enabled',
+            message: res.warning || 'SuperAdmin push notifications are active on this device! You will receive instant alerts for subscriptions, new store trials, and operational updates.',
+          });
+        } else if (res.permission === 'denied') {
+          setPushPermission('denied');
+          setNotificationModalData({
+            isOpen: true,
+            type: 'warning',
+            title: 'Notifications Blocked in Browser',
+            message: 'Notification permission is blocked by your browser settings. Please allow notifications in your browser address bar to receive instant SuperAdmin alerts.',
+            showBrowserGuide: true,
+            actionText: 'Check Permission',
+            onAction: () => handleTogglePushNotifications(),
+          });
         } else if (res.error) {
-          setPushStatusMessage(res.error);
-          setTimeout(() => setPushStatusMessage(null), 7000);
+          setNotificationModalData({
+            isOpen: true,
+            type: 'error',
+            title: 'Notification Setup Notice',
+            message: res.error,
+            details: res.error,
+            actionText: 'Retry',
+            onAction: () => handleTogglePushNotifications(),
+          });
         }
       }
     } catch (err: any) {
-      setPushStatusMessage('Error updating push notification settings: ' + (err?.message || err));
-      setTimeout(() => setPushStatusMessage(null), 6000);
+      setNotificationModalData({
+        isOpen: true,
+        type: 'error',
+        title: 'Notification Setup Error',
+        message: 'Could not update push notification settings: ' + (err?.message || err),
+        actionText: 'Try Again',
+        onAction: () => handleTogglePushNotifications(),
+      });
     } finally {
       setIsTogglingPush(false);
       setPushPermission(getNotificationPermissionState());
@@ -345,7 +397,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         message: 'SuperAdmin push notification test delivered successfully to registered devices!',
       });
       setTestPushStatus(res.success ? 'success' : 'error');
-      setPushStatusMessage(res.message || '🔔 Test alert sent to registered devices.');
 
       // Fallback local desktop alert if browser permission is already granted
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -358,19 +409,36 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         } catch {}
       }
 
+      if (res.success) {
+        setNotificationModalData({
+          isOpen: true,
+          type: 'success',
+          title: 'Test Alert Delivered',
+          message: 'SuperAdmin test notification was delivered to registered devices. Real-time counter and system alerts are working properly.',
+        });
+      } else {
+        setNotificationModalData({
+          isOpen: true,
+          type: 'error',
+          title: 'Test Alert Failed',
+          message: res.message || 'Could not deliver test notification to registered devices.',
+        });
+      }
+
       setTimeout(() => {
         setTestPushStatus(null);
       }, 4000);
-      setTimeout(() => {
-        setPushStatusMessage(null);
-      }, 6000);
     } catch (err: any) {
       setTestPushStatus('error');
-      setPushStatusMessage('Test alert failed: ' + (err?.message || err));
+      setNotificationModalData({
+        isOpen: true,
+        type: 'error',
+        title: 'Test Alert Error',
+        message: 'Test alert failed: ' + (err?.message || err),
+      });
       setTimeout(() => {
         setTestPushStatus(null);
-        setPushStatusMessage(null);
-      }, 5000);
+      }, 4000);
     }
   };
 
@@ -2007,20 +2075,11 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
       {/* RIGHT COLUMN: TOP HEADER + MAIN WORKSPACE + FOOTER (Aligned with Store Page) */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#F8FAFC] dark:bg-[#0A0E1A]">
-        {/* Push Status Feedback Notification */}
-        {pushStatusMessage && (
-          <div className="bg-indigo-900/95 text-indigo-100 px-3 sm:px-4 py-1.5 text-xs flex items-center justify-between border-b border-indigo-700/50 no-print z-40 relative">
-            <span className="truncate">{pushStatusMessage}</span>
-            <button
-              type="button"
-              onClick={() => setPushStatusMessage(null)}
-              className="text-indigo-200 hover:text-white ml-2 cursor-pointer p-0.5"
-              aria-label="Close status message"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
+        {/* Notification Status Modal Window (Pop-up Window for warnings, errors, and success confirmations) */}
+        <NotificationStatusModal
+          modal={notificationModalData}
+          onClose={() => setNotificationModalData(null)}
+        />
 
         {/* STICKY TOP HEADER BAR (Exact h-[3.6rem] aligned with Store Header.tsx) */}
         <header className="h-[3.6rem] sticky top-0 z-20 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-lg border-b border-indigo-500/20 px-3 sm:px-6 flex items-center justify-between gap-3 shrink-0 shadow-2xs transition-colors">
@@ -2293,11 +2352,6 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                           <span>{testPushStatus === 'success' ? 'Sent!' : 'Test Alert'}</span>
                         </button>
                       </div>
-                      {pushStatusMessage && (
-                        <div className="mt-1.5 p-1 rounded bg-purple-100/90 dark:bg-purple-900/60 text-[9.5px] text-purple-900 dark:text-purple-200 leading-tight">
-                          {pushStatusMessage}
-                        </div>
-                      )}
                     </div>
 
                     {/* Category Filter Tabs */}
