@@ -511,10 +511,6 @@ export const api = {
       apiFetch<{ success: boolean; message: string }>(`/superadmin/notifications/${id}`, {
         method: 'DELETE',
       }),
-    revokeNotification: (id: number) =>
-      apiFetch<{ success: boolean; message: string }>(`/superadmin/notifications/${id}`, {
-        method: 'DELETE',
-      }),
   },
 
   install: {
@@ -722,43 +718,7 @@ export const api = {
         throw err;
       }
     },
-    scanBarcode: async (code: string) => {
-      const activeTenantId = getActiveTenantId();
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        const cached = await lookupCachedProductOffline(code, activeTenantId);
-        if (cached) return { product: cached, offline: true };
-      }
-      try {
-        const res = await apiFetch<any>(`/products/barcode/${encodeURIComponent(code)}`);
-        if (res && res.product) {
-          cacheCatalogOffline([res.product], activeTenantId).catch(() => {});
-        }
-        return res;
-      } catch (err: any) {
-        const cached = await lookupCachedProductOffline(code, activeTenantId).catch(() => null);
-        if (cached) return { product: cached, offline: true };
-        throw err;
-      }
-    },
     lookupBarcode: async (code: string) => {
-      const activeTenantId = getActiveTenantId();
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        const cached = await lookupCachedProductOffline(code, activeTenantId);
-        if (cached) return { product: cached, offline: true };
-      }
-      try {
-        const res = await apiFetch<any>(`/products/barcode/${encodeURIComponent(code)}`);
-        if (res && res.product) {
-          cacheCatalogOffline([res.product], activeTenantId).catch(() => {});
-        }
-        return res;
-      } catch (err: any) {
-        const cached = await lookupCachedProductOffline(code, activeTenantId).catch(() => null);
-        if (cached) return { product: cached, offline: true };
-        throw err;
-      }
-    },
-    getByBarcode: async (code: string) => {
       const activeTenantId = getActiveTenantId();
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         const cached = await lookupCachedProductOffline(code, activeTenantId);
@@ -912,11 +872,6 @@ export const api = {
     createCategory: (name: string) => apiFetch('/categories', { method: 'POST', body: { name } }),
     deleteCategory: (id: number) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
   },
-  brandCategory: {
-    getCategories: () => apiFetch('/categories'),
-    createCategory: (name: string) => apiFetch('/categories', { method: 'POST', body: { name } }),
-    deleteCategory: (id: number) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
-  },
   pos: {
     verifyOverride: (credentials: { email?: string; password?: string; pin?: string }) =>
       apiFetch('/pos/verify-override', { method: 'POST', body: credentials }),
@@ -939,17 +894,11 @@ export const api = {
   returns: {
     verifyInvoice: (invoiceNumber: string) =>
       apiFetch(`/returns/verify-invoice/${encodeURIComponent(invoiceNumber)}`),
-    createReturn: (data: any) => apiFetch('/returns', { method: 'POST', body: data }),
     create: (data: any) => apiFetch('/returns', { method: 'POST', body: data }),
-    listReturns: (search?: string) => {
-      const query = search ? `?search=${encodeURIComponent(search)}` : '';
-      return apiFetch(`/returns${query}`);
-    },
     list: (search?: string) => {
       const query = search ? `?search=${encodeURIComponent(search)}` : '';
       return apiFetch(`/returns${query}`);
     },
-    getReturn: (id: number) => apiFetch(`/returns/${id}`),
     get: (id: number) => apiFetch(`/returns/${id}`),
   },
   suppliers: {

@@ -407,16 +407,50 @@ function nextMockId(table: string): number {
   return current;
 }
 
+let mockTxSnapshot: { store: Record<string, any[]>; counters: Record<string, number> } | null = null;
+
+function restoreMockStoreSnapshot(snapshot: { store: Record<string, any[]>; counters: Record<string, number> }) {
+  for (const key of Object.keys(mockStore)) {
+    delete mockStore[key];
+  }
+  for (const [key, val] of Object.entries(snapshot.store)) {
+    mockStore[key] = val;
+  }
+  for (const key of Object.keys(mockIdCounters)) {
+    delete mockIdCounters[key];
+  }
+  for (const [key, val] of Object.entries(snapshot.counters)) {
+    mockIdCounters[key] = val;
+  }
+}
+
 async function executeMockQuery<T = any>(text: string, params: any[] = []): Promise<{ rows: T[]; rowCount?: number }> {
   const sql = text.trim();
   const upper = sql.toUpperCase();
 
+  if (upper === 'BEGIN') {
+    if (!mockTxSnapshot) {
+      mockTxSnapshot = structuredClone({ store: mockStore, counters: mockIdCounters });
+    }
+    return { rows: [{ ok: 1 } as unknown as T], rowCount: 1 };
+  }
+
+  if (upper === 'COMMIT') {
+    mockTxSnapshot = null;
+    return { rows: [{ ok: 1 } as unknown as T], rowCount: 1 };
+  }
+
+  if (upper === 'ROLLBACK') {
+    if (mockTxSnapshot) {
+      restoreMockStoreSnapshot(mockTxSnapshot);
+      mockTxSnapshot = null;
+    }
+    return { rows: [{ ok: 1 } as unknown as T], rowCount: 1 };
+  }
+
   if (
     upper === 'SELECT 1' ||
     upper === 'SELECT 1 AS OK' ||
-    upper === 'BEGIN' ||
-    upper === 'COMMIT' ||
-    upper === 'ROLLBACK' ||
     upper.includes('PG_ADVISORY_XACT_LOCK')
   ) {
     return { rows: [{ ok: 1 } as unknown as T], rowCount: 1 };
@@ -1725,6 +1759,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
   // PRODUCTS queries
   if (upper.startsWith('SELECT') && upper.includes('FROM PRODUCTS')) {
     if (
+      upper.includes('P.BARCODE = $1') ||
       upper.includes('LOWER(BARCODE) = LOWER($1)') ||
       upper.includes('LOWER(TRIM(BARCODE)) = LOWER(TRIM($1))') ||
       upper.includes('LOWER(TRIM(BARCODE)) = LOWER($1)') ||
@@ -1737,10 +1772,19 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       const excludeId = hasIdNotEqualSecond
         ? (params[1] ? Number(params[1]) : null)
         : (params[2] ? Number(params[2]) : null);
+      const allowsArticleOrName = upper.includes('LOWER(COALESCE(P.ARTICLE') || upper.includes('LOWER(ARTICLE) = LOWER($1)');
+      const requireActive = upper.includes('ACTIVE = TRUE');
       const matched = mockStore.products.filter(
         (p) =>
           Number(p.tenant_id || 1) === tFilter &&
-          String(p.barcode || '').trim().toLowerCase() === bc &&
+          (!requireActive || p.active !== false) &&
+          (
+            String(p.barcode || '').trim().toLowerCase() === bc ||
+            (allowsArticleOrName && (
+              String(p.article || '').trim().toLowerCase() === bc ||
+              String(p.name || '').trim().toLowerCase() === bc
+            ))
+          ) &&
           (!excludeId || Number(p.id) !== excludeId)
       );
       return { rows: matched as unknown as T[], rowCount: matched.length };
@@ -1809,6 +1853,30 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         .filter((p) => Number(p.tenant_id || 1) === Number(params[0] || 1) && candidates.includes(Number(p.tenant_product_no)))
         .map((p) => ({ tenant_product_no: p.tenant_product_no }));
       return { rows: matched as unknown as T[], rowCount: matched.length };
+    }
+    if (upper.includes('AS CATEGORY_NAME') && upper.includes('AS STOCK_UNITS')) {
+      const catMap = new Map<string, { category_name: string; product_count: number; stock_units: number; units_sold: number; revenue: number }>();
+      for (const p of storeProds) {
+        const key = (p.category || '').trim() || 'Athletic & Sneakers';
+        const cur = catMap.get(key) || { category_name: key, product_count: 0, stock_units: 0, units_sold: 0, revenue: 0 };
+        cur.product_count += 1;
+        cur.stock_units += Number(p.total_stock || 0);
+        const items = mockStore.sale_items.filter((si) => Number(si.product_id) === Number(p.id) && (!tid || Number(si.tenant_id || 1) === tid));
+        cur.units_sold += items.reduce((s, i) => s + Number(i.quantity || 0), 0);
+        cur.revenue += items.reduce((s, i) => s + (Number(i.unit_price || 0) * Number(i.quantity || 0) - Number(i.discount || 0)), 0);
+        catMap.set(key, cur);
+      }
+      const rows = Array.from(catMap.values())
+        .sort((a, b) => b.units_sold - a.units_sold || b.stock_units - a.stock_units)
+        .slice(0, 5)
+        .map((c) => ({
+          category_name: c.category_name,
+          product_count: c.product_count,
+          stock_units: c.stock_units,
+          units_sold: c.units_sold,
+          revenue: String(c.revenue),
+        })) as unknown as T[];
+      return { rows, rowCount: rows.length };
     }
     if (upper.includes('AS PRODUCT_ID') && upper.includes('AS UNITS_SOLD')) {
       const rows = storeProds.slice(0, 4).map((p) => ({
@@ -1919,6 +1987,19 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       }
       return { rows: [], rowCount: 0 };
     }
+    if (upper.includes('SET TOTAL_STOCK = $1') && upper.includes('WHERE ID = $2')) {
+      const nextStock = Number(params[0]);
+      const targetId = Number(params[1]);
+      const tid = params.length >= 3 ? Number(params[2]) || 1 : null;
+      const prod = mockStore.products.find(
+        (p) => Number(p.id) === targetId && (!tid || Number(p.tenant_id || 1) === tid)
+      );
+      if (prod) {
+        prod.total_stock = nextStock;
+        prod.updated_at = new Date().toISOString();
+      }
+      return { rows: prod ? ([prod] as unknown as T[]) : [], rowCount: prod ? 1 : 0 };
+    }
     if (upper.includes('SET ACTIVE = FALSE') && upper.includes('WHERE ID = $1')) {
       const targetId = Number(params[0]);
       const tid = Number(params[1]) || 1;
@@ -1941,18 +2022,96 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: [], rowCount: 1 };
   }
 
-  // Sales / Dashboard aggregates
+  // Sales / Dashboard aggregates & lookups
   if (upper.startsWith('SELECT') && upper.includes('FROM SALES')) {
+    const enrichSale = (s: any) => {
+      const c = s.customer_id ? mockStore.customers.find((cust) => Number(cust.id) === Number(s.customer_id)) : null;
+      const u = s.created_by ? mockStore.users.find((usr) => Number(usr.id) === Number(s.created_by)) : null;
+      return {
+        ...s,
+        customer_name: c?.name || s.customer_name || null,
+        customer_phone: c?.phone || s.customer_phone || null,
+        customer_shop_name: c?.shop_name || null,
+        customer_city: c?.city || null,
+        customer_market_name: c?.market_name || null,
+        customer_type: c?.customer_type || null,
+        customer_ntn: c?.ntn_number || null,
+        customer_outstanding_balance: c ? Number(c.outstanding_balance ?? c.current_balance ?? 0) : 0,
+        customer_current_balance: c ? Number(c.current_balance ?? c.outstanding_balance ?? 0) : 0,
+        cashier_name: u?.name || s.cashier_name || null,
+      };
+    };
+
     if (upper.includes('AS TOTAL_SALES') && upper.includes('AS TOTAL_DISCOUNT')) {
-      return { rows: [{ count: '0', total_sales: '0', total_discount: '0' } as unknown as T], rowCount: 1 };
+      const tid = Number(params[0] || 1);
+      const targetDate = String(params[1] || new Date().toISOString().split('T')[0]);
+      const todaySales = mockStore.sales.filter(
+        (s) => Number(s.tenant_id || 1) === tid && String(s.sale_date || '') === targetDate
+      );
+      const totalSales = todaySales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+      const totalDiscount = todaySales.reduce((sum, s) => sum + Number(s.discount || 0), 0);
+      return {
+        rows: [
+          {
+            count: String(todaySales.length),
+            total_sales: String(totalSales),
+            total_discount: String(totalDiscount),
+          } as unknown as T,
+        ],
+        rowCount: 1,
+      };
     }
+
     if (upper.includes('AS TOTAL_REVENUE') && upper.includes('AS TOTAL_PROFIT')) {
-      return { rows: [{ total_revenue: '0', total_profit: '0', total_sales_count: '0' } as unknown as T], rowCount: 1 };
+      const tid = Number(params[0] || 1);
+      const tSales = mockStore.sales.filter((s) => Number(s.tenant_id || 1) === tid);
+      const tItems = mockStore.sale_items.filter((si) => Number(si.tenant_id || 1) === tid);
+      const totalRevenue = tSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+      const totalProfit = tItems.reduce(
+        (sum, si) =>
+          sum +
+          (Number(si.unit_price || 0) * Number(si.quantity || 0) -
+            Number(si.discount || 0) -
+            Number(si.purchase_price || 0) * Number(si.quantity || 0)),
+        0
+      );
+      return {
+        rows: [
+          {
+            total_revenue: String(totalRevenue),
+            total_profit: String(totalProfit),
+            total_sales_count: String(tSales.length),
+          } as unknown as T,
+        ],
+        rowCount: 1,
+      };
     }
+
     let sList = [...mockStore.sales];
-    if (upper.includes('WHERE S.ID = $1') || upper.includes('WHERE ID = $1')) {
+    if (upper.includes('NOTES LIKE $2')) {
+      const tid = Number(params[0] || 1);
+      const needle = String(params[1] || '').replace(/%/g, '').toLowerCase();
+      sList = sList.filter(
+        (s) => Number(s.tenant_id || 1) === tid && String(s.notes || '').toLowerCase().includes(needle)
+      );
+    } else if (upper.includes('INVOICE_NUMBER LIKE $2')) {
+      const tid = Number(params[0] || 1);
+      const prefix = String(params[1] || '').replace(/%$/, '').toLowerCase();
+      sList = sList
+        .filter((s) => Number(s.tenant_id || 1) === tid && String(s.invoice_number || '').toLowerCase().startsWith(prefix))
+        .sort((a, b) => Number(b.id) - Number(a.id));
+    } else if (upper.includes('UPPER(S.INVOICE_NUMBER) = UPPER($1)')) {
+      const inv = String(params[0] || '').trim().toUpperCase();
+      const tid = Number(params[1] || 1);
+      sList = sList.filter(
+        (s) => Number(s.tenant_id || 1) === tid && String(s.invoice_number || '').trim().toUpperCase() === inv
+      );
+    } else if (upper.includes('WHERE S.ID = $1') || upper.includes('WHERE ID = $1')) {
       const targetId = Number(params[0]);
-      sList = sList.filter((s) => Number(s.id) === targetId);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      sList = sList.filter(
+        (s) => Number(s.id) === targetId && (!tid || Number(s.tenant_id || 1) === tid)
+      );
     } else {
       const tid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
       if (tid && (upper.includes('TENANT_ID = $1') || upper.includes('S.TENANT_ID = $1'))) {
@@ -1975,7 +2134,8 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         sList = sList.filter((s: any) => !dismissals.some((d: any) => d.item_type === 'SALE' && Number(d.item_id) === Number(s.id) && (Number(d.user_id) === uid || Number(d.user_id) === 0)));
       }
     }
-    return { rows: sList as unknown as T[], rowCount: sList.length };
+    const enriched = sList.map(enrichSale);
+    return { rows: enriched as unknown as T[], rowCount: enriched.length };
   }
 
   if (upper.startsWith('INSERT INTO SALES')) {
@@ -2003,6 +2163,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       overridden_by: params[19] ? Number(params[19]) : null,
       notes: String(params[20] || ''),
       sale_date: params[21] ? String(params[21]) : new Date().toISOString().slice(0, 10),
+      transaction_id: params[22] ? String(params[22]) : '',
       created_at: new Date().toISOString(),
     };
     mockStore.sales.unshift(newSale);
@@ -2030,26 +2191,86 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
   }
 
   if (upper.startsWith('SELECT') && upper.includes('FROM SALE_ITEMS')) {
-    if (upper.includes('AS PROFIT')) {
-      return { rows: [{ profit: '0', cost: '0' } as unknown as T], rowCount: 1 };
+    if (upper.includes('AS PROFIT') && upper.includes('AS COST')) {
+      const tid = Number(params[0] || 1);
+      const targetDate = String(params[1] || new Date().toISOString().split('T')[0]);
+      const matchingSaleIds = new Set(
+        mockStore.sales
+          .filter((s) => Number(s.tenant_id || 1) === tid && String(s.sale_date || '') === targetDate)
+          .map((s) => Number(s.id))
+      );
+      const items = mockStore.sale_items.filter((si) => matchingSaleIds.has(Number(si.sale_id)));
+      const profit = items.reduce(
+        (sum, si) =>
+          sum +
+          (Number(si.unit_price || 0) * Number(si.quantity || 0) -
+            Number(si.discount || 0) -
+            Number(si.purchase_price || 0) * Number(si.quantity || 0)),
+        0
+      );
+      const cost = items.reduce((sum, si) => sum + Number(si.purchase_price || 0) * Number(si.quantity || 0), 0);
+      return { rows: [{ profit: String(profit), cost: String(cost) } as unknown as T], rowCount: 1 };
     }
-    if (upper.includes('WHERE SALE_ID = $1')) {
-      const sid = Number(params[0]);
-      const items = mockStore.sale_items.filter((i) => Number(i.sale_id) === sid);
+
+    const enrichSaleItem = (si: any) => {
+      const p = mockStore.products.find((prod) => Number(prod.id) === Number(si.product_id));
+      const returnedQty = (mockStore.return_items || [])
+        .filter((ri) => Number(ri.sale_item_id) === Number(si.id))
+        .reduce((sum, ri) => sum + Number(ri.quantity || 0), 0);
+      return {
+        ...si,
+        article: p?.article || si.product_name,
+        product_name: p?.article || si.product_name,
+        barcode: p?.barcode || '',
+        pairs_per_carton: p?.pairs_per_carton ?? si.pairs_per_carton ?? 12,
+        allow_half_carton: p?.allow_half_carton ?? true,
+        already_returned_quantity: returnedQty,
+      };
+    };
+
+    if (upper.includes('WHERE ID = $1') && upper.includes('SALE_ID = $2')) {
+      const itemId = Number(params[0]);
+      const sid = Number(params[1]);
+      const tid = params.length >= 3 ? Number(params[2]) : null;
+      const items = mockStore.sale_items
+        .filter(
+          (i) =>
+            Number(i.id) === itemId &&
+            Number(i.sale_id) === sid &&
+            (!tid || Number(i.tenant_id || 1) === tid)
+        )
+        .map(enrichSaleItem);
       return { rows: items as unknown as T[], rowCount: items.length };
     }
-    return { rows: mockStore.sale_items as unknown as T[], rowCount: mockStore.sale_items.length };
+
+    if (upper.includes('WHERE SI.SALE_ID = $1') || upper.includes('WHERE SALE_ID = $1')) {
+      const sid = Number(params[0]);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      const items = mockStore.sale_items
+        .filter((i) => Number(i.sale_id) === sid && (!tid || Number(i.tenant_id || 1) === tid))
+        .map(enrichSaleItem);
+      return { rows: items as unknown as T[], rowCount: items.length };
+    }
+
+    const allEnriched = mockStore.sale_items.map(enrichSaleItem);
+    return { rows: allEnriched as unknown as T[], rowCount: allEnriched.length };
   }
 
   // CUSTOMERS
   if (upper.startsWith('SELECT') && upper.includes('FROM CUSTOMERS')) {
     if (upper.includes('COUNT(*)')) {
-      return { rows: [{ count: String(mockStore.customers.length) } as unknown as T], rowCount: 1 };
+      const tid = params.length > 0 && upper.includes('TENANT_ID = $1') ? Number(params[0]) : null;
+      const list = tid ? mockStore.customers.filter((c) => Number(c.tenant_id || 1) === tid) : mockStore.customers;
+      return { rows: [{ count: String(list.length) } as unknown as T], rowCount: 1 };
     }
     let cList = [...mockStore.customers];
     if (upper.includes('WHERE C.ID = $1') || upper.includes('WHERE ID = $1')) {
       const cid = Number(params[0]);
-      cList = cList.filter((c) => Number(c.id) === cid);
+      const tid = params.length >= 2 && upper.includes('TENANT_ID = $2') ? Number(params[1]) : null;
+      cList = cList.filter((c) => Number(c.id) === cid && (!tid || Number(c.tenant_id || 1) === tid));
+    } else if (upper.includes('WHERE C.TENANT_ID = $1') || upper.includes('WHERE TENANT_ID = $1')) {
+      const tid = Number(params[0] || 1);
+      cList = cList.filter((c) => Number(c.tenant_id || 1) === tid);
     }
     return { rows: cList as unknown as T[], rowCount: cList.length };
   }
@@ -2070,6 +2291,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       current_balance: Number(params[10] || 0),
       outstanding_balance: Number(params[11] ?? params[10] ?? 0),
       ntn_number: String(params[12] || ''),
+      customer_type: String(params[13] || 'RETAILER'),
       created_at: new Date().toISOString(),
     };
     mockStore.customers.unshift(newCust);
@@ -2080,7 +2302,10 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     if (upper.includes('SET OUTSTANDING_BALANCE = $1') || upper.includes('SET CURRENT_BALANCE = $1')) {
       const newBal = Number(params[0]);
       const cid = Number(params[1]);
-      const cust = mockStore.customers.find((c) => Number(c.id) === cid);
+      const tid = params.length >= 3 ? Number(params[2]) : null;
+      const cust = mockStore.customers.find(
+        (c) => Number(c.id) === cid && (!tid || Number(c.tenant_id || 1) === tid)
+      );
       if (cust) {
         cust.outstanding_balance = newBal;
         cust.current_balance = newBal;
@@ -2112,7 +2337,8 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     let kList = [...mockStore.customer_ledger];
     if (upper.includes('WHERE CUSTOMER_ID = $1')) {
       const cid = Number(params[0]);
-      kList = kList.filter((k) => Number(k.customer_id) === cid);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      kList = kList.filter((k) => Number(k.customer_id) === cid && (!tid || Number(k.tenant_id || 1) === tid));
     }
     return { rows: kList as unknown as T[], rowCount: kList.length };
   }
@@ -2137,6 +2363,137 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     return { rows: [newEntry as unknown as T], rowCount: 1 };
   }
 
+  // STOCK_MOVEMENTS
+  if (upper.startsWith('INSERT INTO STOCK_MOVEMENTS')) {
+    if (!mockStore.stock_movements) mockStore.stock_movements = [];
+    const colMatch = sql.match(/INSERT\s+INTO\s+stock_movements\s*\(([^)]+)\)/i);
+    const valMatch = sql.match(/VALUES\s*\(([^)]+)\)/i);
+    const entry: Record<string, any> = {
+      id: nextMockId('stock_movements'),
+      created_at: new Date().toISOString(),
+    };
+    if (colMatch && valMatch) {
+      const cols = colMatch[1].split(',').map((c) => c.trim().toLowerCase());
+      const valTokens = valMatch[1].split(',').map((v) => v.trim());
+      cols.forEach((col, idx) => {
+        const token = valTokens[idx] || '';
+        if (token.startsWith('$')) {
+          const pIdx = parseInt(token.slice(1), 10) - 1;
+          entry[col] = params[pIdx];
+        } else {
+          entry[col] = token.replace(/^'|'$/g, '');
+        }
+      });
+    }
+    mockStore.stock_movements.unshift(entry);
+    return { rows: [entry as unknown as T], rowCount: 1 };
+  }
+
+  if (upper.startsWith('SELECT') && upper.includes('FROM STOCK_MOVEMENTS')) {
+    let smList = [...(mockStore.stock_movements || [])];
+    const tid = params.length > 0 ? Number(params[0] || 1) : 1;
+    smList = smList.filter((sm) => Number(sm.tenant_id || 1) === tid);
+    if (upper.includes('SM.PRODUCT_ID = $2')) {
+      const pid = Number(params[1]);
+      smList = smList.filter((sm) => Number(sm.product_id) === pid);
+    }
+    if (upper.includes('SM.MOVEMENT_TYPE =')) {
+      const typeIdx = upper.includes('SM.PRODUCT_ID = $2') ? 2 : 1;
+      const mType = String(params[typeIdx] || '').toUpperCase();
+      smList = smList.filter((sm) => String(sm.movement_type || '').toUpperCase() === mType);
+    }
+    const enriched = smList.map((sm) => {
+      const p = mockStore.products.find((prod) => Number(prod.id) === Number(sm.product_id));
+      const u = mockStore.users.find((usr) => Number(usr.id) === Number(sm.user_id));
+      return {
+        ...sm,
+        article: p?.article || p?.name || '',
+        product_name: p?.article || p?.name || '',
+        barcode: p?.barcode || '',
+        user_name: u?.name || 'System',
+      };
+    });
+    return { rows: enriched as unknown as T[], rowCount: enriched.length };
+  }
+
+  // RETURNS & RETURN_ITEMS
+  if (upper.startsWith('INSERT INTO RETURNS')) {
+    if (!mockStore.returns) mockStore.returns = [];
+    const newRet = {
+      id: nextMockId('returns'),
+      tenant_id: Number(params[0] || 1),
+      return_number: String(params[1] || 'RET-000001'),
+      original_sale_id: params[2] ? Number(params[2]) : null,
+      customer_id: params[3] ? Number(params[3]) : null,
+      return_date: new Date().toISOString().slice(0, 10),
+      total_refund_amount: Number(params[4] || 0),
+      reason: String(params[5] || ''),
+      created_by: Number(params[6] || 1),
+      created_at: new Date().toISOString(),
+    };
+    mockStore.returns.unshift(newRet);
+    return { rows: [{ id: newRet.id } as unknown as T], rowCount: 1 };
+  }
+
+  if (upper.startsWith('INSERT INTO RETURN_ITEMS')) {
+    if (!mockStore.return_items) mockStore.return_items = [];
+    const colMatch = sql.match(/INSERT\s+INTO\s+return_items\s*\(([^)]+)\)/i);
+    const valMatch = sql.match(/VALUES\s*\(([^)]+)\)/i);
+    const entry: Record<string, any> = {
+      id: nextMockId('return_items'),
+    };
+    if (colMatch && valMatch) {
+      const cols = colMatch[1].split(',').map((c) => c.trim().toLowerCase());
+      const valTokens = valMatch[1].split(',').map((v) => v.trim());
+      cols.forEach((col, idx) => {
+        const token = valTokens[idx] || '';
+        if (token.startsWith('$')) {
+          const pIdx = parseInt(token.slice(1), 10) - 1;
+          entry[col] = params[pIdx];
+        } else if (token.toUpperCase() === 'NULL') {
+          entry[col] = null;
+        } else {
+          entry[col] = token.replace(/^'|'$/g, '');
+        }
+      });
+    }
+    mockStore.return_items.push(entry);
+    return { rows: [entry as unknown as T], rowCount: 1 };
+  }
+
+  if (upper.startsWith('SELECT') && upper.includes('FROM RETURN_ITEMS')) {
+    let riList = [...(mockStore.return_items || [])];
+    if (upper.includes('WHERE SALE_ITEM_ID = $1')) {
+      const saleItemId = Number(params[0]);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      riList = riList.filter(
+        (ri) => Number(ri.sale_item_id) === saleItemId && (!tid || Number(ri.tenant_id || 1) === tid)
+      );
+      if (upper.includes('AS TOTAL_RETURNED')) {
+        const sumQty = riList.reduce((sum, ri) => sum + Number(ri.quantity || 0), 0);
+        return { rows: [{ total_returned: String(sumQty) } as unknown as T], rowCount: 1 };
+      }
+      return { rows: riList as unknown as T[], rowCount: riList.length };
+    }
+    if (upper.includes('WHERE RI.RETURN_ID = $1')) {
+      const rid = Number(params[0]);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      riList = riList
+        .filter((ri) => Number(ri.return_id) === rid && (!tid || Number(ri.tenant_id || 1) === tid))
+        .map((ri) => {
+          const p = mockStore.products.find((prod) => Number(prod.id) === Number(ri.product_id));
+          return {
+            ...ri,
+            article: p?.article || p?.name || '',
+            product_name: p?.article || p?.name || '',
+            barcode: p?.barcode || '',
+          };
+        });
+      return { rows: riList as unknown as T[], rowCount: riList.length };
+    }
+    return { rows: riList as unknown as T[], rowCount: riList.length };
+  }
+
   if (upper.startsWith('SELECT') && upper.includes('FROM PURCHASES') && upper.includes('COUNT(*)')) {
     return { rows: [{ count: String(mockStore.purchases.length), total: '0' } as unknown as T], rowCount: 1 };
   }
@@ -2147,27 +2504,49 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
 
   if (upper.startsWith('SELECT') && upper.includes('FROM RETURNS')) {
     let rList = [...(mockStore.returns || [])];
-    const tid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
-    if (tid && (upper.includes('TENANT_ID = $1') || upper.includes('R.TENANT_ID = $1'))) {
-      rList = rList.filter((r: any) => Number(r.tenant_id) === tid);
-    }
-    const roleParam = params.find((p) => typeof p === 'string' && (p === 'CASHIER' || p === 'ADMIN' || p === 'SUPERADMIN'));
-    if (roleParam === 'CASHIER') {
-      const uid = params.length >= 2 && params[1] !== undefined ? Number(params[1]) : 0;
-      if (uid > 0) {
-        rList = rList.filter((r: any) => Number(r.created_by) === uid);
+    if (upper.includes('WHERE R.ID = $1')) {
+      const rid = Number(params[0]);
+      const tid = params.length >= 2 ? Number(params[1]) : null;
+      rList = rList.filter((r: any) => Number(r.id) === rid && (!tid || Number(r.tenant_id || 1) === tid));
+    } else {
+      const tid = params.length > 0 && params[0] !== undefined ? Number(params[0]) : null;
+      if (tid && (upper.includes('TENANT_ID = $1') || upper.includes('R.TENANT_ID = $1'))) {
+        rList = rList.filter((r: any) => Number(r.tenant_id) === tid);
+      }
+      if (upper.includes("RETURN_NUMBER LIKE 'RET-%'")) {
+        rList = rList
+          .filter((r: any) => String(r.return_number || '').startsWith('RET-'))
+          .sort((a: any, b: any) => Number(b.id) - Number(a.id));
+      }
+      const roleParam = params.find((p) => typeof p === 'string' && (p === 'CASHIER' || p === 'ADMIN' || p === 'SUPERADMIN'));
+      if (roleParam === 'CASHIER') {
+        const uid = params.length >= 2 && params[1] !== undefined ? Number(params[1]) : 0;
+        if (uid > 0) {
+          rList = rList.filter((r: any) => Number(r.created_by) === uid);
+        }
+      }
+      if (upper.includes("INTERVAL '48 HOURS'")) {
+        const cutoff = Date.now() - 48 * 3600 * 1000;
+        rList = rList.filter((r: any) => new Date(r.created_at || r.return_date).getTime() >= cutoff);
+      }
+      if (upper.includes('NOT EXISTS') && upper.includes('POS_NOTIFICATION_DISMISSALS')) {
+        const dismissals = mockStore.pos_notification_dismissals || [];
+        const uid = params.length >= 2 ? Number(params[1]) : 0;
+        rList = rList.filter((r: any) => !dismissals.some((d: any) => d.item_type === 'RETURN' && Number(d.item_id) === Number(r.id) && (Number(d.user_id) === uid || Number(d.user_id) === 0)));
       }
     }
-    if (upper.includes("INTERVAL '48 HOURS'")) {
-      const cutoff = Date.now() - 48 * 3600 * 1000;
-      rList = rList.filter((r: any) => new Date(r.created_at || r.return_date).getTime() >= cutoff);
-    }
-    if (upper.includes('NOT EXISTS') && upper.includes('POS_NOTIFICATION_DISMISSALS')) {
-      const dismissals = mockStore.pos_notification_dismissals || [];
-      const uid = params.length >= 2 ? Number(params[1]) : 0;
-      rList = rList.filter((r: any) => !dismissals.some((d: any) => d.item_type === 'RETURN' && Number(d.item_id) === Number(r.id) && (Number(d.user_id) === uid || Number(d.user_id) === 0)));
-    }
-    return { rows: rList as unknown as T[], rowCount: rList.length };
+    const enriched = rList.map((r: any) => {
+      const s = mockStore.sales.find((sale) => Number(sale.id) === Number(r.original_sale_id));
+      const c = r.customer_id ? mockStore.customers.find((cust) => Number(cust.id) === Number(r.customer_id)) : null;
+      const u = r.created_by ? mockStore.users.find((usr) => Number(usr.id) === Number(r.created_by)) : null;
+      return {
+        ...r,
+        invoice_number: s?.invoice_number || null,
+        customer_name: c?.name || null,
+        cashier_name: u?.name || null,
+      };
+    });
+    return { rows: enriched as unknown as T[], rowCount: enriched.length };
   }
 
   return { rows: [], rowCount: 0 };

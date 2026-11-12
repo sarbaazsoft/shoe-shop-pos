@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, ensureTenantStoreUsers } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, ensureTenantStoreUsers, ensureEmailVerificationSchema } from '../../db/schemaInit.ts';
 import { generateToken, requireAuth, requireAdmin, extractTokenFromRequest, revokeToken, clearAuthCookies } from '../auth.ts';
 import type { AuthenticatedRequest, AuthUser } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
@@ -422,26 +422,7 @@ router.all('/logout', (req: Request, res: Response) => {
   return res.status(200).json({ success: true, message: 'Logged out successfully.' });
 });
 
-// Ensure email verification tokens table
-let emailVerificationSchemaVerified = false;
-async function ensureEmailVerificationSchema() {
-  if (emailVerificationSchemaVerified) return;
-  try {
-    await pgClient.query(`
-      CREATE TABLE IF NOT EXISTS email_verification_tokens (
-        id SERIAL PRIMARY KEY,
-        tenant_id INTEGER NOT NULL DEFAULT 1,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL UNIQUE,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )
-    `);
-    emailVerificationSchemaVerified = true;
-  } catch (err) {
-    console.warn('Could not ensure email_verification_tokens table:', err);
-  }
-}
+// Email verification table schema is maintained centrally in schemaInit.ts
 
 // Registration / Free Trial Signup Handler
 const handleStoreRegister = async (req: Request, res: Response) => {

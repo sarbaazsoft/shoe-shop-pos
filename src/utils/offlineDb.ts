@@ -1,45 +1,6 @@
 // IndexedDB + LocalStorage Persistent Queue & Tenant-Scoped Product Cache for Offline POS Billing
-
-export interface QueuedSaleItem {
-  productId: number;
-  article?: string;
-  name?: string;
-  barcode?: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  subtotal?: number;
-  totalStock?: number;
-}
-
-export interface QueuedSale {
-  clientTxId: string; // Unique local identifier e.g. "OFFLINE-1726578000-abcd"
-  tenantId?: number | null;
-  createdAt: string; // ISO date string when cashier pressed Complete Sale
-  items: QueuedSaleItem[];
-  customerId: number | null;
-  customerName?: string;
-  customerPhone?: string;
-  paymentMethod: 'CASH' | 'CARD' | 'SPLIT' | 'BANK_TRANSFER' | 'ONLINE' | 'KHATA' | string;
-  transactionId?: string;
-  cashReceived: number;
-  changeGiven: number;
-  subtotal?: number;
-  totalDiscount?: number;
-  totalAmount: number;
-  notes: string;
-  cashierName?: string;
-  cashierId?: number;
-  authToken?: string;
-  isMinPriceOverridden?: boolean;
-  adminOverrideEmail?: string;
-  adminOverridePassword?: string;
-  exchange?: any | null;
-  status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
-  errorMessage?: string;
-  syncedInvoiceNumber?: string;
-  syncedAt?: string;
-}
+import type { QueuedSale, QueuedSaleItem } from '../services/offline/offlineTypes.ts';
+export type { QueuedSale, QueuedSaleItem };
 
 const DB_NAME = 'ShoePosOfflineDB';
 const DB_VERSION = 3;

@@ -4,6 +4,7 @@ import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
 import { toTitleCaseLive, toTitleCaseTrimmed } from '../../utils/textFormat.ts';
+import { calculateReturnNetUnitPrice } from '../../utils/posCalculations.ts';
 import type { ActiveExchange, ExchangeItem } from '../../types.ts';
 
 interface SalesReturnViewProps {
@@ -117,8 +118,7 @@ export const SalesReturnView: React.FC<SalesReturnViewProps> = ({
     const unitPrice = Number(item.unitPrice ?? item.unit_price ?? 0) || 0;
     const subtotal = Number(item.subtotal ?? soldQty * unitPrice) || 0;
     const discount = Number(item.discount ?? 0) || 0;
-    const netUnitPrice =
-      soldQty > 0 ? (subtotal - discount) / soldQty : unitPrice;
+    const netUnitPrice = calculateReturnNetUnitPrice(item);
 
     return {
       soldQty,

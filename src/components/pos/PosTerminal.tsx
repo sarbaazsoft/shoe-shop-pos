@@ -7,6 +7,7 @@ import { InvoicePrintModal } from './InvoicePrintModal.tsx';
 import { ShoeExchangeModal } from './ShoeExchangeModal.tsx';
 import { formatStockPrice, cleanStockPriceInput, getProductRetailPrice, getProductMinFloorPrice } from '../../utils/priceFormat.ts';
 import { isHalfCartonAllowed } from '../../utils/footwear.ts';
+import { reconcileInvoiceBalance } from '../../utils/posCalculations.ts';
 import type { ActiveExchange } from '../../types.ts';
 import { offlineQueueService } from '../../services/offlineQueueService.ts';
 import { cacheCatalogOffline, lookupCachedProductOffline, searchCachedProductsOffline, resolveActiveTenantId } from '../../utils/offlineDb.ts';
@@ -1149,9 +1150,9 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
     if (isWholesaleStore) {
       for (const item of cart) {
         const lot = Number(item.pairsPerCarton) === 16 ? 16 : 12;
-        const halfLot = lot / 2; // 0.5 carton (6 or 8 pairs)
-        const minAllowed = halfLot;
-        const cartonDesc = minAllowed === lot ? '1 Carton' : '0.5 Carton';
+        const itemHalfAllowed = isHalfCartonAllowed(item, companySettings);
+        const minAllowed = itemHalfAllowed ? (lot / 2) : lot;
+        const cartonDesc = itemHalfAllowed ? '0.5 Carton' : '1 Carton';
 
         if (item.quantity < minAllowed && item.totalStock >= minAllowed) {
           triggerValidationToast(
@@ -1162,9 +1163,9 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
           return;
         }
 
-        if (item.quantity % halfLot !== 0 && item.quantity < item.totalStock) {
+        if (item.quantity % minAllowed !== 0 && item.quantity < item.totalStock) {
           triggerValidationToast(
-            `Quantity must be added in multiples of 0.5 Carton (${halfLot} pairs)`,
+            `Quantity must be added in multiples of ${cartonDesc} (${minAllowed} pairs)`,
             'error',
             'Carton Multiple Required'
           );
@@ -1211,21 +1212,32 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       : 0;
 
     // For wholesale stores, deduct returned pair value directly against the current invoice and from the remaining balance
-    const netInvoiceDue = isWholesaleStore
-      ? (newSaleTotal - totalExchangeCredit)
-      : Math.max(0, netDifference);
-    const totalAmountDue = Math.max(0, Math.round((netInvoiceDue + prevBalance) * 100) / 100);
+    const preReconcile = reconcileInvoiceBalance({
+      isWholesaleStore,
+      customerPreviousBalance: prevBalance,
+      calculatedSubtotal: grossSubtotal,
+      calculatedTotalDiscount: totalDiscounts,
+      totalExchangeCredit,
+      effectivePaidAmount: 0,
+    });
+    const totalAmountDue = preReconcile.totalAmountDue;
     const effectivePaidAmount = paymentMethod === 'KHATA'
       ? (typeof cashReceived === 'number' ? cashReceived : 0)
       : paymentMethod === 'SPLIT'
       ? totalSplitTendered
       : (typeof cashReceived === 'number' ? cashReceived : (cashReceived === '' ? totalAmountDue : parseFloat(String(cashReceived)) || totalAmountDue));
-    const remainingBalance = Math.max(0, Math.round((totalAmountDue - effectivePaidAmount) * 100) / 100);
+    const reconciled = reconcileInvoiceBalance({
+      isWholesaleStore,
+      customerPreviousBalance: prevBalance,
+      calculatedSubtotal: grossSubtotal,
+      calculatedTotalDiscount: totalDiscounts,
+      totalExchangeCredit,
+      effectivePaidAmount,
+    });
+    const remainingBalance = reconciled.remainingBalance;
     const changeGivenDue = paymentMethod === 'SPLIT'
       ? splitChangeDue
-      : effectivePaidAmount > totalAmountDue
-      ? Math.round((effectivePaidAmount - totalAmountDue) * 100) / 100
-      : (netDifference < 0 ? Math.abs(netDifference) : 0);
+      : reconciled.changeGivenDue;
 
     if (!isWholesaleStore && paymentMethod === 'KHATA') {
       playAudioFeedback.warning();
@@ -1287,66 +1299,68 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       payload.exchange = activeExchange;
     }
 
+    const enqueueAndCompleteOfflineSale = async (noticeBuilder: (clientTxId: string) => string) => {
+      const queued = await offlineQueueService.enqueueSale({
+        items: cart.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          article: i.article,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discount: i.discount,
+        })),
+        customerId: selectedCustomerId,
+        customerName: customers.find((c: any) => c.id === selectedCustomerId)?.name || undefined,
+        paymentMethod,
+        transactionId: transactionId.trim() || undefined,
+        cashReceived: Number(effectiveCashReceived) || 0,
+        changeGiven: Number(changeDue) || 0,
+        notes,
+        totalAmount: netTotalPayable,
+        isMinPriceOverridden: Boolean(adminOverrideCreds || currentUser.role === 'ADMIN'),
+        adminOverrideEmail: adminOverrideCreds?.email || undefined,
+        adminOverridePassword: adminOverrideCreds?.pass || undefined,
+        exchange: activeExchange || null,
+      });
+
+      playAudioFeedback.saleSuccess();
+
+      const offlineSaleObj = {
+        id: -Date.now(),
+        invoiceNumber: `${queued.clientTxId} (OFFLINE)`,
+        totalAmount: netTotalPayable,
+        paymentMethod,
+        cashReceived: Number(effectiveCashReceived) || 0,
+        changeGiven: Number(changeDue) || 0,
+        notes: notes ? `${notes} [Offline Transaction]` : '[Offline Transaction]',
+        createdAt: queued.createdAt,
+        items: cart.map((i) => ({
+          ...i,
+          product: { article: i.article, name: i.name },
+        })),
+        customer: customers.find((c: any) => c.id === selectedCustomerId),
+      };
+
+      setCompletedSale(offlineSaleObj);
+      setOfflineNotice(noticeBuilder(queued.clientTxId));
+
+      setCart([]);
+      setActiveExchange(null);
+      onClearInitialExchange?.();
+      setCashReceived('');
+      setTransactionId('');
+      setNotes('');
+      selectCustomerForPayment(null);
+      setShowAdminOverrideModal(false);
+      setOverridePendingItem(null);
+    };
+
     // Check if offline or network failure occurs
     if (!navigator.onLine) {
       try {
-        const queued = await offlineQueueService.enqueueSale({
-          items: cart.map((i) => ({
-            productId: i.productId,
-            name: i.name,
-            article: i.article,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            discount: i.discount,
-          })),
-          customerId: selectedCustomerId,
-          customerName: customers.find((c: any) => c.id === selectedCustomerId)?.name || undefined,
-          paymentMethod,
-          transactionId: transactionId.trim() || undefined,
-          cashReceived: Number(effectiveCashReceived) || 0,
-          changeGiven: Number(changeDue) || 0,
-          notes,
-          totalAmount: netTotalPayable,
-          isMinPriceOverridden: Boolean(adminOverrideCreds || currentUser.role === 'ADMIN'),
-          adminOverrideEmail: adminOverrideCreds?.email || undefined,
-          adminOverridePassword: adminOverrideCreds?.pass || undefined,
-          exchange: activeExchange || null,
-        });
-
-        playAudioFeedback.saleSuccess();
-
-        // Create an offline invoice representation so the cashier can still print receipt immediately
-        const offlineSaleObj = {
-          id: -Date.now(),
-          invoiceNumber: `${queued.clientTxId} (OFFLINE)`,
-          totalAmount: netTotalPayable,
-          paymentMethod,
-          cashReceived: Number(effectiveCashReceived) || 0,
-          changeGiven: Number(changeDue) || 0,
-          notes: notes ? `${notes} [Offline Transaction]` : '[Offline Transaction]',
-          createdAt: queued.createdAt,
-          items: cart.map((i) => ({
-            ...i,
-            product: { article: i.article, name: i.name },
-          })),
-          customer: customers.find((c: any) => c.id === selectedCustomerId),
-        };
-
-        setCompletedSale(offlineSaleObj);
-        setOfflineNotice(
-          `Offline Mode: Transaction ${queued.clientTxId} saved locally. It will automatically synchronize once internet is restored.`
+        await enqueueAndCompleteOfflineSale(
+          (txId) => `Offline Mode: Transaction ${txId} saved locally. It will automatically synchronize once internet is restored.`
         );
-
-        // Reset cart & exchange state
-        setCart([]);
-        setActiveExchange(null);
-        onClearInitialExchange?.();
-        setCashReceived('');
-        setTransactionId('');
-        setNotes('');
-        selectCustomerForPayment(null);
-        setShowAdminOverrideModal(false);
-        setOverridePendingItem(null);
         return;
       } catch (err: any) {
         console.error('Failed to queue offline sale:', err);
@@ -1398,61 +1412,9 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
       if (isNetError) {
         try {
-          const queued = await offlineQueueService.enqueueSale({
-            items: cart.map((i) => ({
-              productId: i.productId,
-              name: i.name,
-              article: i.article,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-              discount: i.discount,
-            })),
-            customerId: selectedCustomerId,
-            customerName: customers.find((c: any) => c.id === selectedCustomerId)?.name || undefined,
-            paymentMethod,
-            transactionId: transactionId.trim() || undefined,
-            cashReceived: Number(effectiveCashReceived) || 0,
-            changeGiven: Number(changeDue) || 0,
-            notes,
-            totalAmount: netTotalPayable,
-            isMinPriceOverridden: Boolean(adminOverrideCreds || currentUser.role === 'ADMIN'),
-            adminOverrideEmail: adminOverrideCreds?.email || undefined,
-            adminOverridePassword: adminOverrideCreds?.pass || undefined,
-            exchange: activeExchange || null,
-          });
-
-          playAudioFeedback.saleSuccess();
-
-          const offlineSaleObj = {
-            id: -Date.now(),
-            invoiceNumber: `${queued.clientTxId} (OFFLINE)`,
-            totalAmount: netTotalPayable,
-            paymentMethod,
-            cashReceived: Number(effectiveCashReceived) || 0,
-            changeGiven: Number(changeDue) || 0,
-            notes: notes ? `${notes} [Offline Transaction]` : '[Offline Transaction]',
-            createdAt: queued.createdAt,
-            items: cart.map((i) => ({
-              ...i,
-              product: { article: i.article, name: i.name },
-            })),
-            customer: customers.find((c: any) => c.id === selectedCustomerId),
-          };
-
-          setCompletedSale(offlineSaleObj);
-          setOfflineNotice(
-            `Connection interrupted: Saved to local offline queue (${queued.clientTxId}). Will auto-sync when online.`
+          await enqueueAndCompleteOfflineSale(
+            (txId) => `Connection interrupted: Saved to local offline queue (${txId}). Will auto-sync when online.`
           );
-
-          setCart([]);
-          setActiveExchange(null);
-          onClearInitialExchange?.();
-          setCashReceived('');
-          setTransactionId('');
-          setNotes('');
-          selectCustomerForPayment(null);
-          setShowAdminOverrideModal(false);
-          setOverridePendingItem(null);
           return;
         } catch (queueErr: any) {
           playAudioFeedback.warning();
@@ -1462,7 +1424,11 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
       }
 
       playAudioFeedback.warning();
-      if (err.message && err.message.includes('Minimum Sale Price Violation')) {
+      if (
+        err.message &&
+        (err.message.includes('Minimum Price Violation') ||
+          err.message.includes('Minimum Sale Price Violation'))
+      ) {
         setShowAdminOverrideModal(true);
       }
       setErrorMessage(err.message || 'Checkout failed. Stock has been preserved.');
@@ -2085,7 +2051,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         </div>
                         {isWholesaleStore && (() => {
                           const lotSize = Number(item.pairsPerCarton || 12) === 16 ? 16 : 12;
-                          const isItemHalfAllowed = storeAllowsHalfCarton || item.allowHalfCarton === true || (item as any).allow_half_carton === true;
+                          const isItemHalfAllowed = isHalfCartonAllowed(item, companySettings);
                           const minLotPairs = isItemHalfAllowed ? (lotSize / 2) : lotSize;
                           const minLotDesc = isItemHalfAllowed ? '0.5 ctn' : '1 ctn';
                           return (

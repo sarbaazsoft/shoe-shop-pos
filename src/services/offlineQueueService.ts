@@ -2,6 +2,7 @@
 
 import { api, getAuthToken } from './api.ts';
 import { QueuedSale, queueOfflineSale, getOfflineSales, getPendingOfflineSalesCount, updateOfflineSaleStatus, deleteOfflineSale, cacheCatalogOffline, resolveActiveTenantId } from '../utils/offlineDb.ts';
+import { buildCheckoutRequestPayload, processOfflineSalesQueue } from './offline/syncEngine.ts';
 
 export const SW_SYNC_TAG = 'pos-offline-transactions-sync';
 
@@ -287,38 +288,7 @@ class OfflineQueueService {
   }
 
   private buildCheckoutPayload(sale: QueuedSale): any {
-    const payload: any = {
-      clientTxId: sale.clientTxId,
-      saleDate: sale.createdAt,
-      items: sale.items.map((i) => ({
-        productId: i.productId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        discount: i.discount,
-      })),
-      customerId: sale.customerId,
-      paymentMethod: sale.paymentMethod,
-      transactionId: sale.transactionId,
-      cashReceived: sale.cashReceived,
-      changeGiven: sale.changeGiven,
-      notes: sale.notes,
-      isMinPriceOverridden: Boolean(sale.isMinPriceOverridden),
-      adminOverrideEmail: sale.adminOverrideEmail,
-      adminOverridePassword: sale.adminOverridePassword,
-    };
-
-    if (sale.exchange && Array.isArray(sale.exchange.items) && sale.exchange.items.length > 0) {
-      payload.exchange = {
-        originalInvoiceNumber: sale.exchange.originalInvoiceNumber,
-        items: sale.exchange.items.map((ex: any) => ({
-          saleItemId: ex.saleItemId,
-          productId: ex.productId,
-          returnQty: ex.returnQty || ex.quantity || 1,
-        })),
-      };
-    }
-
-    return payload;
+    return buildCheckoutRequestPayload(sale);
   }
 
   /**
@@ -373,69 +343,25 @@ class OfflineQueueService {
       return { synced: 0, failed: 0 };
     }
 
-    const allSales = await getOfflineSales();
-    const pendingSales = allSales.filter((s) => s.status === 'PENDING' || s.status === 'FAILED');
-
-    if (pendingSales.length === 0) {
-      this.notify();
-      return { synced: 0, failed: 0 };
-    }
-
     this.isSyncingState = true;
     this.notify();
 
-    let synced = 0;
-    let failed = 0;
-
-    // Process in FIFO order (oldest offline transaction first to preserve sequential inventory deductions)
-    const sorted = [...pendingSales].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    const result = await processOfflineSalesQueue(
+      {
+        getSales: () => getOfflineSales(),
+        updateSaleStatus: updateOfflineSaleStatus,
+      },
+      {
+        submitCheckout: (payload) => api.pos.checkout(payload),
+      },
+      () => this.notify()
     );
 
-    for (const sale of sorted) {
-      try {
-        await updateOfflineSaleStatus(sale.clientTxId, 'SYNCING');
-        this.notify();
-
-        const payload = this.buildCheckoutPayload(sale);
-        const res = await api.pos.checkout(payload);
-
-        // Mark as synced with generated official invoice number
-        await updateOfflineSaleStatus(sale.clientTxId, 'SYNCED', {
-          syncedInvoiceNumber: res?.sale?.invoiceNumber || res?.invoiceNumber,
-          syncedAt: new Date().toISOString(),
-          errorMessage: undefined,
-        });
-
-        synced++;
-      } catch (err: any) {
-        const rawMsg = String(err?.message || err || '');
-        const isNetworkError =
-          rawMsg.includes('Failed to fetch') ||
-          rawMsg.includes('NetworkError') ||
-          rawMsg.includes('Network request failed') ||
-          rawMsg.includes('Load failed') ||
-          rawMsg.includes('ERR_CONNECTION') ||
-          rawMsg.includes('abort');
-
-        if (isNetworkError) {
-          console.warn(`[OfflineSync] Remote server temporarily unreachable while syncing ${sale.clientTxId}. Registering background sync...`);
-          this.isBackendConnectedState = false;
-          this.isOnlineState = false;
-          await updateOfflineSaleStatus(sale.clientTxId, 'PENDING', {
-            errorMessage: 'Server offline (will auto-retry on reconnect)',
-          });
-          await this.registerBackgroundSync();
-          failed++;
-          break; // Stop immediately, avoid flooding when network is unreachable
-        } else {
-          console.warn(`[OfflineSync] Sale ${sale.clientTxId} sync error: ${rawMsg}`);
-          await updateOfflineSaleStatus(sale.clientTxId, 'FAILED', {
-            errorMessage: rawMsg,
-          });
-          failed++;
-        }
-      }
+    const { synced, failed, abortedByNetwork } = result;
+    if (abortedByNetwork) {
+      this.isBackendConnectedState = false;
+      this.isOnlineState = false;
+      await this.registerBackgroundSync();
     }
 
     this.isSyncingState = false;

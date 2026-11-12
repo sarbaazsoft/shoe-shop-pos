@@ -3,6 +3,7 @@ import { Search, AlertCircle, ArrowRight, X, Repeat, Minus, Plus, Package, Trash
 import { api } from '../../services/api.ts';
 import { playAudioFeedback } from '../../utils/audio.ts';
 import { formatStockPrice } from '../../utils/priceFormat.ts';
+import { calculateReturnNetUnitPrice } from '../../utils/posCalculations.ts';
 import type { ActiveExchange, ExchangeItem } from '../../types.ts';
 
 interface ShoeExchangeModalProps {
@@ -130,10 +131,7 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
 
   const totalRetailExchangeCredit = retailItems.reduce((acc: number, item: any) => {
     const qty = selectedQtys[item.id] || 0;
-    const netUnitPrice =
-      item.soldQuantity > 0
-        ? (item.subtotal - (item.discount || 0)) / item.soldQuantity
-        : item.unitPrice;
+    const netUnitPrice = calculateReturnNetUnitPrice(item);
     return acc + qty * netUnitPrice;
   }, 0);
 
@@ -146,10 +144,7 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
     for (const item of retailItems) {
       const qty = selectedQtys[item.id] || 0;
       if (qty > 0) {
-        const netUnitPrice =
-          item.soldQuantity > 0
-            ? (item.subtotal - (item.discount || 0)) / item.soldQuantity
-            : item.unitPrice;
+        const netUnitPrice = calculateReturnNetUnitPrice(item);
         exchangeItems.push({
           saleItemId: item.id,
           productId: item.productId,
@@ -646,10 +641,7 @@ export const ShoeExchangeModal: React.FC<ShoeExchangeModalProps> = ({
                       {retailItems.map((item: any) => {
                         const isFullyReturned = item.returnableQuantity <= 0;
                         const qty = selectedQtys[item.id] || 0;
-                        const netUnitPrice =
-                          item.soldQuantity > 0
-                            ? (item.subtotal - (item.discount || 0)) / item.soldQuantity
-                            : item.unitPrice;
+                        const netUnitPrice = calculateReturnNetUnitPrice(item);
                         const isSelected = qty > 0;
 
                         return (

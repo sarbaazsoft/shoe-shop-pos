@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LayoutDashboard, ShoppingCart, Boxes, Truck, RotateCcw, Users, TrendingUp, Settings, Printer, BookOpen, X, Building2, Check, Cloud, Keyboard, Sun, Moon, Download, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { UserAvatar } from './UserAvatar.tsx';
@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   });
 
-  const toggleCollapse = () => {
+  const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => {
       const next = !prev;
       try {
@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       } catch {}
       return next;
     });
-  };
+  }, []);
 
   // Keyboard shortcut: Ctrl+B or Cmd+B to toggle sidebar collapse
   useEffect(() => {
@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [toggleCollapse]);
 
   const storeName =
     companySettings?.name ||
@@ -83,78 +83,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isPlatformOwner = (currentUser?.role || '').toUpperCase() === 'SUPERADMIN';
   const isStoreAdmin = (currentUser?.role || '').toUpperCase() === 'ADMIN';
 
-  // Flat navigation sections
-  const rawSections: NavSection[] = [
-    {
-      header: 'COUNTER & INVENTORY',
-      items: [
-        { id: 'pos', label: 'POS Terminal', icon: ShoppingCart, shortcut: 'F1' },
-        { id: 'inventory', label: 'Shoe Catalog', icon: Boxes, shortcut: 'F2' },
-        { id: 'ledger', label: 'Stock Ledger', icon: BookOpen },
-      ],
-    },
-    {
-      header: 'SALES & PURCHASES',
-      items: [
-        { id: 'purchases', label: 'Purchases', icon: Truck, shortcut: 'F3' },
-        { id: 'suppliers', label: 'Suppliers', icon: Building2 },
-        { id: 'returns', label: 'Returns', icon: RotateCcw, shortcut: 'F4' },
-        { id: 'customers', label: 'Customers', icon: Users, shortcut: 'F5' },
-      ],
-    },
-    {
-      header: (isPlatformOwner || isStoreAdmin || isCashier)
-        ? (isCashier ? 'SETTINGS & HARDWARE' : 'ADMINISTRATION')
-        : 'REPORTS & ANALYTICS',
-      items: [
-        { id: 'reports', label: 'Reports', icon: TrendingUp, shortcut: 'F6' },
-        ...(isPlatformOwner || isStoreAdmin
-          ? [
-              {
-                id: 'settings',
-                label: isPlatformOwner ? 'System Settings' : 'Settings',
-                icon: Settings,
-                shortcut: 'F7',
-              },
-            ]
-          : isCashier
-          ? [
-              {
-                id: 'settings',
-                label: 'Printer Settings',
-                icon: Printer,
-                shortcut: 'F7',
-              },
-            ]
-          : []),
-      ],
-    },
-    {
-      header: 'HELP & SUPPORT',
-      items: [
-        { id: 'assistant', label: 'Sammi AI Assistant', icon: Sparkles },
-      ],
-    },
-  ];
-
   const isWholesaleStore =
     String(companySettings?.businessType || companySettings?.business_type || '').toUpperCase() === 'WHOLESALE';
 
-  const sections: NavSection[] = rawSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        if (isCashier && item.id === 'purchases') {
-          return false;
-        }
-        // Wholesale stores process returns directly on the current invoice; hide Returns/Exchange navigation link
-        if (isWholesaleStore && (item.id === 'returns' || item.id === 'exchange')) {
-          return false;
-        }
-        return true;
-      }),
-    }))
-    .filter((section) => section.items.length > 0);
+  const sections: NavSection[] = useMemo(() => {
+    const rawSections: NavSection[] = [
+      {
+        header: 'COUNTER & INVENTORY',
+        items: [
+          { id: 'pos', label: 'POS Terminal', icon: ShoppingCart, shortcut: 'F1' },
+          { id: 'inventory', label: 'Shoe Catalog', icon: Boxes, shortcut: 'F2' },
+          { id: 'ledger', label: 'Stock Ledger', icon: BookOpen },
+        ],
+      },
+      {
+        header: 'SALES & PURCHASES',
+        items: [
+          { id: 'purchases', label: 'Purchases', icon: Truck, shortcut: 'F3' },
+          { id: 'suppliers', label: 'Suppliers', icon: Building2 },
+          { id: 'returns', label: 'Returns', icon: RotateCcw, shortcut: 'F4' },
+          { id: 'customers', label: 'Customers', icon: Users, shortcut: 'F5' },
+        ],
+      },
+      {
+        header: (isPlatformOwner || isStoreAdmin || isCashier)
+          ? (isCashier ? 'SETTINGS & HARDWARE' : 'ADMINISTRATION')
+          : 'REPORTS & ANALYTICS',
+        items: [
+          { id: 'reports', label: 'Reports', icon: TrendingUp, shortcut: 'F6' },
+          ...(isPlatformOwner || isStoreAdmin
+            ? [
+                {
+                  id: 'settings',
+                  label: isPlatformOwner ? 'System Settings' : 'Settings',
+                  icon: Settings,
+                  shortcut: 'F7',
+                },
+              ]
+            : isCashier
+            ? [
+                {
+                  id: 'settings',
+                  label: 'Printer Settings',
+                  icon: Printer,
+                  shortcut: 'F7',
+                },
+              ]
+            : []),
+        ],
+      },
+      {
+        header: 'HELP & SUPPORT',
+        items: [
+          { id: 'assistant', label: 'Sammi AI Assistant', icon: Sparkles },
+        ],
+      },
+    ];
+
+    return rawSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => {
+          if (isCashier && item.id === 'purchases') {
+            return false;
+          }
+          // Wholesale stores process returns directly on the current invoice; hide Returns/Exchange navigation link
+          if (isWholesaleStore && (item.id === 'returns' || item.id === 'exchange')) {
+            return false;
+          }
+          return true;
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [isPlatformOwner, isStoreAdmin, isCashier, isWholesaleStore]);
 
   const handleItemClick = (tabId: string) => {
     onTabChange(tabId);
@@ -405,7 +406,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {currentUser?.name || 'Admin'}
                   </div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                    {currentUser?.role === 'ADMIN' ? 'Administrator' : 'Staff Cashier'}
+                    {(() => {
+                      const roleUpper = (currentUser?.role || '').toUpperCase();
+                      if (roleUpper === 'SUPERADMIN') return 'Platform Owner';
+                      if (roleUpper === 'ADMIN') return 'Administrator';
+                      return 'Staff Cashier';
+                    })()}
                   </div>
                 </div>
               )}

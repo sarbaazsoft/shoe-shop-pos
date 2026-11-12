@@ -8,6 +8,8 @@ import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { ensureCustomerLedgerSchema, ensureSalesTransactionIdSchema } from '../../db/schemaInit.ts';
 import { notifyPosAction } from '../pushNotificationService.ts';
 import { getAppSetting } from '../services/appSettingsService.ts';
+import { reconcileInvoiceBalance } from '../../utils/posCalculations.ts';
+import { fetchLockedCustomerPreviousBalance, recordCustomerSaleKhataEntry } from '../services/ledgerService.ts';
 
 const router = Router();
 
@@ -183,7 +185,21 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
     const prod = prodRes.rows[0];
     const costPrice = Math.round(parseFloat(prod.cost_price || '0'));
     const prodIdentifier = prod.article || prod.name;
-    const effectiveUnitPrice = Math.round(parseFloat(item.unitPrice));
+    const itemQty = parseInt(item.quantity, 10);
+    const parsedUnitPrice = parseFloat(item.unitPrice);
+    const parsedDiscount = item.discount !== undefined && item.discount !== null ? parseFloat(item.discount) : 0;
+
+    if (!Number.isFinite(itemQty) || itemQty <= 0) {
+      return res.status(400).json({ error: `Invalid quantity for "${prodIdentifier}".` });
+    }
+    if (!Number.isFinite(parsedUnitPrice) || parsedUnitPrice < 0) {
+      return res.status(400).json({ error: `Invalid unit price for "${prodIdentifier}".` });
+    }
+    if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > parsedUnitPrice * itemQty) {
+      return res.status(400).json({ error: `Invalid discount for "${prodIdentifier}".` });
+    }
+
+    const effectiveUnitPrice = Math.round((parsedUnitPrice * itemQty - parsedDiscount) / itemQty);
 
     let minAllowedPrice = 0;
     if (isFixedMode) {
@@ -280,6 +296,9 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
         const refundPrice = parseFloat(rItem.unitRefundPrice);
         const prodId = parseInt(rItem.productId, 10);
         if (isNaN(retQty) || retQty <= 0 || !prodId) continue;
+        if (!Number.isFinite(refundPrice) || refundPrice < 0) {
+          throw new Error(`Invalid refund price for returned product #${prodId}.`);
+        }
 
         const prodRes = await pgClient.query<{ id: number; total_stock: number; article: string }>(
           'SELECT id, total_stock, COALESCE(article, id::text) as article FROM products WHERE id = $1 AND COALESCE(tenant_id, 1) = $2 FOR UPDATE',
@@ -369,6 +388,9 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
         const retQty = parseInt(rItem.quantity, 10);
         const refundPrice = parseFloat(rItem.unitRefundPrice);
         if (isNaN(retQty) || retQty <= 0) continue;
+        if (!Number.isFinite(refundPrice) || refundPrice < 0) {
+          throw new Error('Invalid refund price for exchange item.');
+        }
 
         const siRes = await pgClient.query<{ id: number; product_id: number; product_name: string; quantity: number }>(
           'SELECT id, product_id, product_name, quantity FROM sale_items WHERE id = $1 AND sale_id = $2',
@@ -488,6 +510,12 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
       if (isNaN(qty) || qty <= 0) {
         throw new Error(`Invalid quantity (${qty}) for item.`);
       }
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        throw new Error(`Invalid unit price for product #${item.productId}.`);
+      }
+      if (!Number.isFinite(discount) || discount < 0 || discount > unitPrice * qty) {
+        throw new Error(`Invalid discount for product #${item.productId}.`);
+      }
 
       const pRes = await pgClient.query<{
         id: number;
@@ -567,30 +595,19 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
     let customerPreviousBalance = 0;
     const targetCustomerId = customerId ? parseInt(customerId, 10) : (origSale ? origSale.customer_id : null);
     if (targetCustomerId && isWholesaleStore) {
-      const custBalRes = await pgClient.query<{ outstanding_balance: string; current_balance: string }>(
-        `SELECT COALESCE(outstanding_balance, current_balance, 0)::numeric as outstanding_balance FROM customers WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
-        [targetCustomerId, tenantId]
-      );
-      if (custBalRes.rows.length > 0) {
-        customerPreviousBalance = Math.max(0, parseFloat(custBalRes.rows[0].outstanding_balance || '0'));
-      }
+      customerPreviousBalance = await fetchLockedCustomerPreviousBalance(targetCustomerId, tenantId);
     }
 
-    // Invoice Calculation Logic:
-    // For wholesale stores, returned pair value directly reduces the current invoice and Khata remaining balance:
-    // Net Current Invoice = (Items Subtotal - Items Discount) - Returned Credit
-    // Total Amount Due = Customer_Previous_Balance + Net_Current_Invoice
-    // Remaining Balance = Total_Amount_Due - Payment_Received
-    let netCurrentInvoice: number;
-    let totalAmountDue: number;
-    if (isWholesaleStore) {
-      netCurrentInvoice = Math.round(((calculatedSubtotal - calculatedTotalDiscount) - totalExchangeCredit) * 100) / 100;
-      totalAmountDue = Math.max(0, Math.round((customerPreviousBalance + netCurrentInvoice) * 100) / 100);
-    } else {
-      netCurrentInvoice = Math.max(0, netDifference);
-      totalAmountDue = Math.round((netCurrentInvoice + customerPreviousBalance) * 100) / 100;
-    }
-    const currentCartTotal = Math.max(0, netCurrentInvoice);
+    // First compute authoritative totalAmountDue with 0 paid so missing paidAmount defaults to totalAmountDue
+    const preReconciliation = reconcileInvoiceBalance({
+      isWholesaleStore,
+      customerPreviousBalance,
+      calculatedSubtotal,
+      calculatedTotalDiscount,
+      totalExchangeCredit,
+      effectivePaidAmount: 0,
+    });
+    const totalAmountDuePre = preReconciliation.totalAmountDue;
 
     let paymentReceived = 0;
     const rawPaid = typeof req.body.paidAmount !== 'undefined'
@@ -604,16 +621,28 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
     } else {
       paymentReceived = typeof rawPaid === 'number'
         ? rawPaid
-        : (parseFloat(String(rawPaid ?? totalAmountDue)) || totalAmountDue);
+        : (parseFloat(String(rawPaid ?? totalAmountDuePre)) || totalAmountDuePre);
     }
-    const effectivePaidAmount = Math.max(0, Math.round(paymentReceived * 100) / 100);
+    const effectivePaidAmount = Number.isFinite(paymentReceived) ? Math.max(0, Math.round(paymentReceived * 100) / 100) : 0;
+
+    const {
+      currentCartTotal,
+      totalAmountDue,
+      remainingBalance,
+      balanceChange,
+      changeGivenDue,
+    } = reconcileInvoiceBalance({
+      isWholesaleStore,
+      customerPreviousBalance,
+      calculatedSubtotal,
+      calculatedTotalDiscount,
+      totalExchangeCredit,
+      effectivePaidAmount,
+    });
+
     if (!isWholesaleStore && effectivePaidAmount < totalAmountDue) {
       throw new Error('Retail checkout requires full payment. Partial payments and Khata credit are not allowed.');
     }
-    const remainingBalance = Math.max(0, Math.round((totalAmountDue - effectivePaidAmount) * 100) / 100);
-    const changeGivenDue = effectivePaidAmount > totalAmountDue
-      ? Math.round((effectivePaidAmount - totalAmountDue) * 100) / 100
-      : (netDifference < 0 ? Math.abs(netDifference) : 0);
 
     const saleRes = await pgClient.query<{ id: number }>(
       `INSERT INTO sales (
@@ -687,34 +716,19 @@ router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     // Update Customer outstanding_balance = Remaining_Balance and record in Khata Ledger history
     if (targetCustomerId && isWholesaleStore) {
-      await pgClient.query(
-        `UPDATE customers
-         SET outstanding_balance = $1,
-             current_balance = $1
-         WHERE id = $2 AND tenant_id = $3`,
-        [remainingBalance, targetCustomerId, tenantId]
-      );
-
-      const balanceChange = Math.round((currentCartTotal - effectivePaidAmount) * 100) / 100;
-      await pgClient.query(
-        `INSERT INTO customer_ledger (
-          tenant_id, customer_id, transaction_date, invoice_id, invoice_number,
-          total_bill, amount_paid, balance_change, running_balance, payment_method, notes
-        ) VALUES ($1, $2, COALESCE($3, NOW()::date::text), $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          tenantId,
-          targetCustomerId,
-          effectiveSaleDate,
-          saleId,
-          invoiceNumber,
-          currentCartTotal,
-          effectivePaidAmount,
-          balanceChange,
-          remainingBalance,
-          paymentMethod,
-          `Invoice #${invoiceNumber} (Items: Rs. ${calculatedSubtotal - calculatedTotalDiscount}${totalExchangeCredit > 0 ? `, Return: -Rs. ${totalExchangeCredit}` : ''}, Prev Khata: Rs. ${customerPreviousBalance})`,
-        ]
-      );
+      await recordCustomerSaleKhataEntry({
+        tenantId,
+        customerId: targetCustomerId,
+        effectiveSaleDate,
+        saleId,
+        invoiceNumber,
+        currentCartTotal,
+        effectivePaidAmount,
+        balanceChange,
+        remainingBalance,
+        paymentMethod,
+        notes: `Invoice #${invoiceNumber} (Items: Rs. ${calculatedSubtotal - calculatedTotalDiscount}${totalExchangeCredit > 0 ? `, Return: -Rs. ${totalExchangeCredit}` : ''}, Prev Khata: Rs. ${customerPreviousBalance})`,
+      });
     }
 
     await pgClient.query('COMMIT');

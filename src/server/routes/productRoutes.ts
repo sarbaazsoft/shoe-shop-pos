@@ -1376,7 +1376,7 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 description = $9,
                 active = true,
                 updated_at = NOW()
-              WHERE id = $10`,
+              WHERE id = $10 AND COALESCE(tenant_id, 1) = $11`,
               [
                 mergedName,
                 rawBrand ? finalBrand : existingProduct.brand,
@@ -1388,15 +1388,16 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 rawImageUrl || existingProduct.primary_image_url || '',
                 rawDesc || existingProduct.description || '',
                 existingProduct.id,
+                tenantId,
               ]
             );
 
             if (importedStock > 0) {
               await pgClient.query(
                 `INSERT INTO stock_movements (
-                  product_id, qty_change, prev_stock, new_stock, movement_type, reference_id, user_id, notes
-                ) VALUES ($1, $2, $3, $4, 'PURCHASE', 'CSV-IMPORT-MERGE', $5, 'CSV bulk import stock addition')`,
-                [existingProduct.id, importedStock, prevStock, newStock, req.user!.id]
+                  tenant_id, product_id, qty_change, prev_stock, new_stock, movement_type, reference_id, user_id, notes
+                ) VALUES ($1, $2, $3, $4, $5, 'PURCHASE', 'CSV-IMPORT-MERGE', $6, 'CSV bulk import stock addition')`,
+                [tenantId, existingProduct.id, importedStock, prevStock, newStock, req.user!.id]
               );
             }
             mergedCount++;
@@ -1420,7 +1421,7 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 description = $10,
                 active = true,
                 updated_at = NOW()
-              WHERE id = $11`,
+              WHERE id = $11 AND COALESCE(tenant_id, 1) = $12`,
               [
                 finalName,
                 finalBrand,
@@ -1433,6 +1434,7 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 rawImageUrl,
                 rawDesc,
                 existingProduct.id,
+                tenantId,
               ]
             );
 
@@ -1440,9 +1442,9 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
             if (stockDiff !== 0) {
               await pgClient.query(
                 `INSERT INTO stock_movements (
-                  product_id, qty_change, prev_stock, new_stock, movement_type, reference_id, user_id, notes
-                ) VALUES ($1, $2, $3, $4, 'ADJUSTMENT', 'CSV-IMPORT-OVERWRITE', $5, 'CSV bulk import record overwrite')`,
-                [existingProduct.id, stockDiff, prevStock, importedStock, req.user!.id]
+                  tenant_id, product_id, qty_change, prev_stock, new_stock, movement_type, reference_id, user_id, notes
+                ) VALUES ($1, $2, $3, $4, $5, 'ADJUSTMENT', 'CSV-IMPORT-OVERWRITE', $6, 'CSV bulk import record overwrite')`,
+                [tenantId, existingProduct.id, stockDiff, prevStock, importedStock, req.user!.id]
               );
             }
             overwrittenCount++;
@@ -1489,7 +1491,8 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
           }
         }
 
-        const importedPairsPerCarton = parseInt(String(rawItem.pairs_per_carton ?? rawItem.pairsPerCarton ?? 12), 10) || 12;
+        const importedPairsPerCarton =
+          normalizePairsPerCarton(rawItem.pairs_per_carton ?? rawItem.pairsPerCarton) || 12;
 
         const insertRes = await pgClient.query<{ id: number }>(
           `INSERT INTO products (

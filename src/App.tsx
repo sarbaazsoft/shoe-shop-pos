@@ -1,34 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api, getAuthToken, setAuthSession, removeAuthToken, clearAllSessionState, revokeSessionOnServer, setActiveTenantId, getActiveTenantId } from './services/api.ts';
 import { Header } from './components/common/Header.tsx';
 import { Sidebar } from './components/common/Sidebar.tsx';
-import { PosTerminal } from './components/pos/PosTerminal.tsx';
-import { ProductManagement } from './components/inventory/ProductManagement.tsx';
-import { StockLedgerView } from './components/inventory/StockLedgerView.tsx';
-import { PurchaseManagement } from './components/purchases/PurchaseManagement.tsx';
-import { SalesReturnView } from './components/returns/SalesReturnView.tsx';
-import { CustomerManagement } from './components/customers/CustomerManagement.tsx';
-import { ReportsDashboard } from './components/reports/ReportsDashboard.tsx';
-import { SettingsView } from './components/settings/SettingsView.tsx';
-import { SupplierManagement } from './components/suppliers/SupplierManagement.tsx';
-import { DashboardOverview } from './components/dashboard/DashboardOverview.tsx';
 import { AuthModal } from './components/auth/AuthModal.tsx';
-import { UserProfileModal } from './components/auth/UserProfileModal.tsx';
 import { OfflineToastNotification } from './components/common/OfflineToastNotification.tsx';
 import { PushNotificationSoftPrompt } from './components/notifications/PushNotificationSoftPrompt.tsx';
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
 import { LoadingWindow } from './components/common/LoadingWindow.tsx';
-import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
-import { UnknownStore404View } from './components/saas/UnknownStore404View.tsx';
-import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
-import { SuperAdminControlPanel } from './components/saas/SuperAdminControlPanel.tsx';
-import { TenantOnboardingWizard } from './components/saas/TenantOnboardingWizard.tsx';
-import { InstallationWizard } from './components/saas/InstallationWizard.tsx';
-import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
-import { NotificationsView } from './components/notifications/NotificationsView.tsx';
-import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
+
+const PosTerminal = lazy(() => import('./components/pos/PosTerminal.tsx').then((m) => ({ default: m.PosTerminal })));
+const ProductManagement = lazy(() => import('./components/inventory/ProductManagement.tsx').then((m) => ({ default: m.ProductManagement })));
+const StockLedgerView = lazy(() => import('./components/inventory/StockLedgerView.tsx').then((m) => ({ default: m.StockLedgerView })));
+const PurchaseManagement = lazy(() => import('./components/purchases/PurchaseManagement.tsx').then((m) => ({ default: m.PurchaseManagement })));
+const SalesReturnView = lazy(() => import('./components/returns/SalesReturnView.tsx').then((m) => ({ default: m.SalesReturnView })));
+const CustomerManagement = lazy(() => import('./components/customers/CustomerManagement.tsx').then((m) => ({ default: m.CustomerManagement })));
+const ReportsDashboard = lazy(() => import('./components/reports/ReportsDashboard.tsx').then((m) => ({ default: m.ReportsDashboard })));
+const SettingsView = lazy(() => import('./components/settings/SettingsView.tsx').then((m) => ({ default: m.SettingsView })));
+const SupplierManagement = lazy(() => import('./components/suppliers/SupplierManagement.tsx').then((m) => ({ default: m.SupplierManagement })));
+const DashboardOverview = lazy(() => import('./components/dashboard/DashboardOverview.tsx').then((m) => ({ default: m.DashboardOverview })));
+const UserProfileModal = lazy(() => import('./components/auth/UserProfileModal.tsx').then((m) => ({ default: m.UserProfileModal })));
+const SammiAssistantView = lazy(() => import('./components/chat/SammiAssistantView.tsx').then((m) => ({ default: m.SammiAssistantView })));
+const UnknownStore404View = lazy(() => import('./components/saas/UnknownStore404View.tsx').then((m) => ({ default: m.UnknownStore404View })));
+const SuspendedStoreView = lazy(() => import('./components/saas/SuspendedStoreView.tsx').then((m) => ({ default: m.SuspendedStoreView })));
+const SuperAdminControlPanel = lazy(() => import('./components/saas/SuperAdminControlPanel.tsx').then((m) => ({ default: m.SuperAdminControlPanel })));
+const TenantOnboardingWizard = lazy(() => import('./components/saas/TenantOnboardingWizard.tsx').then((m) => ({ default: m.TenantOnboardingWizard })));
+const InstallationWizard = lazy(() => import('./components/saas/InstallationWizard.tsx').then((m) => ({ default: m.InstallationWizard })));
+const SaasLandingPage = lazy(() => import('./components/saas/SaasLandingPage.tsx').then((m) => ({ default: m.SaasLandingPage })));
+const NotificationsView = lazy(() => import('./components/notifications/NotificationsView.tsx').then((m) => ({ default: m.NotificationsView })));
+const VerifyEmailNoticeView = lazy(() => import('./components/auth/VerifyEmailNoticeView.tsx').then((m) => ({ default: m.VerifyEmailNoticeView })));
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
 import { getStandardDocumentTitle, applyBrowserFavicon } from './utils/documentTitle.ts';
@@ -987,20 +988,6 @@ export default function App() {
     window.history.replaceState({}, '', appPathForTab(valid));
   };
 
-  // Global F9 keyboard shortcut: Instantly launch POS Terminal from anywhere in the store app
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F9') {
-        e.preventDefault();
-        if (currentUser && saasMode === 'TENANT_ACTIVE') {
-          handleTabChange('pos');
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentUser, saasMode]);
-
   useEffect(() => {
     const role = (currentUser?.role || '').toLowerCase();
     const isCashier = role === 'cashier';
@@ -1259,6 +1246,8 @@ export default function App() {
 
       const role = (currentUser?.role || '').toLowerCase();
       const isCashier = role === 'cashier';
+      const isAdmin = role === 'admin' || role === 'superadmin';
+      const isPosActive = currentTab === 'pos' || (isCashier && currentTab === 'dashboard');
 
       if (e.altKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -1286,17 +1275,19 @@ export default function App() {
           handleTabChange('reports');
           break;
         case 'F7':
-          if ((currentUser?.role || '').toLowerCase() === 'superadmin') {
+          if (isAdmin || isCashier) {
             handleTabChange('settings');
           }
           break;
         case 'F8':
-          handleTabChange('pos');
-          window.dispatchEvent(new CustomEvent('pos:delete-sale'));
+          if (!isPosActive) {
+            handleTabChange('pos');
+          }
           break;
         case 'F9':
-          handleTabChange('pos');
-          window.dispatchEvent(new CustomEvent('pos:print-receipt'));
+          if (!isPosActive && currentUser) {
+            handleTabChange('pos');
+          }
           break;
         default:
           break;
@@ -1305,9 +1296,18 @@ export default function App() {
 
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [currentUser, saasMode]);
+  }, [currentUser, saasMode, currentTab]);
 
   return (
+    <Suspense
+      fallback={
+        <LoadingWindow
+          isAdmin={saasMode === 'SUPERADMIN'}
+          storeName={effectiveStoreName || 'SarbaazSoft Shoe POS'}
+          statusMessage="Loading module..."
+        />
+      }
+    >
     <div className="min-h-screen w-full flex flex-col bg-slate-100 dark:bg-[#0A0E1A] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-200">
       {saasMode === 'INSTALLER' && (
         <InstallationWizard
@@ -1874,5 +1874,6 @@ export default function App() {
         <PushNotificationSoftPrompt currentUser={currentUser} />
       )}
     </div>
+    </Suspense>
   );
 }

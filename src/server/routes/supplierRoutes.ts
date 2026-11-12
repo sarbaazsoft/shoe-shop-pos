@@ -5,23 +5,11 @@ import { requireAuth, requireAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { supplierOpeningBalanceSchema } from '../../schemas/openingBalanceSchema.ts';
+import { generateSupplierPaymentNumber } from '../services/ledgerService.ts';
 
 const router = Router();
 
-// Helper to generate unique supplier payment voucher number
-async function generatePaymentNumber(tenantId: number): Promise<string> {
-  const lastPay = await pgClient.query<{ payment_number: string }>(
-    `SELECT payment_number FROM supplier_payments WHERE tenant_id = $1 AND payment_number LIKE 'SPAY-%' ORDER BY id DESC LIMIT 1`,
-    [tenantId]
-  );
-  let nextNum = 1;
-  if (lastPay.rows.length > 0) {
-    const rawNum = lastPay.rows[0].payment_number.slice(5);
-    const parsed = parseInt(rawNum, 10);
-    if (!isNaN(parsed)) nextNum = parsed + 1;
-  }
-  return `SPAY-${String(nextNum).padStart(6, '0')}`;
-}
+// Uses shared generateSupplierPaymentNumber from ledgerService.ts
 
 // List / Search Suppliers with Purchases, Returns, Payments and Net Payable Balance
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -366,7 +354,7 @@ router.post('/:id/payments', requireAuth, requireAdmin, async (req: Authenticate
   await pgClient.query('BEGIN');
 
   try {
-    const paymentNumber = await generatePaymentNumber(tenantId);
+    const paymentNumber = await generateSupplierPaymentNumber(tenantId);
     const effectiveDate = paymentDate || new Date().toISOString().split('T')[0];
 
     let linkedPurchaseId: number | null = null;

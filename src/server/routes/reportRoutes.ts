@@ -55,7 +55,7 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
            SELECT COALESCE(SUM((si.unit_price * si.quantity) - si.discount - (si.purchase_price * si.quantity)), 0)
            FROM sale_items si
            WHERE si.tenant_id = $1
-         ) - COALESCE(SUM(s.discount), 0) as total_profit
+         ) as total_profit
        FROM sales s
        WHERE s.tenant_id = $1`,
       [tenantId]
@@ -731,7 +731,7 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
                 : defaultShoeCategories[idx]?.percentage || 55;
             return {
               id: `cat-${idx + 1}`,
-              name: r.category_name,
+              name: r.category_name || 'Athletic & Sneakers',
               unitsSold: sold,
               stockUnits: stock,
               productCount: parseInt(r.product_count, 10) || 1,
@@ -744,7 +744,7 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     // Pad with default shoe categories if store has fewer than 4 distinct categories
     if (categoryBreakdown.length < 4) {
-      const existingNames = new Set(categoryBreakdown.map((c) => c.name.toLowerCase()));
+      const existingNames = new Set(categoryBreakdown.map((c) => (c.name || '').toLowerCase()));
       for (const fallbackCat of defaultShoeCategories) {
         if (categoryBreakdown.length >= 4) break;
         if (!existingNames.has(fallbackCat.name.toLowerCase())) {

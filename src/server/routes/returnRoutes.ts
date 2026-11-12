@@ -5,6 +5,7 @@ import { requireAuth } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { notifyPosAction } from '../pushNotificationService.ts';
+import { calculateReturnNetUnitPrice } from '../../utils/posCalculations.ts';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/verify-invoice/:invoiceNumber', requireAuth, async (req: Authentica
       `SELECT s.*, c.name as customer_name, c.phone as customer_phone, u.name as cashier_name
        FROM sales s
        LEFT JOIN customers c ON s.customer_id = c.id AND c.tenant_id = $2
-       LEFT JOIN users u ON s.user_id = u.id
+       LEFT JOIN users u ON s.created_by = u.id
        WHERE UPPER(s.invoice_number) = UPPER($1) AND s.tenant_id = $2`,
       [invoiceNumber, tenantId]
     );
@@ -72,7 +73,12 @@ router.get('/verify-invoice/:invoiceNumber', requireAuth, async (req: Authentica
       const unitPrice = parseFloat(item.unit_price) || 0;
       const discount = parseFloat(item.discount) || 0;
       const subtotal = parseFloat(item.subtotal) || 0;
-      const effectiveUnitPrice = soldQty > 0 ? (subtotal - discount) / soldQty : unitPrice;
+      const effectiveUnitPrice = calculateReturnNetUnitPrice({
+        soldQuantity: soldQty,
+        subtotal: item.subtotal,
+        unitPrice,
+        discount,
+      });
 
       return {
         id: item.id,
@@ -194,10 +200,12 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =
 
       const saleItem = siRes.rows[0];
       const parsedRefundPrice = parseFloat(item.unitRefundPrice);
-      const fallbackUnitPrice =
-        saleItem.quantity > 0
-          ? (parseFloat(saleItem.subtotal || '0') - parseFloat(saleItem.discount || '0')) / saleItem.quantity
-          : parseFloat(saleItem.unit_price || '0');
+      const fallbackUnitPrice = calculateReturnNetUnitPrice({
+        quantity: saleItem.quantity,
+        subtotal: saleItem.subtotal,
+        unitPrice: saleItem.unit_price,
+        discount: saleItem.discount,
+      });
       const refundPrice = !isNaN(parsedRefundPrice) && parsedRefundPrice >= 0 ? parsedRefundPrice : fallbackUnitPrice;
 
       // Check already returned qty

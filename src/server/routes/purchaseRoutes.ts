@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, forbidCashier } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAppSetting } from '../services/appSettingsService.ts';
+import { generateSupplierPaymentNumber } from '../services/ledgerService.ts';
 
 const router = Router();
 
@@ -30,20 +31,7 @@ async function generatePurchaseNumber(tenantId: number): Promise<string> {
   return `${prefix}${padded}`;
 }
 
-// Helper to generate unique supplier payment voucher number
-async function generatePaymentNumber(tenantId: number): Promise<string> {
-  const lastPay = await pgClient.query<{ payment_number: string }>(
-    `SELECT payment_number FROM supplier_payments WHERE tenant_id = $1 AND payment_number LIKE 'SPAY-%' ORDER BY id DESC LIMIT 1`,
-    [tenantId]
-  );
-  let nextNum = 1;
-  if (lastPay.rows.length > 0) {
-    const rawNum = lastPay.rows[0].payment_number.slice(5);
-    const parsed = parseInt(rawNum, 10);
-    if (!isNaN(parsed)) nextNum = parsed + 1;
-  }
-  return `SPAY-${String(nextNum).padStart(6, '0')}`;
-}
+// Uses shared generateSupplierPaymentNumber from ledgerService.ts
 
 // List Purchases (Forbidden for Cashiers)
 router.get('/', requireAuth, forbidCashier, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -296,7 +284,7 @@ router.post('/', requireAuth, forbidCashier, requireAdmin, async (req: Authentic
 
     // If an initial payment was paid during purchase creation, automatically record into supplier_payments
     if (actualPaid > 0 && resolvedSupplierId) {
-      const payNumber = await generatePaymentNumber(tenantId);
+      const payNumber = await generateSupplierPaymentNumber(tenantId);
       await pgClient.query(
         `INSERT INTO supplier_payments (
            tenant_id, payment_number, supplier_id, supplier_name, purchase_id, amount, payment_date, payment_method, reference_number, notes, created_by
