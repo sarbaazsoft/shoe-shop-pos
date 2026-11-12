@@ -265,7 +265,6 @@ function normalizeCachedProduct(p: any, tenantId: number): any {
     max_sale_price: rawMax > 0 ? rawMax : retailPrice,
     totalStock,
     total_stock: totalStock,
-    lowStockLimit: Number(p.lowStockLimit ?? p.low_stock_limit ?? 5) || 5,
     active: p.active !== false,
     cachedAt: new Date().toISOString(),
   };

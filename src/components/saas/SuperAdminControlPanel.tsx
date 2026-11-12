@@ -9,6 +9,7 @@ import { APP_VERSION } from '../../version.ts';
 import { UserAvatar } from '../common/UserAvatar';
 import { ThemeDropdown } from '../common/ThemeDropdown';
 import { UserProfileModal } from '../auth/UserProfileModal';
+import { InstallAppModal } from '../common/InstallAppModal';
 import { RememberedEmailField } from '../auth/RememberedEmailField';
 import { useRememberedAccount } from '../../hooks/useRememberedAccount';
 import { getRememberedEmail, normalizeRememberedEmail } from '../../utils/rememberedAccount';
@@ -53,6 +54,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   // SuperAdmin user menu dropdown & profile modal states
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // SuperAdmin Notifications Dropdown state
@@ -254,7 +256,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   const [newSubscriptionPlan, setNewSubscriptionPlan] = useState<'free_tier' | '6_MONTHS' | 'YEARLY'>('free_tier');
   const [newBusinessType, setNewBusinessType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [newPricingMode, setNewPricingMode] = useState<'FIXED' | 'NEGOTIABLE'>('FIXED');
-  const [newMinSellingQuantity, setNewMinSellingQuantity] = useState<number>(1.0);
+  const [newAllowHalfCarton, setNewAllowHalfCarton] = useState<boolean>(false);
   const [creatingStore, setCreatingStore] = useState(false);
   const [createStoreError, setCreateStoreError] = useState<string | null>(null);
 
@@ -1101,8 +1103,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         subscriptionPlan: newSubscriptionPlan,
         businessType: newBusinessType,
         pricingMode: newBusinessType === 'WHOLESALE' ? 'FIXED' : newPricingMode,
-        minSellingQuantity: newBusinessType === 'WHOLESALE' ? newMinSellingQuantity : 1.0,
-        allowHalfCarton: newBusinessType === 'WHOLESALE' ? newMinSellingQuantity <= 0.5 : true,
+        allowHalfCarton: newBusinessType === 'WHOLESALE' ? newAllowHalfCarton : true,
       });
       if (res.provisioned) {
         setProvisionedBanner(res.provisioned);
@@ -1119,7 +1120,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       setNewSubscriptionPlan('free_tier');
       setNewBusinessType('RETAIL');
       setNewPricingMode('FIXED');
-      setNewMinSellingQuantity(1.0);
+      setNewAllowHalfCarton(false);
 
 
       await loadOverview();
@@ -1973,23 +1974,25 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             )}
           </button>
 
-          {/* Dedicated SuperAdmin PWA Badge */}
-          <div
-            className={`w-full flex items-center rounded-xl bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 transition shadow-xs ${
+          {/* Dedicated SuperAdmin PWA Install Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsInstallModalOpen(true)}
+            className={`w-full flex items-center rounded-xl bg-indigo-50/60 hover:bg-indigo-100/80 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 transition shadow-xs cursor-pointer ${
               collapsed ? 'justify-center p-2 relative' : 'justify-between px-2.5 py-1.5'
             }`}
-            title="Dedicated SuperAdmin PWA"
+            title="Install Dedicated SuperAdmin PWA / App"
           >
             <div className="flex items-center gap-2">
-              <FileCode2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              {!collapsed && <span className="text-[11px] font-bold">POS Admin PWA</span>}
+              <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              {!collapsed && <span className="text-[11px] font-bold">Install POS Admin</span>}
             </div>
             {!collapsed && (
               <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white dark:bg-[#070B14] text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                 PWA
               </span>
             )}
-          </div>
+          </button>
 
           {/* Theme Toggle & Database Connected Status */}
           <div className="space-y-1.5 pt-1">
@@ -2048,7 +2051,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
             {!collapsed && (
               <div className="px-2 pt-1 border-t border-indigo-500/15 flex items-center justify-between text-[9.5px] text-slate-400 dark:text-slate-500">
                 <span>POS SaaS C-Panel</span>
-                <span className="font-mono">v1.0.0</span>
+                <span className="font-mono">{APP_VERSION}</span>
               </div>
             )}
           </div>
@@ -4245,7 +4248,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                                     </span>
                                     {store.businessType === 'WHOLESALE' && (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40 font-mono">
-                                        Min: {Number((store as any).minSellingQuantity ?? (store as any).min_selling_quantity ?? ((store as any).allowHalfCarton ? 0.5 : 1.0)) <= 0.5 ? '0.5 Carton' : '1 Carton'}
+                                        Min: {(store as any).allowHalfCarton === false || (store as any).allow_half_carton === false ? '1 Carton' : '0.5 Carton'}
                                       </span>
                                     )}
                                   </div>
@@ -5633,7 +5636,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                         <label
                           className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
-                            newMinSellingQuantity === 0.5
+                            newAllowHalfCarton
                               ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 dark:border-purple-500 ring-1 ring-purple-500/20'
                               : 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-gray-300'
                           }`}
@@ -5642,8 +5645,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                             type="radio"
                             name="superAdminMinSellingQty"
                             value="0.5"
-                            checked={newMinSellingQuantity === 0.5}
-                            onChange={() => setNewMinSellingQuantity(0.5)}
+                            checked={newAllowHalfCarton}
+                            onChange={() => setNewAllowHalfCarton(true)}
                             className="mt-0.5 text-purple-600 focus:ring-purple-500"
                           />
                           <div className="text-xs">
@@ -5659,7 +5662,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
                         <label
                           className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
-                            newMinSellingQuantity === 1.0
+                            !newAllowHalfCarton
                               ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 dark:border-purple-500 ring-1 ring-purple-500/20'
                               : 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-gray-300'
                           }`}
@@ -5668,8 +5671,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
                             type="radio"
                             name="superAdminMinSellingQty"
                             value="1"
-                            checked={newMinSellingQuantity === 1.0}
-                            onChange={() => setNewMinSellingQuantity(1.0)}
+                            checked={!newAllowHalfCarton}
+                            onChange={() => setNewAllowHalfCarton(false)}
                             className="mt-0.5 text-purple-600 focus:ring-purple-500"
                           />
                           <div className="text-xs">
@@ -6791,6 +6794,14 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           storeName="Platform SuperAdmin"
         />
       )}
+
+      {/* SuperAdmin PWA / APK / Desktop Install Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        storeName="POS Admin"
+        isAdmin={true}
+      />
     </div>
   );
 };

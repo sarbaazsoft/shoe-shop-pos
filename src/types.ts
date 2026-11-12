@@ -68,7 +68,6 @@ export interface SuperAdminStoreRow {
   status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED';
   businessType?: 'RETAIL' | 'WHOLESALE' | string;
   pricingMode?: PricingMode;
-  minSellingQuantity?: number;
   allowHalfCarton?: boolean;
   subscriptionType?: SubscriptionType;
   subscriptionPlan: SubscriptionPlan;
@@ -205,13 +204,11 @@ export interface CompanySettings {
   currencySymbol: string;
   currency_symbol?: string;
   invoiceFooter: string;
-  lowStockLimit: number;
+  lowStockThreshold: number;
+  low_stock_threshold?: number;
   pricingMode: PricingMode;
   pricing_mode?: PricingMode;
-  pricingPolicyLocked: boolean;
-  pricing_policy_locked?: boolean;
-  minSellingQuantity?: number;
-  min_selling_quantity?: number;
+  onboardingCompleted?: boolean;
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
   updatedAt: string;
@@ -223,31 +220,6 @@ export interface Brand {
   name: string;
   logo?: string;
   prefix?: string;
-}
-
-export type AiConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
-
-export interface AiProductSuggestionResult {
-  title: string;
-  category: {
-    suggestedName: string;
-    matchedName?: string | null;
-    matchedId?: number | null;
-    isExisting?: boolean;
-    confidence?: AiConfidenceLevel;
-  };
-  brand: {
-    suggestedName: string;
-    matchedName?: string | null;
-    matchedId?: number | null;
-    isExisting?: boolean;
-    isUnknown?: boolean;
-    confidence?: AiConfidenceLevel;
-  };
-  confidence: AiConfidenceLevel;
-  shoeType?: string;
-  isFootwear?: boolean;
-  visualClues?: string[];
 }
 
 export interface Category {
@@ -284,9 +256,6 @@ export interface Product {
   minSalePrice?: number | null;
   maxSalePrice?: number | null;
   totalStock: number;
-  lowStockLimit: number;
-  lowStockAlert?: number;
-  low_stock_limit?: number;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -303,10 +272,6 @@ export interface ProductFormValues extends Pick<
   pairsPerCarton?: 12 | 16;
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
-  lowStockLimit?: number;
-  lowStockAlert?: number;
-  low_stock_limit?: number;
-  lowStockThresholdCartons?: number;
 }
 
 export interface Customer {

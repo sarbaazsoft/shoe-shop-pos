@@ -60,10 +60,10 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
   // 3. Document Prefixes, Tax Rates, Currency & POS Defaults
 
 
-  const [lowStockLimit, setLowStockLimit] = useState(5);
+  const [lowStockThreshold, setLowStockThreshold] = useState(5);
   const [businessType, setBusinessType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [pricingMode, setPricingMode] = useState<'FIXED' | 'NEGOTIABLE'>('FIXED');
-  const [minSellingQuantity, setMinSellingQuantity] = useState<number>(1.0);
+  const [allowHalfCarton, setAllowHalfCarton] = useState<boolean>(false);
   const [currency, setCurrency] = useState('PKR');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [taxId, setTaxId] = useState('');
@@ -100,7 +100,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
             t.invoiceFooter ||
               'Thank you for shopping with us! Exchanges accepted within 7 days with original receipt.'
           );
-          setLowStockLimit(Number(t.lowStockLimit) || 5);
+          setLowStockThreshold(Number((t as any).lowStockThreshold ?? (t as any).low_stock_threshold ?? 5) || 5);
           const bType = ((t as any).businessType || (t as any).business_type || 'RETAIL').toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
           setBusinessType(bType);
           if (bType === 'WHOLESALE') {
@@ -108,12 +108,8 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
           } else {
             setPricingMode(t.pricingMode === 'NEGOTIABLE' ? 'NEGOTIABLE' : 'FIXED');
           }
-          const rawMin = (t as any).minSellingQuantity ?? (t as any).min_selling_quantity;
-          if (rawMin !== undefined && rawMin !== null && String(rawMin).trim() !== '') {
-            setMinSellingQuantity(parseFloat(String(rawMin)) <= 0.5 ? 0.5 : 1.0);
-          } else if ((t as any).allowHalfCarton !== undefined || (t as any).allow_half_carton !== undefined) {
-            const allowHalf = Boolean((t as any).allowHalfCarton ?? (t as any).allow_half_carton);
-            setMinSellingQuantity(allowHalf ? 0.5 : 1.0);
+          if ((t as any).allowHalfCarton !== undefined || (t as any).allow_half_carton !== undefined) {
+            setAllowHalfCarton(Boolean((t as any).allowHalfCarton ?? (t as any).allow_half_carton));
           }
           setLogoUrl(t.logoUrl || '/pwa-512x512.png');
           setAlreadyCompleted(Boolean(t.onboardingCompleted || (t as any).isLocked));
@@ -243,11 +239,10 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
 
 
         invoiceFooter: toTitleCaseTrimmed(invoiceFooter),
-        lowStockLimit,
+        lowStockThreshold,
         businessType,
         pricingMode: businessType === 'WHOLESALE' ? 'FIXED' : pricingMode,
-        minSellingQuantity: businessType === 'WHOLESALE' ? minSellingQuantity : 1.0,
-        allowHalfCarton: businessType === 'WHOLESALE' ? minSellingQuantity <= 0.5 : true,
+        allowHalfCarton: businessType === 'WHOLESALE' ? allowHalfCarton : true,
         logoUrl,
         initialProducts: initialProducts
           .filter((p) => p.name.trim().length > 0)
@@ -368,7 +363,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                     Barcode Standard: <span className="text-emerald-600 dark:text-emerald-400">Code-128</span>
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Low Stock Alert: {businessType === 'WHOLESALE' ? `${Math.max(1, Math.round(lowStockLimit / 12))} Cartons (${lowStockLimit} Pairs)` : `${lowStockLimit} Pairs`}
+                    Low Stock Alert: {businessType === 'WHOLESALE' ? `${Math.max(1, Math.round(lowStockThreshold / 12))} Cartons (${lowStockThreshold} Pairs)` : `${lowStockThreshold} Pairs`}
                   </div>
                 </div>
 
@@ -1044,21 +1039,21 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div>
                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                            {businessType === 'WHOLESALE' ? 'Low Stock Threshold (Cartons)' : 'Low Stock Alert Threshold (Pairs)'}
+                            {businessType === 'WHOLESALE' ? 'Low stock threshold (Cartons)' : 'Low stock threshold (Pairs)'}
                           </label>
                           <input
                             type="number"
                             min={1}
-                            value={businessType === 'WHOLESALE' ? Math.max(1, Math.round(lowStockLimit / 12)) : lowStockLimit}
+                            value={businessType === 'WHOLESALE' ? Math.max(1, Math.round(lowStockThreshold / 12)) : lowStockThreshold}
                             onChange={(e) => {
                               const entered = Math.max(1, Number(e.target.value) || 1);
-                              setLowStockLimit(businessType === 'WHOLESALE' ? entered * 12 : entered);
+                              setLowStockThreshold(businessType === 'WHOLESALE' ? entered * 12 : entered);
                             }}
                             className="app-input w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-800/60 text-slate-900 dark:text-white text-sm font-mono"
                           />
                           {businessType === 'WHOLESALE' && (
                             <p className="text-[10px] text-purple-700 dark:text-purple-300 font-mono mt-1">
-                              = {lowStockLimit} pairs ({Math.max(1, Math.round(lowStockLimit / 12))} cartons × 12 pairs)
+                              = {lowStockThreshold} pairs ({Math.max(1, Math.round(lowStockThreshold / 12))} cartons × 12 pairs)
                             </p>
                           )}
                         </div>
@@ -1207,7 +1202,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                                   <label
                                     className={`flex items-start gap-2.5 p-3 rounded-xl border transition ${
-                                      minSellingQuantity === 0.5
+                                      allowHalfCarton
                                         ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-500 ring-1 ring-purple-500/20'
                                         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 opacity-60'
                                     } cursor-pointer`}
@@ -1216,8 +1211,8 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                       type="radio"
                                       name="onboardingMinSellingQty"
                                       value="0.5"
-                                      checked={minSellingQuantity === 0.5}
-                                      onChange={() => setMinSellingQuantity(0.5)}
+                                      checked={allowHalfCarton}
+                                      onChange={() => setAllowHalfCarton(true)}
                                       className="mt-0.5 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                     <div className="text-xs">
@@ -1233,7 +1228,7 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
 
                                   <label
                                     className={`flex items-start gap-2.5 p-3 rounded-xl border transition ${
-                                      minSellingQuantity === 1.0
+                                      !allowHalfCarton
                                         ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-500 ring-1 ring-purple-500/20'
                                         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 opacity-60'
                                     } cursor-pointer`}
@@ -1242,8 +1237,8 @@ export const TenantOnboardingWizard: React.FC<TenantOnboardingWizardProps> = ({
                                       type="radio"
                                       name="onboardingMinSellingQty"
                                       value="1"
-                                      checked={minSellingQuantity === 1.0}
-                                      onChange={() => setMinSellingQuantity(1.0)}
+                                      checked={!allowHalfCarton}
+                                      onChange={() => setAllowHalfCarton(false)}
                                       className="mt-0.5 text-purple-600 focus:ring-purple-500 cursor-pointer"
                                     />
                                     <div className="text-xs">

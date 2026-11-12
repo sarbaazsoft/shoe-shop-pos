@@ -252,52 +252,6 @@ export function normalizePairsPerCarton(value: unknown): 12 | 16 {
 }
 
 /**
- * Store-Type-Aware Low Stock Threshold Calculation:
- *
- * 1. Retail Store:
- *    - Preserves current retail behavior exactly.
- *    - Interprets threshold in individual pairs/units.
- *    - Calculation: threshold in pairs directly (e.g. 5 pairs)
- *
- * 2. Wholesale Store:
- *    - Interprets threshold input as a number of cartons.
- *    - Converts entered carton threshold into individual pairs:
- *      product.lowstockalert = entered_carton_threshold * product.pairs_per_carton
- *    - Examples:
- *      1 carton * 12 pairs = 12 pairs
- *      2 cartons * 12 pairs = 24 pairs
- *      1 carton * 16 pairs = 16 pairs
- *      5 cartons * 12 pairs = 60 pairs
- */
-export function calculateLowStockPairs(options: {
-  isWholesale: boolean;
-  threshold: number | string | undefined | null;
-  pairsPerCarton?: number | string | undefined | null;
-}): number {
-  const parsedThreshold = Math.max(1, Math.round(Number(options.threshold) || 1));
-  if (!options.isWholesale) {
-    return parsedThreshold;
-  }
-  const safeCarton = normalizePairsPerCarton(options.pairsPerCarton);
-  return parsedThreshold * safeCarton;
-}
-
-/**
- * Extracts carton threshold for wholesale product editing to prevent corrupting stored thresholds:
- * If an existing wholesale product has 24 pairs stored and carton size 12, displays 2 cartons.
- */
-export function extractCartonThreshold(
-  storedPairs: number | string | undefined | null,
-  pairsPerCarton?: number | string | undefined | null
-): number {
-  if (storedPairs === undefined || storedPairs === null || Number(storedPairs) <= 0) {
-    return 1;
-  }
-  const safeCarton = normalizePairsPerCarton(pairsPerCarton);
-  return Math.max(1, Math.round(Number(storedPairs) / safeCarton));
-}
-
-/**
  * Determination: Product-level allow_half_carton takes precedence as an explicit override.
  * - If product explicitly specifies allowHalfCarton (true or false), that rule is enforced.
  *   (e.g., if a wholesale store globally allows half cartons, but a specific product has allowHalfCarton = false,

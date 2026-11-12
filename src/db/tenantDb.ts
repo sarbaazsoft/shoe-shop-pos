@@ -71,7 +71,7 @@ export class TenantScopedDb {
         sql += ` AND LOWER(category) = $${params.length}`;
       }
       if (filters?.lowStockOnly) {
-        sql += ` AND total_stock <= COALESCE(low_stock_limit, 5)`;
+        sql += ` AND total_stock <= COALESCE((SELECT cs.low_stock_threshold FROM company_settings cs WHERE cs.tenant_id = products.tenant_id LIMIT 1), 5)`;
       }
 
       sql += ` ORDER BY id DESC`;
@@ -116,16 +116,15 @@ export class TenantScopedDb {
       minPrice: number;
       maxPrice: number;
       totalStock: number;
-      lowStockLimit?: number;
       pairsPerCarton?: number;
     }) => {
       const res = await pgClient.query(
         `INSERT INTO products (
           tenant_id, name, brand, category, barcode, article,
           primary_image_url, description, cost_price,
-          min_price, max_price, total_stock, low_stock_limit, active,
+          min_price, max_price, total_stock, active,
           pairs_per_carton
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, $14)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, $13)
         RETURNING *`,
         [
           this.tenantId,
@@ -140,7 +139,6 @@ export class TenantScopedDb {
           data.minPrice,
           data.maxPrice,
           data.totalStock,
-          data.lowStockLimit ?? 5,
           Number(data.pairsPerCarton) || 12,
         ]
       );
@@ -159,7 +157,6 @@ export class TenantScopedDb {
       minPrice: number;
       maxPrice: number;
       totalStock: number;
-      lowStockLimit: number;
       pairsPerCarton: number;
     }>) => {
       const existing = await this.products.findById(id);
@@ -170,10 +167,10 @@ export class TenantScopedDb {
           name = $1, brand = $2, category = $3, barcode = $4,
           article = $5, primary_image_url = $6, description = $7,
           cost_price = $8, min_price = $9, max_price = $10,
-          total_stock = $11, low_stock_limit = $12,
-          pairs_per_carton = $13,
+          total_stock = $11,
+          pairs_per_carton = $12,
           updated_at = NOW()
-         WHERE id = $14 AND tenant_id = $15
+         WHERE id = $13 AND tenant_id = $14
          RETURNING *`,
         [
           data.name ?? existing.name,
@@ -187,7 +184,6 @@ export class TenantScopedDb {
           data.minPrice ?? existing.min_price,
           data.maxPrice ?? existing.max_price,
           data.totalStock ?? existing.total_stock,
-          data.lowStockLimit ?? existing.low_stock_limit,
           data.pairsPerCarton !== undefined ? Number(data.pairsPerCarton) : (existing.pairs_per_carton || 12),
           id,
           this.tenantId,

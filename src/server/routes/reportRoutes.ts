@@ -442,6 +442,12 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
       [tenantId]
     );
 
+    const thresholdRes = await pgClient.query<{ low_stock_threshold: number }>(
+      `SELECT COALESCE(low_stock_threshold, 5) AS low_stock_threshold FROM company_settings WHERE tenant_id = $1 LIMIT 1`,
+      [tenantId]
+    );
+    const storeThreshold = Number(thresholdRes.rows[0]?.low_stock_threshold ?? 5);
+
     // Inventory Metrics
     const inventoryRes = await pgClient.query<{
       total_products: string;
@@ -452,11 +458,11 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
       `SELECT 
          COUNT(*) as total_products,
          COALESCE(SUM(p.total_stock), 0) as total_stock_units,
-         COUNT(CASE WHEN p.total_stock <= COALESCE(p.low_stock_limit, 5) AND p.total_stock > 0 THEN 1 END) as low_stock_count,
+         COUNT(CASE WHEN p.total_stock <= $2 AND p.total_stock > 0 THEN 1 END) as low_stock_count,
          COUNT(CASE WHEN p.total_stock <= 0 THEN 1 END) as out_of_stock_count
        FROM products p
        WHERE p.tenant_id = $1 AND p.active = true`,
-      [tenantId]
+      [tenantId, storeThreshold]
     );
 
     // Recent Sales (Last 5)
@@ -475,12 +481,12 @@ router.get('/dashboard', requireAuth, async (req: AuthenticatedRequest, res: Res
     const lowStockProducts = await pgClient.query(
       `SELECT p.id, COALESCE(p.article, p.name) as article, COALESCE(p.article, p.name) as name, 
               p.barcode, p.total_stock, 
-              COALESCE(p.low_stock_limit, 5) as low_stock_limit, 
+              $2::int as low_stock_threshold,
               p.primary_image_url
        FROM products p
-       WHERE p.tenant_id = $1 AND p.active = true AND p.total_stock <= COALESCE(p.low_stock_limit, 5)
+       WHERE p.tenant_id = $1 AND p.active = true AND p.total_stock <= $2
        ORDER BY p.total_stock ASC LIMIT 5`,
-      [tenantId]
+      [tenantId, storeThreshold]
     );
 
     // Top Selling Brands

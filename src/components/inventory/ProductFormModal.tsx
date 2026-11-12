@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload, Loader2 } from 'lucide-react';
+import { X, Sparkles, Barcode, CheckCircle2, AlertCircle, Package, ArrowRight, ArrowLeft, Scan, Tag, DollarSign, Check, Info, TrendingUp, Building2, Boxes, RefreshCw, Box, Upload } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { SideEndBoxLabelModal } from './SideEndBoxLabelModal.tsx';
 import { BarcodeStickerModal } from './BarcodeStickerModal.tsx';
@@ -9,7 +9,7 @@ import { generateCode128Barcode, analyzeBarcode } from '../../utils/barcode.ts';
 import { parseBrandPrefix, parseCategoryPrefix, generateSuggestedArticle, STANDARD_FOOTWEAR_CATEGORIES, normalizeFootwearCategory } from '../../utils/footwear.ts';
 import { BarcodeSvg } from '../common/BarcodeSvg.tsx';
 import { cleanStockPriceInput, formatStockPrice } from '../../utils/priceFormat.ts';
-import { validateAndNormalizeProductPricing, PricingMode, calculateLowStockPairs, extractCartonThreshold } from '../../schemas/productSchema.ts';
+import { validateAndNormalizeProductPricing, PricingMode } from '../../schemas/productSchema.ts';
 import { BrandLogo } from '../common/BrandLogo.tsx';
 import { toTitleCaseLive, toTitleCaseTrimmed } from '../../utils/textFormat.ts';
 import type { ProductFormValues } from '../../types.ts';
@@ -125,7 +125,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   });
 
   // Inventory & Product info
-  const [productName, setProductName] = useState<string>(product?.name || '');
   const [lotSize, setLotSize] = useState<12 | 16>(() =>
     Number(product?.pairsPerCarton ?? product?.pairs_per_carton) === 16 ? 16 : 12
   );
@@ -141,57 +140,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return 0;
   });
 
-  // Store-type-aware low stock threshold state:
-  // Wholesale: Number of cartons (converted to pairs on save: cartons × pairs_per_carton)
-  // Retail: Number of individual pairs
-  const [lowStockThreshold, setLowStockThreshold] = useState<number | ''>(() => {
-    const rawStored =
-      product?.lowStockLimit ??
-      product?.low_stock_limit ??
-      product?.lowStockAlert ??
-      product?.low_stock_alert;
-
-    if (isWholesaleStore) {
-      const cartonSize = Number(product?.pairsPerCarton ?? product?.pairs_per_carton) === 16 ? 16 : 12;
-      return extractCartonThreshold(rawStored, cartonSize);
-    }
-    return rawStored !== undefined && rawStored !== null && Number(rawStored) > 0 ? Number(rawStored) : 5;
-  });
-
   const [primaryImageUrl, setPrimaryImageUrl] = useState<string>(product?.primaryImageUrl || '');
-
-  // AI Vision Suggestor State (strictly for retail stores only)
-  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<{
-    title?: string;
-    category?: string;
-    brand?: string;
-    shoeType?: string;
-  } | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-
-  const handleRunAiImageAnalysis = async (imageDataUrl: string) => {
-    if (isWholesaleStore || !imageDataUrl) return;
-    setIsAiAnalyzing(true);
-    setAiError(null);
-    try {
-      const res = await api.products.aiSuggestFromImage(imageDataUrl);
-      if (res && res.success) {
-        setAiSuggestions({
-          title: res.title || '',
-          category: res.category ? normalizeFootwearCategory(res.category) : undefined,
-          brand: res.brand ? toTitleCaseLive(res.brand) : 'Unbranded',
-          shoeType: res.shoeType || '',
-        });
-      } else {
-        setAiError(res?.error || 'Could not detect product attributes from image.');
-      }
-    } catch (err: any) {
-      setAiError(err.message || 'AI image suggestion failed. You can enter details manually.');
-    } finally {
-      setIsAiAnalyzing(false);
-    }
-  };
 
 
   const handleProductImageUpload = (file?: File) => {
@@ -218,9 +167,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
         setPrimaryImageUrl(resizedDataUrl);
         setErrorMessage('');
-        if (!isWholesaleStore) {
-          handleRunAiImageAnalysis(resizedDataUrl);
-        }
       };
       image.onerror = () => setErrorMessage('Unable to read this image. Please try another file.');
       image.src = String(reader.result || '');
@@ -375,9 +321,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const designedBarcode = generateCode128Barcode(pId, catPfx).barcode;
       setBarcode(designedBarcode);
     }
-    if (!productName || productName.toUpperCase() === article.toUpperCase()) {
-      setProductName(designedArticle);
-    }
   };
 
   const handleBrandChange = (newBrand: string) => {
@@ -390,30 +333,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const formatted = normalizeFootwearCategory(newCat);
     setCategory(formatted);
     updateClassificationCodes(brand, formatted, effectiveProductId);
-  };
-
-  const handleApplyAllAiSuggestions = () => {
-    if (!aiSuggestions || isWholesaleStore) return;
-    if (aiSuggestions.title) {
-      setProductName(aiSuggestions.title);
-    }
-    if (aiSuggestions.brand) {
-      handleBrandChange(aiSuggestions.brand);
-    }
-    if (aiSuggestions.category) {
-      handleCategoryChange(aiSuggestions.category);
-    }
-  };
-
-  const handleApplySingleAiSuggestion = (field: 'title' | 'brand' | 'category') => {
-    if (!aiSuggestions || isWholesaleStore) return;
-    if (field === 'title' && aiSuggestions.title) {
-      setProductName(aiSuggestions.title);
-    } else if (field === 'brand' && aiSuggestions.brand) {
-      handleBrandChange(aiSuggestions.brand);
-    } else if (field === 'category' && aiSuggestions.category) {
-      handleCategoryChange(aiSuggestions.category);
-    }
   };
 
   const handleArticleChange = (rawVal: string) => {
@@ -515,7 +434,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             if (isMounted) {
               if (articleRes?.suggestedArticle) {
                 setArticle(String(articleRes.suggestedArticle).toUpperCase());
-                setProductName((prev) => prev || String(articleRes.suggestedArticle).toUpperCase());
               }
               if (barcodeRes?.barcode) {
                 setBarcode(barcodeRes.barcode);
@@ -937,39 +855,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
       const finalPairsPerCarton = isWholesaleStore ? (pairsPerCarton === 16 ? 16 : 12) : lotSize;
 
-      // Store-type-aware low stock threshold handling:
-      // Wholesale stores: product-level threshold is hidden.
-      // - For existing wholesale products: preserve existing stored threshold value exactly so updates never overwrite it.
-      // - For new wholesale products: use store-level threshold setting or default.
-      // Retail stores: calculate from the visible input.
-      let finalLowStockLimit: number;
-      if (isWholesaleStore) {
-        const existingLimit =
-          product?.lowStockLimit ??
-          product?.low_stock_limit ??
-          product?.lowStockAlert ??
-          product?.low_stock_alert;
-
-        if (existingLimit !== undefined && existingLimit !== null && !isNaN(Number(existingLimit)) && Number(existingLimit) > 0) {
-          finalLowStockLimit = Number(existingLimit);
-        } else {
-          const storeThreshold = effectiveSettings?.low_stock_limit ?? effectiveSettings?.lowStockLimit;
-          finalLowStockLimit =
-            storeThreshold && !isNaN(Number(storeThreshold)) && Number(storeThreshold) > 0
-              ? Number(storeThreshold)
-              : finalPairsPerCarton;
-        }
-      } else {
-        finalLowStockLimit = calculateLowStockPairs({
-          isWholesale: false,
-          threshold: lowStockThreshold,
-          pairsPerCarton: finalPairsPerCarton,
-        });
-      }
-
       // Consolidated Product Pricing Payload:
       const payload: ProductFormValues = {
-        name: isWholesaleStore ? (product?.name || cleanArticle) : (toTitleCaseTrimmed(productName) || cleanArticle),
+        name: product?.name || cleanArticle,
         brand: finalBrand,
         category: finalCategory,
         article: cleanArticle,
@@ -984,9 +872,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         allowHalfCarton: isWholesaleStore ? allowHalfCarton : true,
         allow_half_carton: isWholesaleStore ? allowHalfCarton : true,
         totalStock: totalStock === '' ? 0 : Math.round(Number(totalStock)),
-        lowStockLimit: finalLowStockLimit,
-        lowStockAlert: finalLowStockLimit,
-        low_stock_limit: finalLowStockLimit,
       };
 
       let savedProduct: any = null;
@@ -1200,21 +1085,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* ========================================================= */}
           {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Product Image & AI Vision Suggestor (Strictly for Retail Stores) */}
+              {/* Product Photo (Strictly for Retail Stores) */}
               {!isWholesaleStore && (
                 <section className="rounded-2xl border border-purple-200/90 bg-gradient-to-br from-purple-50/40 via-white to-indigo-50/30 p-4 shadow-xs dark:border-purple-900/40 dark:from-[#0f172a] dark:via-[#0D1424] dark:to-purple-950/20">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-600 text-white shadow-xs">
-                        <Sparkles className="h-3.5 w-3.5" />
+                        <Upload className="h-3.5 w-3.5" />
                       </div>
                       <h5 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                        Product Photo & AI Suggestor
+                        Product Photo
                       </h5>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
-                      Retail Store Only
-                    </span>
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -1223,11 +1105,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <img src={primaryImageUrl} alt="Product preview" className="h-full w-full object-contain p-1" />
                         <button
                           type="button"
-                          onClick={() => {
-                            setPrimaryImageUrl('');
-                            setAiSuggestions(null);
-                            setAiError(null);
-                          }}
+                          onClick={() => setPrimaryImageUrl('')}
                           aria-label="Remove product image"
                           className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black transition"
                         >
@@ -1240,7 +1118,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <div className="flex flex-wrap gap-2">
                         <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-purple-300 bg-white/80 px-3 py-2.5 text-xs font-semibold text-purple-900 transition hover:border-purple-500 hover:bg-purple-50 dark:border-purple-700/60 dark:bg-slate-900/80 dark:text-purple-200 dark:hover:bg-purple-950/40">
                           <Upload className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                          <span>Upload Shoe Photo (Auto AI Suggest)</span>
+                          <span>Upload Shoe Photo</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -1251,17 +1129,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             }}
                           />
                         </label>
-
-                        {primaryImageUrl && !isAiAnalyzing && (
-                          <button
-                            type="button"
-                            onClick={() => handleRunAiImageAnalysis(primaryImageUrl)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-600 px-3 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 active:scale-95 transition dark:border-purple-600"
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            <span>Re-analyze</span>
-                          </button>
-                        )}
                       </div>
 
                       <div className="flex gap-2">
@@ -1272,111 +1139,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           placeholder="Or paste an image URL"
                           className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         />
-                        {primaryImageUrl && !primaryImageUrl.startsWith('data:') && !isAiAnalyzing && (
-                          <button
-                            type="button"
-                            onClick={() => handleRunAiImageAnalysis(primaryImageUrl)}
-                            className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
-                          >
-                            Analyze
-                          </button>
-                        )}
                       </div>
-
-                      <p className="text-[11px] text-gray-500 dark:text-slate-400">
-                        Upload a photo of the shoe to automatically detect and suggest Title, Category, and Brand.
-                      </p>
                     </div>
                   </div>
-
-                  {/* AI Scanning State */}
-                  {isAiAnalyzing && (
-                    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-purple-200 bg-purple-100/70 p-3 text-xs text-purple-900 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-200 animate-pulse">
-                      <Loader2 className="h-4 w-4 animate-spin text-purple-600 dark:text-purple-400 shrink-0" />
-                      <span className="font-medium">
-                        Analyzing footwear photo with Gemini AI... detecting Title, Category & Brand...
-                      </span>
-                    </div>
-                  )}
-
-                  {/* AI Error Note */}
-                  {aiError && !isAiAnalyzing && (
-                    <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>{aiError}</span>
-                    </div>
-                  )}
-
-                  {/* AI Suggestions Results Panel */}
-                  {aiSuggestions && !isAiAnalyzing && (
-                    <div className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/70 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>AI Suggestions Detected</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleApplyAllAiSuggestions}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition"
-                        >
-                          <Check className="h-3 w-3 stroke-[3]" />
-                          <span>Apply All</span>
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {aiSuggestions.title ? (
-                          <button
-                            type="button"
-                            onClick={() => handleApplySingleAiSuggestion('title')}
-                            title="Click to apply this title"
-                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
-                          >
-                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Title:</span>
-                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
-                              {aiSuggestions.title}
-                            </span>
-                          </button>
-                        ) : null}
-
-                        {aiSuggestions.category ? (
-                          <button
-                            type="button"
-                            onClick={() => handleApplySingleAiSuggestion('category')}
-                            title="Click to apply this category"
-                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
-                          >
-                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Category:</span>
-                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
-                              {aiSuggestions.category}
-                            </span>
-                          </button>
-                        ) : null}
-
-                        {aiSuggestions.brand ? (
-                          <button
-                            type="button"
-                            onClick={() => handleApplySingleAiSuggestion('brand')}
-                            title="Click to apply this brand"
-                            className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-left text-xs font-medium text-gray-800 shadow-2xs hover:border-emerald-500 hover:bg-emerald-50/50 dark:border-emerald-800/80 dark:bg-slate-900 dark:text-slate-100 transition"
-                          >
-                            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-400">Brand:</span>
-                            <span className="font-semibold text-emerald-700 dark:text-emerald-300 group-hover:underline">
-                              {aiSuggestions.brand}
-                            </span>
-                          </button>
-                        ) : null}
-
-                        {aiSuggestions.shoeType ? (
-                          <span className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white/70 px-2 py-1 text-[11px] text-gray-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
-                            <span className="text-[10px] uppercase font-bold text-gray-400">Style:</span>
-                            <span>{aiSuggestions.shoeType}</span>
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
                 </section>
               )}
 
@@ -1767,96 +1532,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Store-Type-Aware Low Stock Threshold for Retail (in Pairs) */}
-                    <div className="pt-2.5 border-t border-indigo-200/60 dark:border-white/10 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="block font-bold text-indigo-950 dark:text-white text-xs">
-                          Low Stock Threshold (Pairs) <span className="text-red-500">*</span>
-                        </label>
-                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-white/90 dark:bg-slate-950/70 border border-indigo-200 dark:border-indigo-400/30 text-indigo-700 dark:text-indigo-300">
-                          {lowStockThreshold || 5} Pairs
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLowStockThreshold((prev) => Math.max(1, (Number(prev) || 1) - 1))
-                          }
-                          className="w-8 h-8 rounded-lg border border-indigo-200 dark:border-indigo-400/40 bg-white dark:bg-white/10 hover:bg-indigo-100 dark:hover:bg-white/20 flex items-center justify-center font-bold text-indigo-950 dark:text-white text-sm transition active:scale-95 shadow-2xs cursor-pointer"
-                          title="Decrease by 1 pair"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={lowStockThreshold}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10) || 1);
-                            setLowStockThreshold(val);
-                          }}
-                          placeholder="5"
-                          className="flex-1 py-1.5 px-3 bg-white dark:bg-slate-950/80 border border-indigo-200 dark:border-indigo-400/40 rounded-lg font-mono font-bold text-center text-sm text-indigo-950 dark:text-white placeholder-indigo-300 dark:placeholder-white/40 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-400/30 shadow-2xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLowStockThreshold((prev) => (Number(prev) || 0) + 1)
-                          }
-                          className="w-8 h-8 rounded-lg border border-indigo-200 dark:border-indigo-400/40 bg-white dark:bg-white/10 hover:bg-indigo-100 dark:hover:bg-white/20 flex items-center justify-center font-bold text-indigo-950 dark:text-white text-sm transition active:scale-95 shadow-2xs cursor-pointer"
-                          title="Increase by 1 pair"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Quick Pairs:</span>
-                        {[3, 5, 10, 15].map((pairs) => {
-                          const isSelected = Number(lowStockThreshold) === pairs;
-                          return (
-                            <button
-                              key={`low-stock-pair-${pairs}`}
-                              type="button"
-                              onClick={() => setLowStockThreshold(pairs)}
-                              className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-emerald-600 text-white shadow-2xs'
-                                  : 'bg-white dark:bg-slate-900 border border-indigo-200/70 dark:border-indigo-900/40 text-slate-700 dark:text-slate-300 hover:border-indigo-400'
-                              }`}
-                            >
-                              {pairs} Pairs
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="text-[10px] text-indigo-900/70 dark:text-white/70">
-                        Alerts POS when inventory falls at or below {lowStockThreshold || 5} pairs.
-                      </p>
-                    </div>
-
                     <div className="pt-2 border-t border-indigo-200/60 dark:border-white/10">
                       <p className="text-[10px] text-indigo-900/70 dark:text-white/80 font-medium">
                         Retail stock is counted per pair. Enter any whole quantity, including loose stock such as 8 or 10 pairs.
                       </p>
                     </div>
-                  </div>
-                )}
-
-                {/* Product Title / Display Name (Retail only - hidden for wholesale mode) */}
-                {!isWholesaleStore && (
-                  <div>
-                    <label className="block font-semibold text-gray-700 dark:text-slate-300 mb-1">
-                      Product Title / Display Name (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={`e.g. ${currentBrandName ? currentBrandName + ' ' : ''}${article || 'Air Runner Shoes'}`}
-                      value={productName}
-                      onChange={(e) => setProductName(toTitleCaseLive(e.target.value))}
-                      className="capitalize w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-indigo-600 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 bg-white dark:bg-[#070B14] text-gray-900 dark:text-white"
-                    />
                   </div>
                 )}
 
@@ -2571,7 +2251,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       />
                     </div>
                     <p className="text-[10px] text-gray-500 dark:text-slate-400 text-center">
-                      Cashier barcode guns will read this code at checkout to look up: <span className="font-semibold text-gray-800 dark:text-slate-200">{productName || article || 'Product'}</span>
+                      Cashier barcode guns will read this code at checkout to look up: <span className="font-semibold text-gray-800 dark:text-slate-200">{article || 'Product'}</span>
                     </p>
 
                     {/* Quick Label & Sticker Actions */}
@@ -2643,7 +2323,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#070B14] border border-gray-100 dark:border-slate-800">
                       <span className="text-[10px] text-gray-400 dark:text-slate-500 block">Brand &amp; Category</span>
                       <span className="font-bold text-gray-900 dark:text-white truncate block">
@@ -2666,12 +2346,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <span className="text-[10px] text-gray-400 dark:text-slate-500 block">Total Stock</span>
                       <span className="font-mono font-bold text-gray-900 dark:text-white truncate block">
                         {totalStock === '' ? 0 : totalStock} Pairs
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#070B14] border border-gray-100 dark:border-slate-800">
-                      <span className="text-[10px] text-gray-400 dark:text-slate-500 block">Low Stock Alert</span>
-                      <span className="font-mono font-bold text-amber-700 dark:text-amber-400 truncate block">
-                        {lowStockThreshold || 5} Pairs
                       </span>
                     </div>
                   </div>
@@ -2750,8 +2424,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             product={
               product || {
                 id: effectiveProductId,
-                article: article || productName || 'Shoe Article',
-                name: productName || article,
+                article: article || 'Shoe Article',
+                name: article || 'Shoe Article',
                 barcode: barcode,
                 costPrice: costVal || 0,
                 sellingPrice: effectiveMaxSale || 0,
@@ -2776,8 +2450,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             product={
               product || {
                 id: effectiveProductId,
-                article: article || productName || 'Shoe Article',
-                name: productName || article,
+                article: article || 'Shoe Article',
+                name: article || 'Shoe Article',
                 barcode: barcode,
                 costPrice: costVal || 0,
                 sellingPrice: effectiveMaxSale || 0,

@@ -4,26 +4,29 @@ import { Download, Monitor, Smartphone, Apple, Check, X, ShieldCheck, Zap, Share
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { ShoeIcon } from './ShoeIcon.tsx';
+import { APP_VERSION } from '../../version.ts';
 
 interface InstallAppModalProps {
   isOpen: boolean;
   onClose: () => void;
   storeName?: string;
+  isAdmin?: boolean;
 }
 
 type PlatformTab = 'android' | 'apple' | 'desktop';
 
 // Only show the native-APK download when a REAL, signed APK is configured (e.g. built with PWABuilder/Bubblewrap).
 // Set VITE_ANDROID_APK_URL=/assets/SarbaazSoft-POS.apk in your env once you drop a real APK at that path.
-export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, storeName }) => {
+export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, storeName, isAdmin = false }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [activeTab, setActiveTab] = useState<PlatformTab>('android');
-  const effectiveStoreName = storeName || localStorage.getItem('cached_store_name') || 'Shoe POS';
+  const effectiveStoreName = storeName || (isAdmin ? 'POS Admin' : localStorage.getItem('cached_store_name') || 'Shoe POS');
   const pwaAppName = effectiveStoreName;
 
-  const cleanStoreFileName = effectiveStoreName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const apkDownloadFileName = `${cleanStoreFileName}-POS.apk`;
-  const exeDownloadFileName = `${cleanStoreFileName}-POS-Desktop-Setup.exe`;
+  const cleanStoreFileName = effectiveStoreName.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'Shoe_POS';
+  const baseStoreFileName = cleanStoreFileName.toLowerCase().endsWith('pos') ? cleanStoreFileName : `${cleanStoreFileName}-POS`;
+  const apkDownloadFileName = `${baseStoreFileName}.apk`;
+  const exeDownloadFileName = `${baseStoreFileName}-Desktop-Setup.exe`;
   const configuredApkUrl: string = (import.meta as any).env?.VITE_ANDROID_APK_URL || '/api/download/apk';
   const apkDownloadUrl = configuredApkUrl.startsWith('/api')
     ? `${configuredApkUrl}?store=${encodeURIComponent(effectiveStoreName)}`
@@ -87,16 +90,20 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
 
         {/* Header */}
         <div className="flex items-center gap-3.5 pr-8">
-          <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden">
-            <ShoeIcon className="w-full h-full object-cover rounded-2xl" />
+          <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden p-0.5">
+            {isAdmin ? (
+              <img src="/admin/pwa-192x192.png" alt="POS Admin Icon" className="w-full h-full object-contain rounded-xl" />
+            ) : (
+              <ShoeIcon className="w-full h-full object-cover rounded-2xl" />
+            )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Install {pwaAppName}
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
-                PWA &amp; App Support
+                PWA &amp; App Support • {APP_VERSION}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -249,18 +256,29 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 )}
               </a>
 
-              <div className="flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400 pt-0.5">
+              <div className="flex items-center justify-between gap-2 text-[10.5px] text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
                 <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  Asset file: <code>/assets/SarbaazSoft-POS.apk</code>
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>TWA Verified: <code>studio.ai.sarbaazsoft.twa</code></span>
                 </span>
-                <a
-                  href="/assets/SarbaazSoft-POS.apk"
-                  download={apkDownloadFileName}
-                  className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
-                >
-                  Direct File Mirror
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/assets/SarbaazSoft-POS.apk"
+                    download={apkDownloadFileName}
+                    className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
+                  >
+                    Direct APK Mirror
+                  </a>
+                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                  <a
+                    href="/.well-known/assetlinks.json"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                  >
+                    assetlinks.json
+                  </a>
+                </div>
               </div>
             </div>
 

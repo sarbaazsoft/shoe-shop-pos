@@ -201,6 +201,9 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
     manifestData.short_name = short;
     manifestData.description = `Dedicated Point of Sale & Retail Inventory Management for ${storeQuery}`;
   }
+  if (manifestData.prefer_related_applications === undefined) {
+    manifestData.prefer_related_applications = false;
+  }
 
   return res.json(manifestData);
 });
@@ -238,31 +241,100 @@ app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.e
 });
 
 // Signed Android APK (.APK) Download Endpoint
-app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk', '/assets/ShoePOS.apk'], (req, res) => {
+app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
   const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
-  const apkPath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS.apk');
-  if (!fs.existsSync(apkPath)) {
+  const requestedBase = 'SarbaazSoft-POS.apk';
+  const candidates = [
+    path.join(rootDir, 'public', 'assets', requestedBase),
+    path.join(rootDir, 'dist', 'assets', requestedBase),
+  ];
+  const apkPath = candidates.find((p) => fs.existsSync(p));
+  if (!apkPath) {
     return res.status(404).send('Android package APK not found');
   }
 
-  const cleanStore = storeQuery ? storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Shoe-POS';
-  const downloadFileName = `${cleanStore}.apk`;
+  let downloadFileName = requestedBase;
+  if (storeQuery) {
+    const cleanStore = storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    if (cleanStore) {
+      downloadFileName = cleanStore.toLowerCase().endsWith('pos') ? `${cleanStore}.apk` : `${cleanStore}-POS.apk`;
+    }
+  }
 
+  const stat = fs.statSync(apkPath);
   res.setHeader('Content-Type', 'application/vnd.android.package-archive');
   res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
+  res.setHeader('Content-Length', stat.size);
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.setHeader('X-APK-Package', process.env.TWA_PACKAGE_NAME || 'studio.ai.sarbaazsoft.twa');
   return res.sendFile(apkPath);
 });
 
 // Official Digital Asset Links endpoint for Android TWA verification
 app.get('/.well-known/assetlinks.json', (_req, res) => {
-  const assetLinksPath = path.join(rootDir, 'public', '.well-known', 'assetlinks.json');
-  if (fs.existsSync(assetLinksPath)) {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(assetLinksPath);
+  const candidates = [
+    path.join(rootDir, 'public', '.well-known', 'assetlinks.json'),
+    path.join(rootDir, 'dist', '.well-known', 'assetlinks.json'),
+  ];
+  const assetLinksPath = candidates.find((p) => fs.existsSync(p));
+
+  let statements: Array<{
+    relation: string[];
+    target: { namespace: string; package_name: string; sha256_cert_fingerprints: string[] };
+  }> = [];
+
+  if (assetLinksPath) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(assetLinksPath, 'utf8'));
+      if (Array.isArray(parsed)) {
+        statements = parsed;
+      }
+    } catch {}
   }
-  return res.status(404).json({ error: 'assetlinks.json not found' });
+
+  if (statements.length === 0) {
+    statements = [
+      {
+        relation: ['delegate_permission/common.handle_all_urls'],
+        target: {
+          namespace: 'android_app',
+          package_name: 'studio.ai.sarbaazsoft.twa',
+          sha256_cert_fingerprints: [
+            '58:54:C6:78:45:D3:CD:EA:AC:3B:42:57:23:DD:C9:EA:1B:7C:22:23:16:DF:93:6B:E3:06:DF:FF:00:FA:5F:50',
+          ],
+        },
+      },
+    ];
+  }
+
+  const extraPackage = (process.env.TWA_PACKAGE_NAME || '').trim();
+  const extraShaList = (process.env.ASSETLINKS_SHA256 || '')
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (extraPackage || extraShaList.length > 0) {
+    const targetPackage = extraPackage || statements[0].target.package_name;
+    const existing = statements.find((s) => s?.target?.package_name === targetPackage);
+    if (existing) {
+      const merged = new Set([...(existing.target.sha256_cert_fingerprints || []), ...extraShaList]);
+      existing.target.sha256_cert_fingerprints = Array.from(merged);
+    } else if (extraShaList.length > 0) {
+      statements.push({
+        relation: ['delegate_permission/common.handle_all_urls'],
+        target: {
+          namespace: 'android_app',
+          package_name: targetPackage,
+          sha256_cert_fingerprints: extraShaList,
+        },
+      });
+    }
+  }
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.json(statements);
 });
 
 app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => {
@@ -330,7 +402,7 @@ app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => 
         description: 'Open SuperAdmin Overview & Metrics',
         url: '/admin',
         icons: [
-          { src: '/admin/shortcut-icon.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/admin/shortcut-dashboard.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
         ],
       },
@@ -427,8 +499,6 @@ app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/system-settings', settingsRoutes);
-app.use('/api/root-settings', settingsRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -522,7 +592,7 @@ async function startServer() {
       })
     );
     // Missing static files must 404 (never fall through to index.html with a 200)
-    app.get(/\.(?:js|map|webmanifest|png|svg|ico|apk|exe)$/, (_req, res) => res.sendStatus(404));
+    app.get(/\.(?:js|map|json|webmanifest|png|svg|ico|apk|exe)$/, (_req, res) => res.sendStatus(404));
     app.get('*', (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');

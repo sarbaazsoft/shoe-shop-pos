@@ -8,7 +8,7 @@
 // 4. Background Sync & Periodic Sync for Offline POS Transactions (IndexedDB)
 // =========================================================================
 
-const CACHE_NAME = 'sarbaazsoft-pos-cache-v4';
+const CACHE_NAME = 'sarbaazsoft-pos-cache-v5';
 const SW_SYNC_TAG = 'pos-offline-transactions-sync';
 const SW_PERIODIC_SYNC_TAG = 'pos-offline-periodic-sync';
 const DB_NAME = 'ShoePosOfflineDB';
@@ -21,6 +21,8 @@ const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/manifest.json',
+  '/.well-known/assetlinks.json',
   '/favicon.png',
   '/icon.svg',
   '/pwa-192x192.png',
@@ -30,15 +32,30 @@ const PRECACHE_ASSETS = [
   '/apple-touch-icon.png',
   '/admin/manifest.webmanifest',
   '/admin/manifest.json',
+  '/admin/favicon.ico',
   '/admin/favicon.png',
+  '/admin/favicon-16x16.png',
+  '/admin/favicon-32x32.png',
   '/admin/icon.svg',
   '/admin/pwa-192x192.png',
   '/admin/pwa-512x512.png',
   '/admin/pwa-maskable-192x192.png',
   '/admin/pwa-maskable-512x512.png',
+  '/admin/maskable-icon.png',
   '/admin/apple-touch-icon.png',
-  '/admin/shortcut-icon.png',
+  '/admin/apple-touch-icon-180x180.png',
+  '/admin/shortcut-dashboard.png',
+  '/admin/shortcut-tenants.png',
+  '/admin/shortcut-reports.png',
 ];
+
+function isCacheableStaticOrigin(url) {
+  if (url.origin === self.location.origin) return true;
+  return (
+    url.hostname === 'fonts.googleapis.com' ||
+    url.hostname === 'fonts.gstatic.com'
+  );
+}
 
 // -------------------------------------------------------------------------
 // 1. Service Worker Lifecycle (Install & Activate)
@@ -85,12 +102,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pass-through API calls, SSE notifications, and Vite dev server internals directly to network
+  // Pass-through API calls, binary installers (.apk / .exe), signing assets, and Vite dev internals directly to network
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/@') ||
     url.pathname.startsWith('/node_modules') ||
-    url.pathname.includes('hot-update')
+    url.pathname.includes('hot-update') ||
+    url.pathname.endsWith('.apk') ||
+    url.pathname.endsWith('.exe')
   ) {
     return;
   }
@@ -125,7 +144,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Static Assets (JS, CSS, Images, Fonts, Icons, Manifest): Stale-While-Revalidate
+  // 2. Digital Asset Links & Web App Manifests: Network-First (always fresh for TWA/PWA verification, with offline fallback)
+  if (
+    url.pathname.startsWith('/.well-known/') ||
+    url.pathname.endsWith('.webmanifest') ||
+    url.pathname.endsWith('/manifest.json')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || Response.error();
+        })
+    );
+    return;
+  }
+
+  // Skip runtime caching for unrelated third-party origins
+  if (!isCacheableStaticOrigin(url)) {
+    return;
+  }
+
+  // 3. Static Assets (JS, CSS, Images, Fonts, Icons): Stale-While-Revalidate
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
@@ -175,14 +222,16 @@ async function initFirebaseInWorker() {
       messaging.onBackgroundMessage((payload) => {
         const title = payload.notification?.title || payload.data?.title || 'SarbaazSoft Shoe POS Alert';
         const body = payload.notification?.body || payload.data?.body || 'New store transaction activity received.';
-        const icon = payload.notification?.icon || '/pwa-192x192.png';
-        const tag = payload.data?.tag || `pos-${Date.now()}`;
         const url = payload.data?.url || '/?tab=reports';
+        const isAdminTarget = String(url).startsWith('/admin') || payload.data?.isAdmin === 'true';
+        const defaultIcon = isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png';
+        const icon = payload.notification?.icon || defaultIcon;
+        const tag = payload.data?.tag || `pos-${Date.now()}`;
 
         const notificationOptions = {
           body,
           icon,
-          badge: '/pwa-192x192.png',
+          badge: defaultIcon,
           tag,
           vibrate: [200, 100, 200],
           data: {
@@ -190,7 +239,7 @@ async function initFirebaseInWorker() {
             ...payload.data,
           },
           actions: [
-            { action: 'open_pos', title: 'Open POS' },
+            { action: 'open_pos', title: isAdminTarget ? 'Open Admin' : 'Open POS' },
             { action: 'dismiss', title: 'Dismiss' },
           ],
         };
@@ -222,17 +271,20 @@ self.addEventListener('push', (event) => {
   const notification = data.notification || data;
   const title = notification.title || 'SarbaazSoft Shoe POS Alert';
   const tag = data.data?.tag || data.tag || `pos-alert-${Date.now()}`;
+  const targetUrl = (data.data && data.data.url) || data.url || '/?tab=reports';
+  const isAdminTarget = String(targetUrl).startsWith('/admin') || Boolean(data.data?.isAdmin);
+  const defaultIcon = isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png';
   const options = {
     body: notification.body || data.body || data.message || 'New Point of Sale transaction confirmed.',
-    icon: notification.icon || data.icon || '/pwa-192x192.png',
-    badge: data.badge || '/pwa-192x192.png',
+    icon: notification.icon || data.icon || defaultIcon,
+    badge: data.badge || defaultIcon,
     tag,
-    data: data.data || { url: data.url || '/?tab=reports' },
+    data: data.data || { url: targetUrl },
     vibrate: [250, 100, 250, 100, 250],
     requireInteraction: true,
     renotify: true,
     actions: [
-      { action: 'open_pos', title: 'Open POS' },
+      { action: 'open_pos', title: isAdminTarget ? 'Open Admin' : 'Open POS' },
       { action: 'open_receipt', title: 'Open Receipt' },
       { action: 'dismiss', title: 'Dismiss' },
     ],

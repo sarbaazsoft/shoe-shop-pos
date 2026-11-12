@@ -101,7 +101,7 @@ export function dropLegacyDocumentPrefixColumns(): Promise<void> {
           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'min_selling_quantity') THEN
             BEGIN
               UPDATE public.company_settings cs
-              SET min_selling_quantity = COALESCE(cs.min_selling_quantity, t.min_selling_quantity, 1.0)
+              SET allow_half_carton = COALESCE(cs.allow_half_carton, (t.min_selling_quantity <= 0.5), true)
               FROM public.tenants t
               WHERE cs.tenant_id = t.id;
             EXCEPTION WHEN OTHERS THEN NULL;
@@ -385,15 +385,10 @@ const DATABASE_TABLE_DDL: string[] = [
     invoice_footer TEXT NOT NULL DEFAULT 'Thank you for shopping with us!',
     show_receipt_logo BOOLEAN NOT NULL DEFAULT false,
     receipt_logo TEXT DEFAULT '',
-    low_stock_limit INTEGER NOT NULL DEFAULT 5,
+    low_stock_threshold INTEGER NOT NULL DEFAULT 5,
     pricing_mode pricing_mode_enum NOT NULL DEFAULT 'FIXED',
-    pricing_policy_locked BOOLEAN NOT NULL DEFAULT false,
     business_type business_type_enum NOT NULL DEFAULT 'RETAIL',
-    min_selling_quantity NUMERIC(3, 1) NOT NULL DEFAULT 1.0,
     allow_half_carton BOOLEAN NOT NULL DEFAULT true,
-    telegram_bot_token TEXT DEFAULT '',
-    telegram_chat_id TEXT DEFAULT '',
-    telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false,
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
@@ -418,7 +413,6 @@ const DATABASE_TABLE_DDL: string[] = [
     pairs_per_carton INTEGER NOT NULL DEFAULT 12,
     allow_half_carton BOOLEAN NOT NULL DEFAULT true,
     total_stock INTEGER NOT NULL DEFAULT 0,
-    low_stock_limit INTEGER NOT NULL DEFAULT 5,
     active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -698,7 +692,7 @@ const DATABASE_INDEX_DDL: string[] = [
   `CREATE INDEX IF NOT EXISTS platform_notification_reads_notif_idx ON platform_notification_reads(notification_id)`,
   `CREATE INDEX IF NOT EXISTS platform_notification_reads_tenant_idx ON platform_notification_reads(tenant_id)`,
   `CREATE INDEX IF NOT EXISTS app_settings_category_idx ON app_settings(category)`,
-  `CREATE OR REPLACE VIEW app_setting AS SELECT * FROM app_settings`,
+  `DROP VIEW IF EXISTS app_setting CASCADE`,
   `CREATE INDEX IF NOT EXISTS trial_activations_email_idx ON trial_activations(LOWER(BTRIM(email)))`,
   `CREATE INDEX IF NOT EXISTS trial_activations_tenant_idx ON trial_activations(tenant_id)`,
   `CREATE INDEX IF NOT EXISTS trial_activations_status_idx ON trial_activations(status)`,
@@ -988,7 +982,7 @@ export function ensureDatabaseEnumsSchema(): Promise<void> {
           IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'min_selling_quantity') THEN
             BEGIN
               UPDATE public.company_settings cs
-              SET min_selling_quantity = COALESCE(cs.min_selling_quantity, t.min_selling_quantity, 1.0)
+              SET allow_half_carton = COALESCE(cs.allow_half_carton, (t.min_selling_quantity <= 0.5), true)
               FROM public.tenants t
               WHERE cs.tenant_id = t.id;
               ALTER TABLE public.tenants DROP COLUMN IF EXISTS min_selling_quantity CASCADE;
@@ -1250,21 +1244,49 @@ export async function ensureDatabaseSchema(): Promise<void> {
             ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS pricing_mode pricing_mode_enum NOT NULL DEFAULT 'FIXED';
           EXCEPTION WHEN OTHERS THEN NULL;
           END;
-          -- Wholesale minimum selling quantity (0.5 half carton or 1 full carton) centralized in company_settings
+          -- Global low_stock_threshold and half-carton settings centralized in company_settings
           BEGIN
-            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS min_selling_quantity NUMERIC(3, 1) NOT NULL DEFAULT 1.0;
+            IF EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'company_settings' AND column_name = 'low_stock_limit'
+            ) THEN
+              IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'company_settings' AND column_name = 'low_stock_threshold'
+              ) THEN
+                ALTER TABLE company_settings RENAME COLUMN low_stock_limit TO low_stock_threshold;
+              ELSE
+                UPDATE company_settings SET low_stock_threshold = COALESCE(low_stock_threshold, low_stock_limit, 5);
+                ALTER TABLE company_settings DROP COLUMN IF EXISTS low_stock_limit CASCADE;
+              END IF;
+            END IF;
+            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 5;
+            IF EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'company_settings' AND column_name = 'min_selling_quantity'
+            ) THEN
+              UPDATE company_settings
+              SET allow_half_carton = COALESCE(allow_half_carton, (min_selling_quantity <= 0.5), true);
+            END IF;
             ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS allow_half_carton BOOLEAN NOT NULL DEFAULT true;
-            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_bot_token TEXT DEFAULT '';
-            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT DEFAULT '';
-            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN NOT NULL DEFAULT false;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS min_selling_quantity CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS pricing_policy_locked CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS telegram_bot_token CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS telegram_chat_id CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS telegram_alerts_enabled CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS gmail_user CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS gmail_app_password CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS gmail_from_name CASCADE;
+            ALTER TABLE company_settings DROP COLUMN IF EXISTS active_alert_provider CASCADE;
           EXCEPTION WHEN OTHERS THEN NULL;
           END;
           BEGIN
             ALTER TABLE products ADD COLUMN IF NOT EXISTS allow_half_carton BOOLEAN NOT NULL DEFAULT true;
-            ALTER TABLE products DROP COLUMN IF EXISTS min_selling_quantity;
+            ALTER TABLE products DROP COLUMN IF EXISTS min_selling_quantity CASCADE;
+            ALTER TABLE products DROP COLUMN IF EXISTS low_stock_limit CASCADE;
           EXCEPTION WHEN OTHERS THEN NULL;
           END;
-          -- Sync any existing business_type, pricing_mode, min_selling_quantity, and allow_half_carton from tenants into company_settings before dropping
+          -- Sync any existing business_type, pricing_mode, and allow_half_carton from tenants into company_settings before dropping
           BEGIN
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'business_type') THEN
               UPDATE company_settings cs
@@ -1275,12 +1297,6 @@ export async function ensureDatabaseSchema(): Promise<void> {
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'pricing_mode') THEN
               UPDATE company_settings cs
               SET pricing_mode = (CASE WHEN UPPER(TRIM(COALESCE(NULLIF(cs.pricing_mode::text, ''), NULLIF(t.pricing_mode::text, ''), 'FIXED'))) = 'NEGOTIABLE' THEN 'NEGOTIABLE'::pricing_mode_enum ELSE 'FIXED'::pricing_mode_enum END)
-              FROM tenants t
-              WHERE cs.tenant_id = t.id;
-            END IF;
-            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'min_selling_quantity') THEN
-              UPDATE company_settings cs
-              SET min_selling_quantity = COALESCE(cs.min_selling_quantity, t.min_selling_quantity, 1.0)
               FROM tenants t
               WHERE cs.tenant_id = t.id;
             END IF;
@@ -1735,9 +1751,17 @@ export async function ensureSaasControlPlane(): Promise<void> {
                    AND to_regclass('public.platform_notifications') IS NOT NULL
                    AND to_regclass('public.platform_notification_reads') IS NOT NULL
                    AND to_regclass('public.store_requests') IS NULL
-                   AND to_regclass('public.customer_khata_ledger') IS NULL) as has_core_tables
+                   AND to_regclass('public.customer_khata_ledger') IS NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'low_stock_limit'
+                   )
+                   AND EXISTS (
+                     SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'company_settings' AND column_name = 'low_stock_threshold'
+                   )) as has_core_tables
            FROM app_settings
-           WHERE key = '__schema_v15_platform_notifications__'`
+           WHERE key = '__schema_v16_low_stock_threshold__'`
         )
         .catch(() => null);
 
@@ -1899,7 +1923,7 @@ export async function ensureSaasControlPlane(): Promise<void> {
     await pgClient
       .query(
         `INSERT INTO app_settings (key, value, category, description, is_secret)
-         VALUES ('__schema_v15_platform_notifications__', 'true', 'system', 'Schema migration dropping store_requests table and ensuring notifications', false)
+         VALUES ('__schema_v16_low_stock_threshold__', 'true', 'system', 'Schema migration removing product-level low_stock_limit and using company_settings.low_stock_threshold', false)
          ON CONFLICT (key) DO UPDATE SET value = 'true', updated_at = NOW()`
       )
       .catch(() => {});
@@ -2014,6 +2038,8 @@ export async function ensureTelegramSettingsSchema(): Promise<void> {
             ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_app_password;
             ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_from_name;
             ALTER TABLE public.company_settings DROP COLUMN IF EXISTS active_alert_provider;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS pricing_policy_locked;
+            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS min_selling_quantity;
           END IF;
         END $$;
       `);

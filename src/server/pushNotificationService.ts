@@ -4,7 +4,6 @@ import type { Response } from 'express';
 import { pgClient } from '../db/index.ts';
 import { ensureFcmTokensSchema } from '../db/schemaInit.ts';
 import { getCachedAppSetting, getAppSetting, loadAppSettingsCache, registerSettingsUpdateListener } from './services/appSettingsService.ts';
-import { sendTelegramMessage, dispatchPosTelegramAlert } from './services/telegramService.ts';
 import { dispatchPosEmailAlert } from './services/emailAlertService.ts';
 
 // ============================================================================
@@ -210,28 +209,6 @@ export async function getFcmStats(): Promise<{
   }
 }
 
-// Backward-compatible stubs for legacy web-push endpoints if any client probes them
-export function getVapidPublicKey(): string {
-  return getCachedAppSetting('FCM_VAPID_KEY', '') || process.env.FCM_VAPID_KEY || '';
-}
-
-export async function savePushSubscription(
-  tenantId: number,
-  userId: number,
-  userRole: string,
-  subscription: any,
-  userAgent: string = ''
-): Promise<boolean> {
-  // If a client sends an endpoint as a token, save it as an FCM token
-  if (subscription?.endpoint) {
-    return saveFcmToken(tenantId, userId, userRole, subscription.endpoint, userAgent, 'Web Client');
-  }
-  return false;
-}
-
-export async function removePushSubscription(endpoint: string): Promise<boolean> {
-  return removeFcmToken(endpoint);
-}
 
 // ============================================================================
 // FCM MULTICAST DISPATCH ENGINE
@@ -482,10 +459,7 @@ export async function notifyPosAction(
     console.error('Error during FCM POS push dispatch:', err);
   }
 
-  // 3. Multi-channel store owner alerts: Telegram & Email
-  dispatchPosTelegramAlert(cleanTenantId, enrichedPayload).catch((err) => {
-    console.warn('[pushNotificationService] Error in dispatchPosTelegramAlert:', err?.message || err);
-  });
+  // 3. Store owner transactional email alert
   dispatchPosEmailAlert(cleanTenantId, enrichedPayload).catch((err) => {
     console.warn('[pushNotificationService] Error in dispatchPosEmailAlert:', err?.message || err);
   });
@@ -615,25 +589,6 @@ export async function notifyPlatformAnnouncement(
     });
   } catch (err) {
     console.error('Error during FCM announcement push dispatch:', err);
-  }
-
-  // 3. Deliver via Telegram to SuperAdmin if configured
-  if (targetRole === 'SUPERADMIN') {
-    try {
-      const botToken = getCachedAppSetting('TELEGRAM_BOT_TOKEN', '').trim();
-      const superAdminChatId = getCachedAppSetting('TELEGRAM_SUPERADMIN_CHAT_ID', '').trim();
-      const telegramAlertsEnabled = getCachedAppSetting('TELEGRAM_ALERTS_ENABLED', 'true').toLowerCase() !== 'false';
-
-      if (botToken && superAdminChatId && telegramAlertsEnabled) {
-        const cleanTitle = (payload.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const cleanMsg = (payload.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const actionText = payload.actionUrl ? `\n\n🔗 <i>Action: ${payload.actionLabel || 'Open Dashboard'} (${payload.actionUrl})</i>` : '';
-        const text = `<b>🔔 SuperAdmin Alert: ${cleanTitle}</b>\n\n${cleanMsg}${actionText}\n\n<i>Time: ${new Date().toLocaleString()}</i>`;
-        sendTelegramMessage(botToken, superAdminChatId, text).catch(() => {});
-      }
-    } catch (err) {
-      console.warn('Error during Telegram SuperAdmin announcement dispatch:', err);
-    }
   }
 }
 

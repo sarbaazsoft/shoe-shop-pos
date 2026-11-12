@@ -265,9 +265,6 @@ export async function ensureAppSettingsSchema(): Promise<void> {
       await pgClient.query(`
         CREATE INDEX IF NOT EXISTS idx_app_settings_category ON public.app_settings (category)
       `);
-      await pgClient.query(`
-        CREATE OR REPLACE VIEW public.app_setting AS SELECT * FROM public.app_settings
-      `).catch(() => {});
 
       // Sanitize any malformed non-HTTP URLs that may have been saved into webhook fields
       await pgClient.query(`
@@ -374,23 +371,18 @@ export async function loadAppSettingsCache(): Promise<void> {
  */
 export async function getAppSetting(key: string, fallback?: string): Promise<string> {
   if (key === 'RESEND_API_KEY') {
-    // CRITICAL REQUIREMENT: Do not use .env for resend_api_key.
-    // Retrieve resend_api_key dynamically from the app_setting database table.
+    // Retrieve RESEND_API_KEY dynamically from the app_settings database table.
     try {
       const res = await pgClient.query<{ value: string }>(
         `SELECT value FROM public.app_settings WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
-      ).catch(async () => {
-        return await pgClient.query<{ value: string }>(
-          `SELECT value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
-        );
-      });
+      );
       if (res.rows.length > 0) {
         const val = (res.rows[0].value || '').trim();
         settingsCache.set('RESEND_API_KEY', val);
         return val;
       }
     } catch (err) {
-      console.warn('Notice querying RESEND_API_KEY dynamically from app_setting table:', err);
+      console.warn('Notice querying RESEND_API_KEY dynamically from app_settings table:', err);
     }
     return settingsCache.get('RESEND_API_KEY') || fallback || '';
   }

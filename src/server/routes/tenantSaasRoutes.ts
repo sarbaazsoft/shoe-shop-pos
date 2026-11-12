@@ -84,6 +84,7 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
       orientation: 'any',
       theme_color: DEFAULT_PWA_THEME_COLOR,
       background_color: DEFAULT_PWA_BACKGROUND_COLOR,
+      prefer_related_applications: false,
       categories: ['business', 'shopping', 'finance'],
       icons: [
         {
@@ -317,7 +318,6 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
         : String(body.pricingMode || 'FIXED').toUpperCase() === 'NEGOTIABLE'
         ? 'NEGOTIABLE'
         : 'FIXED';
-    const minSellingQuantity = body.minSellingQuantity !== undefined ? Number(body.minSellingQuantity) : 1.0;
     const allowHalfCarton = body.allowHalfCarton !== undefined ? Boolean(body.allowHalfCarton) : true;
 
     if (!storeName || !ownerEmail) {
@@ -349,7 +349,6 @@ router.post('/saas/store-request', async (req: Request, res: Response) => {
       ownerPhone,
       businessType,
       pricingMode,
-      minSellingQuantity,
       allowHalfCarton,
       subscriptionPlan: 'free_tier',
       subscriptionType: 'free_tier',
@@ -619,7 +618,6 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
         t.*,
         COALESCE(NULLIF(cs.business_type::text, ''), 'RETAIL') AS business_type,
         COALESCE(NULLIF(cs.pricing_mode::text, ''), 'FIXED') AS pricing_mode,
-        COALESCE(cs.min_selling_quantity, 1.0) AS min_selling_quantity,
         COALESCE(cs.allow_half_carton, true) AS allow_half_carton,
         COALESCE(NULLIF(cs.logo, ''), '/pwa-512x512.png') AS logo_url,
         COALESCE(u.email, cs.email, '') AS owner_email,
@@ -838,9 +836,6 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
         name: s.name,
         status: s.status,
         businessType: String(s.business_type || 'RETAIL').toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL',
-        minSellingQuantity: (s as any).min_selling_quantity !== undefined && (s as any).min_selling_quantity !== null
-          ? parseFloat(String((s as any).min_selling_quantity))
-          : ((s as any).allow_half_carton !== false ? 0.5 : 1.0),
         allowHalfCarton: (s as any).allow_half_carton !== undefined ? Boolean((s as any).allow_half_carton) : true,
         subscriptionType: normalizeSubscriptionType((s as any).subscription_type || s.subscription_plan),
         subscriptionPlan: normalizeSubscriptionPlan(s.subscription_plan),
@@ -1478,7 +1473,6 @@ async function provisionNewTenantStore(params: {
   invoiceFooter?: string;
   businessType?: 'RETAIL' | 'WHOLESALE';
   pricingMode?: 'FIXED' | 'NEGOTIABLE';
-  minSellingQuantity?: number | string;
   allowHalfCarton?: boolean;
   subscriptionType?: 'free_tier' | '6_months' | '1_year' | string;
   subscriptionPlan?: 'free_tier' | '6_MONTHS' | 'YEARLY' | string;
@@ -1521,19 +1515,10 @@ async function provisionNewTenantStore(params: {
       ? 'NEGOTIABLE'
       : 'FIXED';
 
-  let minSellingQuantity = 1.0;
   let allowHalfCarton = true;
   if (businessType === 'WHOLESALE') {
-    if (params.minSellingQuantity !== undefined && params.minSellingQuantity !== null && String(params.minSellingQuantity).trim() !== '') {
-      const parsed = parseFloat(String(params.minSellingQuantity));
-      minSellingQuantity = parsed <= 0.5 ? 0.5 : 1.0;
-      allowHalfCarton = minSellingQuantity <= 0.5;
-    } else if (params.allowHalfCarton !== undefined && params.allowHalfCarton !== null) {
+    if (params.allowHalfCarton !== undefined && params.allowHalfCarton !== null) {
       allowHalfCarton = String(params.allowHalfCarton) === 'true' || params.allowHalfCarton === true;
-      minSellingQuantity = allowHalfCarton ? 0.5 : 1.0;
-    } else {
-      minSellingQuantity = 0.5;
-      allowHalfCarton = true;
     }
   }
 
@@ -1613,12 +1598,12 @@ async function provisionNewTenantStore(params: {
   const taxId = params.taxId?.trim() || '';
   const taxRate = params.taxRate ? Number(params.taxRate) : 0;
 
-  // Store is fully initialized upon provisioning with locked pricing policy
+  // Store is initialized with its configured pricing and carton settings
   await pgClient.query(
     `INSERT INTO company_settings (
       tenant_id, logo, address, phone, email, tax_id, tax_rate, currency, currency_symbol,
-      invoice_footer, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked
-    ) VALUES ($1, '/pwa-512x512.png', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)`,
+      invoice_footer, pricing_mode, business_type, allow_half_carton
+    ) VALUES ($1, '/pwa-512x512.png', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       newTenant.id,
       storeAddress,
@@ -1631,7 +1616,6 @@ async function provisionNewTenantStore(params: {
       invoiceFooter,
       pricingMode,
       businessType,
-      minSellingQuantity,
       allowHalfCarton,
     ]
   );
@@ -1657,7 +1641,6 @@ async function provisionNewTenantStore(params: {
     storeName: newTenant.name,
     businessType,
     pricingMode,
-    minSellingQuantity,
     allowHalfCarton,
     subscriptionType: (newTenant as any).subscription_type || subscriptionType,
     subscriptionPlan: newTenant.subscription_plan,
@@ -2311,7 +2294,6 @@ router.post('/superadmin/tenants', requireAuth, requireSuperAdmin, async (req: A
       currency,
       businessType: finalBusinessType,
       pricingMode: finalPricingMode,
-      minSellingQuantity: req.body?.minSellingQuantity ?? req.body?.min_selling_quantity,
       allowHalfCarton: req.body?.allowHalfCarton ?? req.body?.allow_half_carton,
       subscriptionPlan: subscriptionPlan || 'YEARLY',
       subscriptionStartDate,
@@ -2413,12 +2395,9 @@ router.get('/tenants/onboarding', requireAuth, requireAdmin, async (req: Request
         invoiceFooter:
           cs.invoice_footer ||
           'Thank you for shopping with us! Exchanges accepted within 7 days with original receipt.',
-        lowStockLimit: Number(cs.low_stock_limit) || 5,
+        lowStockThreshold: Number(cs.low_stock_threshold ?? 5) || 5,
         pricingMode: cs.pricing_mode || 'FIXED',
         businessType: (cs.business_type || 'RETAIL') as 'RETAIL' | 'WHOLESALE',
-        minSellingQuantity: cs.min_selling_quantity !== undefined && cs.min_selling_quantity !== null
-          ? parseFloat(String(cs.min_selling_quantity))
-          : (cs.allow_half_carton !== false ? 0.5 : 1.0),
         allowHalfCarton: cs.allow_half_carton !== undefined
           ? Boolean(cs.allow_half_carton)
           : true,
@@ -2524,7 +2503,7 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
       email,
       ownerName,
       invoiceFooter,
-      lowStockLimit,
+      lowStockThreshold,
       logoUrl,
       businessType,
       pricingMode,
@@ -2565,7 +2544,10 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
         invoiceFooter ||
           'Thank you for shopping with us! Exchanges accepted within 7 days with original receipt.'
       ).trim();
-    const finalLowStockLimit = Math.max(1, parseInt(String(lowStockLimit ?? 5), 10) || 5);
+    const finalLowStockThreshold = Math.max(
+      1,
+      parseInt(String(lowStockThreshold ?? req.body?.low_stock_threshold ?? 5), 10) || 5
+    );
     const requestedBusinessType = String(businessType || req.body.business_type || tenant.business_type || 'RETAIL').toUpperCase();
     const finalBusinessType: 'RETAIL' | 'WHOLESALE' =
       requestedBusinessType === 'WHOLESALE'
@@ -2639,22 +2621,10 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
       }
     }
 
-    const rawMinQty = req.body?.minSellingQuantity ?? req.body?.min_selling_quantity;
     const rawAllowHalf = req.body?.allowHalfCarton ?? req.body?.allow_half_carton;
-    let finalMinSellingQuantity = 1.0;
     let finalAllowHalfCarton = true;
-    if (finalBusinessType === 'WHOLESALE') {
-      if (rawMinQty !== undefined && rawMinQty !== null && String(rawMinQty).trim() !== '') {
-        const parsed = parseFloat(String(rawMinQty));
-        finalMinSellingQuantity = parsed <= 0.5 ? 0.5 : 1.0;
-        finalAllowHalfCarton = finalMinSellingQuantity <= 0.5;
-      } else if (rawAllowHalf !== undefined && rawAllowHalf !== null) {
-        finalAllowHalfCarton = String(rawAllowHalf) === 'true' || rawAllowHalf === true;
-        finalMinSellingQuantity = finalAllowHalfCarton ? 0.5 : 1.0;
-      } else {
-        finalMinSellingQuantity = 0.5;
-        finalAllowHalfCarton = true;
-      }
+    if (finalBusinessType === 'WHOLESALE' && rawAllowHalf !== undefined && rawAllowHalf !== null) {
+      finalAllowHalfCarton = String(rawAllowHalf) === 'true' || rawAllowHalf === true;
     }
 
     // Update tenants table and mark store ACTIVE + onboarded (locked)
@@ -2671,7 +2641,7 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
       ]
     );
 
-    // Sync tenant company_settings with all configured Initial Store Setup defaults and lock POS defaults
+    // Sync tenant company_settings with all configured Initial Store Setup defaults
     const settingsCheck = await pgClient.query('SELECT id FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenant.id]);
     if (settingsCheck.rows.length > 0) {
       await pgClient.query(
@@ -2686,14 +2656,12 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
              phone = COALESCE(NULLIF($8, ''), phone),
              email = COALESCE(NULLIF($9, ''), email),
              invoice_footer = $10,
-             low_stock_limit = $11,
+             low_stock_threshold = $11,
              pricing_mode = $12,
-             pricing_policy_locked = true,
              business_type = $13,
-             min_selling_quantity = $14,
-             allow_half_carton = $15,
+             allow_half_carton = $14,
              updated_at = NOW()
-         WHERE tenant_id = $16`,
+         WHERE tenant_id = $15`,
         [
           finalLogoUrl,
           finalAddress,
@@ -2705,10 +2673,9 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
           finalPhone,
           finalEmail,
           finalInvoiceFooter,
-          finalLowStockLimit,
+          finalLowStockThreshold,
           finalPricingMode,
           finalBusinessType,
-          finalMinSellingQuantity,
           finalAllowHalfCarton,
           tenant.id,
         ]
@@ -2718,8 +2685,8 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
         `INSERT INTO company_settings (
            tenant_id, logo, address, tax_id, strn, tax_rate, currency, currency_symbol,
            phone, email, invoice_footer,
-           low_stock_limit, pricing_mode, pricing_policy_locked, business_type, min_selling_quantity, allow_half_carton
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, $14, $15, $16)`,
+           low_stock_threshold, pricing_mode, business_type, allow_half_carton
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           tenant.id,
           finalLogoUrl,
@@ -2732,10 +2699,9 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
           finalPhone,
           finalEmail,
           finalInvoiceFooter,
-          finalLowStockLimit,
+          finalLowStockThreshold,
           finalPricingMode,
           finalBusinessType,
-          finalMinSellingQuantity,
           finalAllowHalfCarton,
         ]
       );
@@ -2817,9 +2783,9 @@ router.post('/tenants/onboarding', requireAuth, requireAdmin, async (req: Reques
         await pgClient.query(
           `INSERT INTO products (
             tenant_id, name, article, barcode, brand, category,
-            cost_price, min_price, max_price, total_stock, low_stock_limit, primary_image_url, active
-          ) VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, '/assets/images/hd-07.jpg', true)`,
-          [tenant.id, pName, pBarcode, pBrand, pCategory, pCost, pMin, tagPrice, pStock, finalLowStockLimit]
+            cost_price, min_price, max_price, total_stock, primary_image_url, active
+          ) VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, '/assets/images/hd-07.jpg', true)`,
+          [tenant.id, pName, pBarcode, pBrand, pCategory, pCost, pMin, tagPrice, pStock]
         );
       }
     }

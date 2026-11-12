@@ -5,6 +5,7 @@ import { UserAvatar } from './UserAvatar.tsx';
 import { ShoeIcon } from './ShoeIcon.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { InstallAppModal } from './InstallAppModal.tsx';
+import { APP_VERSION } from '../../version.ts';
 
 interface SidebarProps {
   currentTab: string;
@@ -525,7 +526,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!collapsed && (
               <div className="px-2 pt-1 border-t border-indigo-500/15 flex items-center justify-between text-[9.5px] text-slate-400 dark:text-slate-500">
                 <span>SarbaazSoft Shoe POS</span>
-                <span className="font-mono">v1.0.0</span>
+                <span className="font-mono">{APP_VERSION}</span>
               </div>
             )}
           </div>

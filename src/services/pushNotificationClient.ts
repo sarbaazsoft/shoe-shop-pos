@@ -1,9 +1,10 @@
-import { api, getAuthToken, getActiveTenantId } from './api.ts';
+import { getAuthToken, getActiveTenantId } from './api.ts';
 import { playAudioFeedback } from '../utils/audio.ts';
 import {
   initFirebaseClient,
   requestFcmPermissionAndToken,
   syncFcmTokenSilently,
+  unregisterFcmDeviceToken,
 } from './firebaseConfig.ts';
 
 export function isIOSDevice(): boolean {
@@ -185,10 +186,9 @@ export async function unsubscribeDeviceFromWebPush(): Promise<boolean> {
     if (reg) {
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        const endpoint = sub.endpoint;
         await sub.unsubscribe().catch(() => {});
-        await api.notifications.unsubscribe(endpoint).catch(() => {});
       }
+      await unregisterFcmDeviceToken().catch(() => {});
     }
     return true;
   } catch (err) {

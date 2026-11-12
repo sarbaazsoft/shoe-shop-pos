@@ -199,7 +199,7 @@ async function queryLiveStoreDatabase(
   try {
     if (cleanEntity === 'products' || cleanEntity === 'inventory') {
       const params: any[] = [tenantId];
-      let sql = `SELECT id, tenant_product_no, article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock, low_stock_limit
+      let sql = `SELECT id, tenant_product_no, article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock
                  FROM products WHERE tenant_id = $1 AND active = true`;
       if (cleanSearch) {
         params.push(`%${cleanSearch}%`);
@@ -212,10 +212,11 @@ async function queryLiveStoreDatabase(
 
     if (cleanEntity === 'low_stock') {
       const res = await pgClient.query(
-        `SELECT id, article, name, brand, category, barcode, total_stock, low_stock_limit, min_price, max_price
-         FROM products
-         WHERE tenant_id = $1 AND active = true AND total_stock <= COALESCE(low_stock_limit, 5)
-         ORDER BY total_stock ASC, id DESC LIMIT ${safeLimit}`,
+        `SELECT p.id, p.article, p.name, p.brand, p.category, p.barcode, p.total_stock, p.min_price, p.max_price
+         FROM products p
+         WHERE p.tenant_id = $1 AND p.active = true
+           AND p.total_stock <= COALESCE((SELECT cs.low_stock_threshold FROM company_settings cs WHERE cs.tenant_id = $1 LIMIT 1), 5)
+         ORDER BY p.total_stock ASC, p.id DESC LIMIT ${safeLimit}`,
         [tenantId]
       );
       return { entity: 'low_stock', count: res.rows.length, items: res.rows };
@@ -361,7 +362,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     try {
       const settingsRes = await pgClient.query<any>(
-        `SELECT cs.*, t.name AS name
+        `SELECT cs.*, t.name AS name, t.onboarding_completed
          FROM company_settings cs
          LEFT JOIN tenants t ON t.id = cs.tenant_id
          WHERE cs.tenant_id = $1
@@ -379,12 +380,10 @@ router.post('/', async (req: Request, res: Response) => {
           String(row.pricing_mode || 'FIXED').toUpperCase() === 'NEGOTIABLE'
             ? 'NEGOTIABLE'
             : 'FIXED';
-        isPolicyLocked = Boolean(
-          row.pricing_policy_locked ?? row.pricingPolicyLocked ?? true
-        );
-        isInstalled = Boolean(row.pricing_policy_locked ?? row.pricingPolicyLocked ?? true);
+        isPolicyLocked = Boolean(row.onboarding_completed ?? true);
+        isInstalled = Boolean(row.onboarding_completed ?? true);
         currencySymbol = row.currency_symbol || row.currencySymbol || 'Rs.';
-        lowStockLimit = Number(row.low_stock_limit || row.lowStockLimit || 5);
+        lowStockLimit = Number(row.low_stock_threshold ?? row.lowStockThreshold ?? 5);
       } else if (!storeName) {
         storeName = 'Retail Store';
       }
@@ -396,7 +395,7 @@ router.post('/', async (req: Request, res: Response) => {
       const [prodListRes, custRes, suppRes, salesRes, brandsRes, catsRes] = await Promise.all([
         pgClient
           .query<any>(
-            `SELECT id, tenant_product_no, article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock, low_stock_limit
+            `SELECT id, tenant_product_no, article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock
              FROM products WHERE tenant_id = $1 AND active = true ORDER BY id DESC`,
             [tenantId]
           )
@@ -425,7 +424,7 @@ router.post('/', async (req: Request, res: Response) => {
       totalProductsCount = allProds.length;
       totalStockPairs = allProds.reduce((acc: number, p: any) => acc + (Number(p.total_stock) || 0), 0);
       const lowItems = allProds.filter(
-        (p: any) => (Number(p.total_stock) || 0) <= (Number(p.low_stock_limit) || lowStockLimit)
+        (p: any) => (Number(p.total_stock) || 0) <= lowStockLimit
       );
       lowStockCount = lowItems.length;
       lowStockSample = lowItems.slice(0, 8);
@@ -500,17 +499,16 @@ DO NOT assume global, generic retail or wholesale software behaviors (Shopify, L
      1. **Download Sample Template**: Click **"Download Sample CSV"** (\`products_import_sample.csv\`) inside the modal to get the exact schema template pre-configured for "${storeName}".
      2. **Supported CSV Schema Columns (\`PRODUCT_CSV_SCHEMA_KEYS\`)**:
         \`article, name, brand, category, barcode, cost_price, min_price, max_price, total_stock, pairs_per_carton\`
-        *(Note: Header aliases like \`title\`, \`product_name\`, \`selling_price\`, \`price\`, \`stock\` are also automatically recognized and mapped!)*
+        *(Note: Header aliases like \`product_name\`, \`price\`, \`stock\` are also automatically recognized and mapped!)*
      3. **Smart Auto-Generation for Blank Fields**:
         - If \`brand\` is blank → defaults to \`"Unbranded"\`.
         - If \`category\` is blank → defaults to \`"Men"\`.
         - If \`article\` is blank → auto-generates using the 2-letter category prefix + sequential product number (e.g., \`MN-0001\`).
-        - If \`name\` (title) is blank → defaults to the \`article\` code.
+        - If \`name\` is blank → defaults to the \`article\` code.
         - If \`barcode\` is blank → auto-generates a unique Code-128 barcode (\`[2-Letter Category]-[ProductID]\`, e.g., \`MN-1\`).
         - If \`total_stock\` is blank → defaults to \`0\` pairs.
-        - If \`low_stock_limit\` is blank → defaults to the store's low stock threshold (\`${lowStockLimit}\` pairs).
      4. **Pricing Rules in CSV (Strictly Enforced by Store's "${pricingMode}" Mode)**:
-        - Under **FIXED** policy: \`min_price\` and \`max_price\` (or \`selling_price\`) are normalized so Fixed Selling Price = \`min_price\` = \`max_price\`, and must be \`>= cost_price\`.
+        - Under **FIXED** policy: \`min_price\` and \`max_price\` are normalized so Fixed Price = \`min_price\` = \`max_price\`, and must be \`>= cost_price\`.
         - Under **NEGOTIABLE** policy: \`cost_price <= min_price < max_price\` is strictly validated.
      5. **Duplicate Detection & 3 Duplicate Handling Strategies**:
         - The importer checks every CSV row against existing database products by **Barcode** or **Article**.
@@ -536,8 +534,8 @@ DO NOT assume global, generic retail or wholesale software behaviors (Shopify, L
      ${
        pricingMode === 'FIXED'
          ? `- FIXED POLICY RULES:
-       • Product Form Step 2 mein sirf 2 price fields hoti hain: "Cost Price" aur single "Fixed Price / Selling Price".
-       • Save karne par system sellingPrice = minPrice = maxPrice set karta hai.
+       • Product Form Step 2 mein sirf 2 price fields hoti hain: "Cost Price" aur single "Fixed Price".
+       • Save karne par system minPrice = maxPrice set karta hai.
        • Barcode sticker aur shelf labels par "Fixed Price : Rs. ****" print hota hai.
        • POS counter par bargaining ki koi gunjaish nahi hoti.`
          : `- NEGOTIABLE POLICY RULES:

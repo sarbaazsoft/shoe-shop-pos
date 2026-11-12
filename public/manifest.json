@@ -10,6 +10,13 @@
   "orientation": "any",
   "start_url": "/",
   "scope": "/",
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "studio.ai.sarbaazsoft.twa"
+    }
+  ],
   "categories": ["business", "productivity", "shopping"],
   "icons": [
     {

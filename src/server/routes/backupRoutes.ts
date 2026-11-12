@@ -267,6 +267,15 @@ router.post('/restore', requireAuth, requireSuperAdmin, async (req: Authenticate
                 )
                 .catch(() => {});
             }
+            if (cleanRow.low_stock_limit !== undefined && cleanRow.low_stock_threshold === undefined) {
+              cleanRow.low_stock_threshold = cleanRow.low_stock_limit;
+            }
+            delete cleanRow.low_stock_limit;
+            delete cleanRow.pricing_policy_locked;
+            delete cleanRow.min_selling_quantity;
+            delete cleanRow.telegram_bot_token;
+            delete cleanRow.telegram_chat_id;
+            delete cleanRow.telegram_alerts_enabled;
             delete cleanRow.deleted_product_ids;
             delete cleanRow.name;
             delete cleanRow.tax_number;
@@ -285,19 +294,19 @@ router.post('/restore', requireAuth, requireSuperAdmin, async (req: Authenticate
               cleanRow.cost_price = cleanRow.purchase_price;
             }
             const costNum = Math.round(Number(cleanRow.cost_price) || 0);
-            if (cleanRow.selling_price === undefined) {
-              cleanRow.selling_price = Math.round(Number(cleanRow.sale_price ?? cleanRow.max_sale_price ?? cleanRow.min_sale_price ?? costNum));
-            }
+            const fallbackSell = cleanRow.max_sale_price ?? cleanRow.sale_price ?? cleanRow.selling_price;
             if (cleanRow.min_price === undefined) {
-              cleanRow.min_price = Math.round(Number(cleanRow.min_sale_price ?? cleanRow.selling_price ?? costNum));
+              cleanRow.min_price = Math.round(Number(cleanRow.min_sale_price ?? fallbackSell ?? costNum));
             }
             if (cleanRow.max_price === undefined) {
-              cleanRow.max_price = Math.round(Number(cleanRow.max_sale_price ?? cleanRow.selling_price ?? cleanRow.min_price ?? costNum));
+              cleanRow.max_price = Math.round(Number(fallbackSell ?? cleanRow.min_price ?? costNum));
             }
             if (!cleanRow.brand && cleanRow.brand_name) cleanRow.brand = cleanRow.brand_name;
             if (!cleanRow.brand) cleanRow.brand = 'Unbranded';
             if (!cleanRow.category && cleanRow.category_name) cleanRow.category = cleanRow.category_name;
             if (!cleanRow.category) cleanRow.category = 'Casual Shoes';
+            delete cleanRow.low_stock_limit;
+            delete cleanRow.selling_price;
             delete cleanRow.brand_id;
             delete cleanRow.category_id;
             delete cleanRow.brand_name;
@@ -363,7 +372,7 @@ router.post('/restore', requireAuth, requireSuperAdmin, async (req: Authenticate
       const settingsCheck = await pgClient.query<any>('SELECT id FROM company_settings LIMIT 1');
       if (settingsCheck.rows.length === 0) {
         await pgClient.query(`
-          INSERT INTO company_settings (name) VALUES ('Shoe Shop POS')
+          INSERT INTO company_settings (tenant_id, phone, low_stock_threshold) VALUES (1, '', 5)
         `);
       }
 

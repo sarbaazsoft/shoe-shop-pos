@@ -278,8 +278,10 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
     }
   };
 
+  const globalLowStockThreshold =
+    Number(companySettings?.lowStockThreshold ?? companySettings?.low_stock_threshold ?? 5) || 5;
   const totalStockPairs = products.reduce((acc, p) => acc + (Number(p.totalStock) || 0), 0);
-  const lowStockCount = products.filter((p) => (Number(p.totalStock) || 0) <= (Number(p.lowStockLimit) || 5)).length;
+  const lowStockCount = products.filter((p) => (Number(p.totalStock) || 0) <= globalLowStockThreshold).length;
   const totalValuation = products.reduce((acc, p) => acc + (Number(p.totalStock) || 0) * (Number(p.costPrice ?? p.cost_price) || 0), 0);
 
   return (
@@ -617,7 +619,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
           {/* Dynamic CSS Grid: 1 col on mobile, scaling up to 5 cols on wide desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
             {products.slice(0, visibleCount).map((p) => {
-              const isLowStock = p.totalStock <= p.lowStockLimit;
+              const isLowStock = p.totalStock <= globalLowStockThreshold;
               const isOutOfStock = p.totalStock <= 0;
               const isChecked = selectedProductIds.includes(p.id);
               const retailPrice = getProductRetailPrice(p, companySettings);
@@ -1001,7 +1003,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                 {products.slice(0, visibleCount).map((p) => {
-                  const isLowStock = p.totalStock <= p.lowStockLimit;
+                  const isLowStock = p.totalStock <= globalLowStockThreshold;
                   const isOutOfStock = p.totalStock <= 0;
                   const isChecked = selectedProductIds.includes(p.id);
                   const isUnbranded = !p.brandName || ['unbranded', 'local'].includes(p.brandName.trim().toLowerCase());
@@ -1277,7 +1279,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                             </span>
                             {isLowStock && !isOutOfStock && (
                               <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                                Low stock (≤{Math.max(1, Math.round(p.lowStockLimit / (p.pairsPerCarton || 12)))} ctn / ≤{p.lowStockLimit} prs)
+                                Low stock (≤{Math.max(1, Math.round(globalLowStockThreshold / (p.pairsPerCarton || 12)))} ctn / ≤{globalLowStockThreshold} prs)
                               </div>
                             )}
                             {isOutOfStock && (
@@ -1321,7 +1323,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                             )}
                             {isLowStock && !isOutOfStock && (
                               <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                                Low stock (≤{p.lowStockLimit})
+                                Low stock (≤{globalLowStockThreshold})
                               </div>
                             )}
                             {isOutOfStock && (

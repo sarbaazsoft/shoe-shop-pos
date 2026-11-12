@@ -325,11 +325,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     currency: companySettings?.currency || 'PKR',
     business_type: String(companySettings?.business_type || companySettings?.businessType || 'RETAIL').toUpperCase() as 'RETAIL' | 'WHOLESALE',
-    min_selling_quantity: Number(
-      companySettings?.min_selling_quantity ??
-      companySettings?.minSellingQuantity ??
-      ((companySettings?.allow_half_carton === false || companySettings?.allowHalfCarton === false) ? 1.0 : 0.5)
-    ),
     allow_half_carton: (
       companySettings?.allow_half_carton !== undefined
         ? Boolean(companySettings.allow_half_carton)
@@ -338,26 +333,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             : true)
     ),
     invoice_footer: companySettings?.invoice_footer || companySettings?.invoiceFooter || 'Exchanges accepted within 7 days with original sales receipt. Thank you for shopping with us!',
-    low_stock_limit: companySettings?.low_stock_limit || companySettings?.lowStockLimit || 5,
+    low_stock_threshold: Number(companySettings?.low_stock_threshold ?? companySettings?.lowStockThreshold ?? 5) || 5,
     pricingMode: (companySettings?.pricingMode || 'FIXED').toUpperCase(),
-    pricing_policy_locked: Boolean(
-      companySettings?.pricing_policy_locked ??
-      companySettings?.pricingPolicyLocked ??
-      true
-    ),
     subscription_plan: extractSubInfo(companySettings).subscriptionPlan,
     subscription_start_date: extractSubInfo(companySettings).subscriptionStartDate,
     subscription_end_date: extractSubInfo(companySettings).subscriptionEndDate,
     subscription_status: extractSubInfo(companySettings).subscriptionStatus,
-    telegram_bot_token: companySettings?.telegram_bot_token || companySettings?.telegramBotToken || '',
-    telegram_chat_id: companySettings?.telegram_chat_id || companySettings?.telegramChatId || '',
-    telegram_alerts_enabled: Boolean(companySettings?.telegram_alerts_enabled ?? companySettings?.telegramAlertsEnabled ?? false),
-    email_alerts_enabled: companySettings?.email_alerts_enabled !== false,
-    gmail_user: companySettings?.gmail_user || companySettings?.gmailUser || '',
-    gmail_app_password: companySettings?.gmail_app_password || companySettings?.gmailAppPassword || '',
-    gmail_from_name: companySettings?.gmail_from_name || companySettings?.gmailFromName || 'SarbaazSoft Store Alerts',
-    active_alert_provider: (companySettings?.active_alert_provider || companySettings?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
   });
+  const [isCorePosLocked, setIsCorePosLocked] = useState<boolean>(
+    Boolean(companySettings?.onboardingCompleted ?? true)
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -393,11 +378,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           currency: s?.currency || 'PKR',
           business_type: String(s?.business_type || s?.businessType || 'RETAIL').toUpperCase() as 'RETAIL' | 'WHOLESALE',
-          min_selling_quantity: Number(
-            s?.min_selling_quantity ??
-            s?.minSellingQuantity ??
-            ((s?.allow_half_carton === false || s?.allowHalfCarton === false) ? 1.0 : 0.5)
-          ),
           allow_half_carton: (
             s?.allow_half_carton !== undefined
               ? Boolean(s.allow_half_carton)
@@ -406,26 +386,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   : true)
           ),
           invoice_footer: s?.invoice_footer || s?.invoiceFooter || '',
-          low_stock_limit: s?.low_stock_limit || s?.lowStockLimit || 5,
+          low_stock_threshold: Number(s?.low_stock_threshold ?? s?.lowStockThreshold ?? 5) || 5,
           pricingMode: (s?.pricingMode || 'FIXED').toUpperCase(),
-          pricing_policy_locked: Boolean(
-            s?.pricing_policy_locked ??
-            s?.pricingPolicyLocked ??
-            true
-          ),
           subscription_plan: mergedSub.subscriptionPlan,
           subscription_start_date: mergedSub.subscriptionStartDate,
           subscription_end_date: mergedSub.subscriptionEndDate,
           subscription_status: mergedSub.subscriptionStatus,
-          telegram_bot_token: s?.telegram_bot_token || s?.telegramBotToken || '',
-          telegram_chat_id: s?.telegram_chat_id || s?.telegramChatId || '',
-          telegram_alerts_enabled: Boolean(s?.telegram_alerts_enabled ?? s?.telegramAlertsEnabled ?? false),
-          email_alerts_enabled: s?.email_alerts_enabled !== false,
-          gmail_user: s?.gmail_user || s?.gmailUser || '',
-          gmail_app_password: s?.gmail_app_password || s?.gmailAppPassword || '',
-          gmail_from_name: s?.gmail_from_name || s?.gmailFromName || 'SarbaazSoft Store Alerts',
-          active_alert_provider: (s?.active_alert_provider || s?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
         });
+        setIsCorePosLocked(Boolean(s?.onboardingCompleted ?? true));
       }
     });
     return () => {
@@ -437,6 +405,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (companySettings) {
       const nextSub = extractSubInfo(companySettings);
       setSubscriptionInfo(nextSub);
+      setIsCorePosLocked(Boolean(companySettings?.onboardingCompleted ?? true));
       setFormData({
         company_name: companySettings?.company_name || companySettings?.companyName || companySettings?.name || '',
         company_phone: companySettings?.company_phone || companySettings?.companyPhone || companySettings?.phone || '',
@@ -457,11 +426,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         business_type: String(
           companySettings?.business_type || companySettings?.businessType || 'RETAIL'
         ).toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL',
-        min_selling_quantity: Number(
-          companySettings?.min_selling_quantity ??
-          companySettings?.minSellingQuantity ??
-          ((companySettings?.allow_half_carton === false || companySettings?.allowHalfCarton === false) ? 1.0 : 0.5)
-        ),
         allow_half_carton: (
           companySettings?.allow_half_carton !== undefined
             ? Boolean(companySettings.allow_half_carton)
@@ -470,25 +434,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 : true)
         ),
         invoice_footer: companySettings?.invoice_footer || companySettings?.invoiceFooter || '',
-        low_stock_limit: companySettings?.low_stock_limit || companySettings?.lowStockLimit || 5,
+        low_stock_threshold: Number(companySettings?.low_stock_threshold ?? companySettings?.lowStockThreshold ?? 5) || 5,
         pricingMode: String(companySettings?.pricingMode || 'FIXED').toUpperCase(),
-        pricing_policy_locked: Boolean(
-          companySettings?.pricing_policy_locked ??
-          companySettings?.pricingPolicyLocked ??
-          true
-        ),
         subscription_plan: nextSub.subscriptionPlan,
         subscription_start_date: nextSub.subscriptionStartDate,
         subscription_end_date: nextSub.subscriptionEndDate,
         subscription_status: nextSub.subscriptionStatus,
-        telegram_bot_token: companySettings?.telegram_bot_token || companySettings?.telegramBotToken || '',
-        telegram_chat_id: companySettings?.telegram_chat_id || companySettings?.telegramChatId || '',
-        telegram_alerts_enabled: Boolean(companySettings?.telegram_alerts_enabled ?? companySettings?.telegramAlertsEnabled ?? false),
-        email_alerts_enabled: companySettings?.email_alerts_enabled !== false,
-        gmail_user: companySettings?.gmail_user || companySettings?.gmailUser || '',
-        gmail_app_password: companySettings?.gmail_app_password || companySettings?.gmailAppPassword || '',
-        gmail_from_name: companySettings?.gmail_from_name || companySettings?.gmailFromName || 'SarbaazSoft Store Alerts',
-        active_alert_provider: (companySettings?.active_alert_provider || companySettings?.activeAlertProvider || 'both') as 'both' | 'telegram' | 'gmail' | 'none',
       });
     }
   }, [companySettings]);
@@ -649,6 +600,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // Server Installation Status & Lockdown
   const [installStatus, setInstallStatus] = useState<any | null>(null);
+  const effectivePosLocked = Boolean(installStatus?.isInstalled || isCorePosLocked);
   const [isLoadingInstallStatus, setIsLoadingInstallStatus] = useState(false);
   const [resetPasswordInput, setResetPasswordInput] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -834,11 +786,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         RESEND_FROM: fromValue,
         RESEND_FROM_EMAIL: emailValue,
       };
-
-      // Strip any accidental lowercase store notification keys from platform appSettings payload
-      delete (payload as any).gmail_user;
-      delete (payload as any).gmail_app_password;
-      delete (payload as any).gmail_from_name;
 
       const res = await api.settings.saveAppSettings(payload);
       setAppSettingsSuccess(true);
@@ -1068,12 +1015,8 @@ setFormErrors(errors);
         delete sanitizedFormData.businessType;
         delete sanitizedFormData.pricing_mode;
         delete sanitizedFormData.pricingMode;
-        delete sanitizedFormData.min_selling_quantity;
-        delete sanitizedFormData.minSellingQuantity;
         delete sanitizedFormData.allow_half_carton;
         delete sanitizedFormData.allowHalfCarton;
-        delete sanitizedFormData.pricing_policy_locked;
-        delete sanitizedFormData.pricingPolicyLocked;
         delete sanitizedFormData.appSettings;
       }
       const updateRes = await api.settings.update(sanitizedFormData);
@@ -2095,7 +2038,7 @@ setFormErrors(errors);
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex flex-wrap items-center gap-2">
                     <span>Currency Settings (POS Defaults)</span>
-                    {formData.pricing_policy_locked && (
+                    {effectivePosLocked && (
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800/60 flex items-center gap-1">
                         <Lock className="w-3 h-3 text-amber-500" />
                         Locked After Initial Setup
@@ -2103,15 +2046,15 @@ setFormErrors(errors);
                     )}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-purple-200/70 mt-0.5 font-normal">
-                    {formData.pricing_policy_locked
+                    {effectivePosLocked
                       ? 'Core POS defaults, including currency and fixed document numbering, are permanently locked after initial store setup.'
                       : 'System identifiers and currency parameters required to run POS'}
                   </p>
                 </div>
               </div>
               <span className="text-xs font-semibold px-3 py-1 rounded-xl bg-slate-100 dark:bg-purple-950/60 text-slate-700 dark:text-purple-200 border border-slate-200 dark:border-purple-800/60 flex items-center gap-1.5 shrink-0">
-                {formData.pricing_policy_locked && <Lock className="w-3.5 h-3.5 text-amber-500" />}
-                <span>{formData.pricing_policy_locked ? 'POS Defaults Locked' : 'System Formats'}</span>
+                {effectivePosLocked && <Lock className="w-3.5 h-3.5 text-amber-500" />}
+                <span>{effectivePosLocked ? 'POS Defaults Locked' : 'System Formats'}</span>
               </span>
             </div>
 
@@ -2122,7 +2065,7 @@ setFormErrors(errors);
                   <span>
                     Currency Name <span className="text-rose-500 font-bold">*</span>
                   </span>
-                  {formData.pricing_policy_locked && (
+                  {effectivePosLocked && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-600 dark:text-amber-400">
                       <Lock className="w-2.5 h-2.5" /> Locked
                     </span>
@@ -2133,10 +2076,10 @@ setFormErrors(errors);
                   <input
                     type="text"
                     value={formData.currency_name}
-                    disabled={Boolean(formData.pricing_policy_locked)}
-                    readOnly={Boolean(formData.pricing_policy_locked)}
+                    disabled={effectivePosLocked}
+                    readOnly={effectivePosLocked}
                     onChange={(e) => {
-                      if (formData.pricing_policy_locked) return;
+                      if (effectivePosLocked) return;
                       setFormData({ ...formData, currency_name: toTitleCaseLive(e.target.value) });
                       if (formErrors.currency_name) {
                         setFormErrors({ ...formErrors, currency_name: '' });
@@ -2144,7 +2087,7 @@ setFormErrors(errors);
                     }}
                     placeholder='e.g., "Pakistani Rupee", "US Dollar"'
                     className={`capitalize w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 font-medium text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
-                      formData.pricing_policy_locked
+                      effectivePosLocked
                         ? 'opacity-75 cursor-not-allowed select-none border-slate-200 dark:border-slate-800'
                         : formErrors.currency_name
                         ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10'
@@ -2165,7 +2108,7 @@ setFormErrors(errors);
                   <span>
                     Currency Symbol <span className="text-rose-500 font-bold">*</span>
                   </span>
-                  {formData.pricing_policy_locked && (
+                  {effectivePosLocked && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-600 dark:text-amber-400">
                       <Lock className="w-2.5 h-2.5" /> Locked
                     </span>
@@ -2176,10 +2119,10 @@ setFormErrors(errors);
                   <input
                     type="text"
                     value={formData.currency_symbol}
-                    disabled={Boolean(formData.pricing_policy_locked)}
-                    readOnly={Boolean(formData.pricing_policy_locked)}
+                    disabled={effectivePosLocked}
+                    readOnly={effectivePosLocked}
                     onChange={(e) => {
-                      if (formData.pricing_policy_locked) return;
+                      if (effectivePosLocked) return;
                       setFormData({ ...formData, currency_symbol: e.target.value });
                       if (formErrors.currency_symbol) {
                         setFormErrors({ ...formErrors, currency_symbol: '' });
@@ -2187,7 +2130,7 @@ setFormErrors(errors);
                     }}
                     placeholder='e.g., "Rs.", "$", "PKR"'
                     className={`w-full h-11 pl-10 pr-3.5 rounded-xl border bg-slate-50 dark:bg-[#060B18]/90 font-bold font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all ${
-                      formData.pricing_policy_locked
+                      effectivePosLocked
                         ? 'opacity-75 cursor-not-allowed select-none border-slate-200 dark:border-slate-800'
                         : formErrors.currency_symbol
                         ? 'border-rose-400 ring-2 ring-rose-500/20 bg-rose-50/10'
@@ -2202,13 +2145,13 @@ setFormErrors(errors);
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">Printed on POS receipts &amp; invoice totals</p>
               </div>
 
-              {/* Low Stock Limit (Store-Type-Aware) */}
+              {/* Low Stock Threshold (Store-Type-Aware) */}
               <div>
                 <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center justify-between">
                   <span>Low stock threshold</span>
                   {formData.business_type === 'WHOLESALE' && (
                     <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                      Cartons (= {formData.low_stock_limit} Pairs)
+                      Cartons (= {formData.low_stock_threshold} Pairs)
                     </span>
                   )}
                 </label>
@@ -2217,21 +2160,21 @@ setFormErrors(errors);
                   min="1"
                   value={
                     formData.business_type === 'WHOLESALE'
-                      ? Math.max(1, Math.round(Number(formData.low_stock_limit || 12) / 12))
-                      : formData.low_stock_limit
+                      ? Math.max(1, Math.round(Number(formData.low_stock_threshold || 12) / 12))
+                      : formData.low_stock_threshold
                   }
                   onChange={(e) => {
                     const entered = parseInt(e.target.value, 10) || 1;
                     setFormData({
                       ...formData,
-                      low_stock_limit: formData.business_type === 'WHOLESALE' ? entered * 12 : entered,
+                      low_stock_threshold: formData.business_type === 'WHOLESALE' ? entered * 12 : entered,
                     });
                   }}
                   className="w-full h-11 px-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-[#060B18]/90 text-xs font-bold font-mono text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
                   {formData.business_type === 'WHOLESALE'
-                    ? `Alerts POS and inventory reports when stock falls at or below ${Math.max(1, Math.round(Number(formData.low_stock_limit || 12) / 12))} cartons (${formData.low_stock_limit} pairs)`
+                    ? `Alerts POS and inventory reports when stock falls at or below ${Math.max(1, Math.round(Number(formData.low_stock_threshold || 12) / 12))} cartons (${formData.low_stock_threshold} pairs)`
                     : 'Alerts POS when quantity falls at or below this limit'}
                 </p>
               </div>
@@ -2330,7 +2273,7 @@ setFormErrors(errors);
                     </div>
                   </div>
                   <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-300 dark:border-purple-700">
-                    Active: {Number(formData.min_selling_quantity) <= 0.5 ? '0.5 Carton (Half)' : '1.0 Carton (Full)'}
+                    Active: {formData.allow_half_carton ? '0.5 Carton (Half)' : '1.0 Carton (Full)'}
                   </span>
                 </div>
 
@@ -2339,7 +2282,7 @@ setFormErrors(errors);
                     className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
                       !isPlatformOwner ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
                     } ${
-                      Number(formData.min_selling_quantity) <= 0.5
+                      formData.allow_half_carton
                         ? 'border-purple-600 bg-white dark:bg-purple-950/50 dark:border-purple-500 ring-2 ring-purple-500/20 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
@@ -2349,12 +2292,11 @@ setFormErrors(errors);
                       name="settingsMinSellingQty"
                       value="0.5"
                       disabled={!isPlatformOwner}
-                      checked={Number(formData.min_selling_quantity) <= 0.5}
+                      checked={Boolean(formData.allow_half_carton)}
                       onChange={() => {
                         if (!isPlatformOwner) return;
                         setFormData((prev) => ({
                           ...prev,
-                          min_selling_quantity: 0.5,
                           allow_half_carton: true,
                         }));
                       }}
@@ -2377,7 +2319,7 @@ setFormErrors(errors);
                     className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
                       !isPlatformOwner ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
                     } ${
-                      Number(formData.min_selling_quantity) > 0.5
+                      !formData.allow_half_carton
                         ? 'border-purple-600 bg-white dark:bg-purple-950/50 dark:border-purple-500 ring-2 ring-purple-500/20 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
@@ -2387,12 +2329,11 @@ setFormErrors(errors);
                       name="settingsMinSellingQty"
                       value="1.0"
                       disabled={!isPlatformOwner}
-                      checked={Number(formData.min_selling_quantity) > 0.5}
+                      checked={!formData.allow_half_carton}
                       onChange={() => {
                         if (!isPlatformOwner) return;
                         setFormData((prev) => ({
                           ...prev,
-                          min_selling_quantity: 1.0,
                           allow_half_carton: false,
                         }));
                       }}
@@ -4014,7 +3955,7 @@ setFormErrors(errors);
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-purple-950/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs border border-slate-200 dark:border-purple-800/60">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                {installStatus?.isInstalled || formData.pricing_policy_locked ? (
+                {effectivePosLocked ? (
                   <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 ) : (
                   <Sparkles className="w-4 h-4 text-blue-600 dark:text-purple-300" />
@@ -4022,7 +3963,7 @@ setFormErrors(errors);
                 <span className="font-bold text-xs text-slate-900 dark:text-white">
                   Initial Store Setup &amp; POS Defaults
                 </span>
-                {(installStatus?.isInstalled || formData.pricing_policy_locked) && (
+                {effectivePosLocked && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/70">
                     <Lock className="w-2.5 h-2.5" />
                     LOCKED AFTER SETUP
@@ -4030,7 +3971,7 @@ setFormErrors(errors);
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-purple-200/70">
-                {installStatus?.isInstalled || formData.pricing_policy_locked
+                {effectivePosLocked
                   ? 'Initial Store Setup & POS Defaults have been completed by the Store Owner and are permanently locked against unauthorized modification.'
                   : 'Launch the setup wizard interface to complete first-time store configuration and POS defaults.'}
               </p>
@@ -4046,7 +3987,7 @@ setFormErrors(errors);
               }}
               className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 dark:border-purple-400/50 font-bold text-xs py-2.5 px-4 rounded-xl shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.3)] transition-all shrink-0 flex items-center gap-2 cursor-pointer active:scale-95"
             >
-              {installStatus?.isInstalled || formData.pricing_policy_locked ? (
+              {effectivePosLocked ? (
                 <>
                   <Lock className="w-3.5 h-3.5" />
                   <span>View Locked Setup Status</span>

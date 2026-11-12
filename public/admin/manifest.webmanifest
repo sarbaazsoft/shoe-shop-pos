@@ -10,6 +10,7 @@
   "orientation": "any",
   "background_color": "#FFFFFF",
   "theme_color": "#FFFFFF",
+  "prefer_related_applications": false,
   "categories": ["business", "productivity", "finance"],
   "icons": [
     {
@@ -57,7 +58,7 @@
       "url": "/admin",
       "icons": [
         {
-          "src": "/admin/shortcut-icon.png",
+          "src": "/admin/shortcut-dashboard.png",
           "sizes": "192x192",
           "type": "image/png",
           "purpose": "any"

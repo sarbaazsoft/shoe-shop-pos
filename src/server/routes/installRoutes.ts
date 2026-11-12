@@ -322,8 +322,8 @@ router.post(['/bootstrap', '/install-platform'], async (req: Request, res: Respo
     // 4. Record schema initialization markers so control-plane startup knows the schema is ready
     await pgClient
       .query(
-        `INSERT INTO app_settings (key, value, category, description, is_encrypted)
-         VALUES ('__schema_v14_drop_deprecated_store_requests__', 'true', 'system', 'Schema migration dropping store_requests table', false)
+        `INSERT INTO app_settings (key, value, category, description, is_secret)
+         VALUES ('__schema_v16_low_stock_threshold__', 'true', 'system', 'Schema initialized with global low_stock_threshold and cleaned columns', false)
          ON CONFLICT (key) DO NOTHING`
       )
       .catch(() => {});

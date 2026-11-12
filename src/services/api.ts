@@ -1,7 +1,7 @@
 // Central API service with JWT token injection, tenant isolation, and offline catalog fallback
 import { cacheCatalogOffline, deleteCachedProductOffline, lookupCachedProductOffline, searchCachedProductsOffline } from '../utils/offlineDb.ts';
 import { transformKeysToCamelCase } from '../utils/caseTransformer.ts';
-import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, AiProductSuggestionResult, GroupedNotificationsResponse, AllNotificationsResponse } from '../types.ts';
+import type { ProductFormValues, TrialActivation, PlatformNotification, PlatformNotificationType, GroupedNotificationsResponse, AllNotificationsResponse } from '../types.ts';
 
 const TOKEN_KEY = 'pos_auth_token';
 const ALT_TOKEN_KEY = 'shoe_pos_jwt_token';
@@ -486,7 +486,6 @@ export const api = {
       currency?: string;
       businessType?: 'RETAIL' | 'WHOLESALE' | string;
       pricingMode?: 'FIXED' | 'NEGOTIABLE' | string;
-      minSellingQuantity?: number;
       allowHalfCarton?: boolean;
       subscriptionPlan?: '6_MONTHS' | 'YEARLY' | string;
       subscriptionStartDate?: string;
@@ -680,8 +679,21 @@ export const api = {
           );
         }
         if (params?.lowStock || params?.lowStockOnly) {
+          let globalThreshold = 5;
+          try {
+            const rawSettings =
+              (typeof localStorage !== 'undefined' &&
+                (localStorage.getItem('cached_company_settings') ||
+                  (activeTenantId ? localStorage.getItem(`cached_company_settings_${activeTenantId}`) : null))) ||
+              null;
+            if (rawSettings) {
+              const parsedSettings = JSON.parse(rawSettings);
+              const tVal = Number(parsedSettings?.lowStockThreshold ?? parsedSettings?.low_stock_threshold ?? 5);
+              if (Number.isFinite(tVal) && tVal > 0) globalThreshold = tVal;
+            }
+          } catch {}
           cached = cached.filter(
-            (p: any) => (Number(p.totalStock ?? p.total_stock ?? 0) || 0) <= (Number(p.lowStockLimit ?? 5) || 5)
+            (p: any) => (Number(p.totalStock ?? p.total_stock ?? 0) || 0) <= globalThreshold
           );
         }
         return { products: cached, offline: true };
@@ -857,28 +869,6 @@ export const api = {
       if (params.excludeId !== undefined && params.excludeId !== null) qs.set('excludeId', String(params.excludeId));
       return apiFetch<any>(`/products/suggest-article?${qs.toString()}`);
     },
-    aiSuggest: (image: string) =>
-      apiFetch<{
-        success: boolean;
-        suggestion?: AiProductSuggestionResult;
-        error?: string;
-      }>('/products/ai-suggest', {
-        method: 'POST',
-        body: { image },
-      }),
-    aiSuggestFromImage: (image: string) =>
-      apiFetch<{
-        success: boolean;
-        title?: string;
-        category?: string;
-        brand?: string;
-        shoeType?: string;
-        suggestion?: AiProductSuggestionResult;
-        error?: string;
-      }>('/products/ai-suggest-from-image', {
-        method: 'POST',
-        body: { image },
-      }),
     create: async (data: ProductFormValues) => {
       const normalizedData = { ...data, brand: String(data.brand ?? '').trim() || 'Unbranded' };
       const res = await apiFetch<any>('/products', { method: 'POST', body: normalizedData });
@@ -1076,20 +1066,11 @@ export const api = {
       }>('/settings/test-email', { method: 'POST', body: { recipientEmail } }),
     testFcm: (data?: { title?: string; message?: string }) =>
       apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number; error?: string }>('/settings/test-fcm', { method: 'POST', body: data || {} }),
-    testTelegram: (data?: { botToken?: string; chatId?: string }) =>
-      apiFetch<{ success: boolean; message: string; error?: string }>('/settings/test-telegram', { method: 'POST', body: data || {} }),
-    testGmail: (data?: { gmailUser?: string; gmailAppPassword?: string; fromName?: string; recipientEmail?: string }) =>
-      apiFetch<{ success: boolean; delivered: boolean; message: string; error?: string }>('/settings/test-gmail', { method: 'POST', body: data || {} }),
-    saveAlertProviders: (data: any) =>
-      apiFetch<{ success: boolean; message: string; settings?: any }>('/settings/alert-providers', { method: 'POST', body: data }).catch(() =>
-        apiFetch('/settings', { method: 'POST', body: data })
-      ),
     post: (data: any) => apiFetch('/settings', { method: 'POST', body: data }),
     getSubscription: () => apiFetch('/settings/subscription'),
     requestSubscriptionRenewal: (data: { plan: '6_MONTHS' | 'YEARLY' | string; notes?: string }) =>
       apiFetch('/settings/renew-subscription', { method: 'POST', body: data }),
     update: (data: any) => apiFetch('/settings', { method: 'PUT', body: data }),
-    changeSetting: (data: any) => apiFetch('/settings/changeSetting', { method: 'PUT', body: data }),
     getUsers: () => apiFetch('/settings/users'),
     createUser: (data: any) =>
       apiFetch<{
@@ -1207,11 +1188,6 @@ export const api = {
         method: 'POST',
         body: data || {},
       }),
-    getVapidPublicKey: () => apiFetch<{ publicKey: string }>('/notifications/vapid-public-key'),
-    subscribe: (subscription: any) =>
-      apiFetch<{ success: boolean; error?: string }>('/notifications/subscribe', { method: 'POST', body: { subscription } }),
-    unsubscribe: (endpoint: string) =>
-      apiFetch<{ success: boolean; error?: string }>('/notifications/unsubscribe', { method: 'POST', body: { endpoint } }),
     testPush: (data?: { title?: string; message?: string }) =>
       apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number }>('/notifications/test-push', { method: 'POST', body: data || {} }),
     getPlatformAnnouncements: () =>

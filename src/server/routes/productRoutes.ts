@@ -7,7 +7,6 @@ import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { generateCode128Barcode, analyzeBarcode } from '../../utils/barcode.ts';
 import { parseCategoryPrefix, generateSuggestedArticle, buildArticleInfo, normalizeFootwearCategory } from '../../utils/footwear.ts';
 import { validateAndNormalizeProductPricing, validateProductBrand } from '../../schemas/productSchema.ts';
-import { getGeminiClient } from '../gemini.ts';
 
 const router = Router();
 
@@ -173,16 +172,6 @@ export async function generateProductEan13(
     attempts++;
   }
   return candidate;
-}
-
-// Backward compatibility alias
-export async function generateNumericBarcode(
-  productId?: number | string,
-  tenantId: number = 1,
-  categoryHint?: string
-): Promise<string> {
-  const res = await generateProductEan13(productId, tenantId, categoryHint);
-  return res.barcode;
 }
 
 // Generate new unique Code-128 store barcode API (supports both GET and POST)
@@ -395,323 +384,6 @@ const handleValidateArticle = async (req: AuthenticatedRequest, res: Response) =
 router.get('/validate-article', requireAuth, handleValidateArticle);
 router.post('/validate-article', requireAuth, handleValidateArticle);
 
-interface ResolvedImagePayload {
-  base64Data: string;
-  mimeType: string;
-}
-
-async function parseAndValidateImage(imageInput: unknown): Promise<{ data?: ResolvedImagePayload; error?: string; statusCode?: number }> {
-  if (!imageInput || typeof imageInput !== 'string') {
-    return { error: 'Product image data is required and must be a string.', statusCode: 400 };
-  }
-
-  const trimmed = imageInput.trim();
-  if (!trimmed) {
-    return { error: 'Product image data cannot be empty.', statusCode: 400 };
-  }
-
-  // 1. HTTP or HTTPS Image URL
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-      const fetchRes = await fetch(trimmed, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/*,*/*'
-        }
-      });
-      clearTimeout(timeoutId);
-
-      if (!fetchRes.ok) {
-        return { error: `Unable to download image from the provided URL (HTTP ${fetchRes.status}).`, statusCode: 400 };
-      }
-
-      const contentTypeHeader = (fetchRes.headers.get('content-type') || '').toLowerCase();
-      const buffer = Buffer.from(await fetchRes.arrayBuffer());
-      if (buffer.length === 0) {
-        return { error: 'The provided image URL returned empty data.', statusCode: 400 };
-      }
-
-      let detectedMime = 'image/jpeg';
-      if (contentTypeHeader.startsWith('image/')) {
-        detectedMime = contentTypeHeader.split(';')[0].trim();
-      } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
-        detectedMime = 'image/png';
-      } else if (buffer[0] === 0xff && buffer[1] === 0xd8) {
-        detectedMime = 'image/jpeg';
-      } else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
-        detectedMime = 'image/gif';
-      } else if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
-        detectedMime = 'image/webp';
-      }
-
-      return {
-        data: {
-          base64Data: buffer.toString('base64'),
-          mimeType: detectedMime,
-        }
-      };
-    } catch (fetchErr: any) {
-      return { error: `Could not fetch image from URL: ${fetchErr?.message || 'Network error'}`, statusCode: 400 };
-    }
-  }
-
-  // 2. Data URI (data:image/...;base64,...)
-  if (trimmed.startsWith('data:')) {
-    const match = trimmed.match(/^data:([^;]+);base64,(.+)$/s);
-    if (!match) {
-      return { error: 'Invalid data URI image format.', statusCode: 400 };
-    }
-    const mime = match[1].trim().toLowerCase();
-    const rawData = match[2].trim().replace(/\s+/g, '');
-    if (!rawData) {
-      return { error: 'Data URI contains no image payload.', statusCode: 400 };
-    }
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(rawData) || rawData.length % 4 !== 0) {
-      return { error: 'Invalid base64 payload in data URI.', statusCode: 400 };
-    }
-    return {
-      data: {
-        base64Data: rawData,
-        mimeType: mime || 'image/jpeg',
-      }
-    };
-  }
-
-  // 3. Raw Base64 String
-  const cleanBase64 = trimmed.replace(/\s+/g, '');
-  const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(cleanBase64) && cleanBase64.length % 4 === 0;
-  if (!isBase64 || cleanBase64.length < 32) {
-    return { error: 'Invalid image format. Provide a valid image URL or base64 data.', statusCode: 400 };
-  }
-
-  try {
-    const buf = Buffer.from(cleanBase64, 'base64');
-    if (buf.length < 16) {
-      return { error: 'Image data is too small to be a valid image file.', statusCode: 400 };
-    }
-
-    let detectedMime = 'image/jpeg';
-    const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-    const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
-    const isGif = buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46;
-    const isWebp = buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP';
-    const isBmp = buf[0] === 0x42 && buf[1] === 0x4d;
-
-    if (isPng) detectedMime = 'image/png';
-    else if (isJpg) detectedMime = 'image/jpeg';
-    else if (isGif) detectedMime = 'image/gif';
-    else if (isWebp) detectedMime = 'image/webp';
-    else if (isBmp) detectedMime = 'image/bmp';
-    else {
-      return { error: 'Invalid image format. Unrecognized image signature.', statusCode: 400 };
-    }
-
-    return {
-      data: {
-        base64Data: cleanBase64,
-        mimeType: detectedMime,
-      }
-    };
-  } catch {
-    return { error: 'Failed to decode base64 image data.', statusCode: 400 };
-  }
-}
-
-// AI Footwear Suggestor from Image - Strictly for Retail Stores
-async function handleAiProductSuggestion(req: AuthenticatedRequest, res: Response) {
-  try {
-    const tenantId = extractStrictTenantId(req);
-
-    // Enforce Retail stores only (business_type is stored in company_settings)
-    const settings = await getCompanyPricingSettings(tenantId);
-    if (settings.businessType === 'WHOLESALE') {
-      return res.status(403).json({
-        success: false,
-        error: 'AI image analysis is available for retail stores only.',
-      });
-    }
-
-    const { image } = req.body || {};
-    const resolved = await parseAndValidateImage(image);
-    if (resolved.error || !resolved.data) {
-      return res.status(resolved.statusCode || 400).json({
-        success: false,
-        error: resolved.error || 'Invalid product image.',
-      });
-    }
-
-    const { base64Data, mimeType } = resolved.data;
-    const aiClient = getGeminiClient();
-    const prompt = `You are an expert footwear cataloger and AI vision inspector for a dual-engine wholesale shoe store POS system.
-Examine this product image carefully.
-
-First, strictly determine if this image shows footwear (shoes, sneakers, boots, sandals, heels, slides, slippers, loafers, clogs, flats, etc.).
-If the image does NOT show footwear (e.g. it is an alarm clock, electronic device, watch, furniture, vehicle, fruit, pet, general clothing item like shirt/pants, etc.), you MUST set "isFootwear": false.
-
-If the image DOES show footwear:
-1. "isFootwear": true
-2. "confidence": "HIGH" | "MEDIUM" | "LOW" (confidence in recognizing the footwear model/style)
-3. "brand": Brand name if clearly visible (e.g. "Nike", "Adidas", "Puma", "Bata", "Service", "Ndure", "Clarks", "Gucci", "Skechers") or "Unbranded" / "Local" if not clearly identified or generic.
-4. "isBrandUnknown": boolean (true if the brand trademark or logo is not clearly visible or cannot be determined with certainty)
-5. "category": Must be one of the standard footwear categories, such as "Casual Shoes", "Sneakers", "Sandals & Chappals", "Flat Sandals", "Heeled Sandals", "Boots", "Loafers", "Formal Shoes", "Men", "Women", "Kids", "Toddler", "Infant".
-6. "title": A concise, marketable retail product title representing the color-free silhouette or model (e.g. "Air Max 270 Athletic Runner", "Classic Leather Penny Loafer", "Double-Strap Slide Sandal", "Suede Chelsea Ankle Boot", "Block Heel Dress Sandal"). Avoid arbitrary temporary color words in the title.
-7. "shoeType": Specific footwear category/silhouette (e.g. "Sneaker", "Running Shoe", "Sandal", "Boot", "Loafer", "Heel", "Slipper").
-8. "visualClues": An array of 2 to 4 concise observed visual features (e.g. ["Swoosh logo on lateral quarter", "Air-cushioned bubble midsole", "Textured rubber tread", "Mesh and synthetic upper"]).
-
-Respond strictly with valid JSON conforming to:
-{
-  "isFootwear": boolean,
-  "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "brand": string,
-  "isBrandUnknown": boolean,
-  "category": string,
-  "title": string,
-  "shoeType": string,
-  "visualClues": string[]
-}`;
-
-    let geminiRes;
-    try {
-      geminiRes = await aiClient.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  data: base64Data,
-                  mimeType,
-                },
-              },
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-    } catch (apiErr: any) {
-      const errMsg = apiErr?.message || '';
-      if (errMsg.includes('Base64') || errMsg.includes('INVALID_ARGUMENT') || apiErr?.status === 400) {
-        return res.status(400).json({
-          success: false,
-          error: 'The provided image could not be processed by AI. Please provide a valid image file or URL.',
-        });
-      }
-      console.warn('Gemini generateContent error in ai-suggest:', errMsg);
-      return res.status(500).json({
-        success: false,
-        error: errMsg || 'Failed to analyze shoe image with AI.',
-      });
-    }
-
-    const rawText = geminiRes.text || '';
-    let parsed: any = {};
-    try {
-      const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsed = JSON.parse(cleanJson);
-    } catch (parseErr) {
-      console.warn('Failed to parse Gemini JSON output:', rawText);
-    }
-
-    // Footwear Guardrail Check
-    if (parsed.isFootwear === false) {
-      return res.status(400).json({
-        success: false,
-        error: 'Alert: Image is not a valid footwear image. Please upload an image of a shoe.',
-      });
-    }
-
-    const rawCatName = String(parsed.category || 'Casual Shoes').trim();
-    const rawBrandName = String(parsed.brand || 'Unbranded').trim();
-    const title = String(parsed.title || `${rawCatName} Shoe`).trim();
-    const shoeType = String(parsed.shoeType || 'Shoe').trim();
-    const confidence = (['HIGH', 'MEDIUM', 'LOW'].includes(parsed.confidence) ? parsed.confidence : 'HIGH') as 'HIGH' | 'MEDIUM' | 'LOW';
-
-    // Query existing store categories
-    let existingCategories: any[] = [];
-    try {
-      const catRes = await pgClient.query<any>('SELECT id, name FROM categories');
-      existingCategories = catRes.rows || [];
-    } catch {}
-
-    const matchedCat = existingCategories.find(
-      (c) => (c.name || '').toLowerCase() === rawCatName.toLowerCase()
-    );
-
-    // Query existing store brands from products
-    let existingBrands: string[] = [];
-    try {
-      const brandRes = await pgClient.query<any>(
-        'SELECT DISTINCT brand FROM products WHERE tenant_id = $1 AND brand IS NOT NULL AND TRIM(brand) != \'\'',
-        [tenantId]
-      );
-      existingBrands = (brandRes.rows || []).map((r) => r.brand).filter(Boolean);
-    } catch {}
-
-    const matchedBrand = existingBrands.find(
-      (b) => b.toLowerCase() === rawBrandName.toLowerCase()
-    );
-
-    const isUnknownBrand = Boolean(
-      parsed.isBrandUnknown ||
-      !rawBrandName ||
-      rawBrandName.toLowerCase() === 'unbranded' ||
-      rawBrandName.toLowerCase() === 'local' ||
-      rawBrandName.toLowerCase() === 'unknown'
-    );
-
-    const suggestion = {
-      title,
-      category: {
-        suggestedName: rawCatName,
-        matchedName: matchedCat ? matchedCat.name : null,
-        matchedId: matchedCat ? matchedCat.id : null,
-        isExisting: !!matchedCat,
-        confidence,
-      },
-      brand: {
-        suggestedName: rawBrandName,
-        matchedName: matchedBrand || null,
-        isExisting: !!matchedBrand,
-        isUnknown: isUnknownBrand,
-        confidence,
-      },
-      confidence,
-      shoeType,
-      isFootwear: true,
-      visualClues: Array.isArray(parsed.visualClues) && parsed.visualClues.length > 0
-        ? parsed.visualClues
-        : ['Footwear silhouette detected', `${shoeType} structure`],
-    };
-
-    return res.json({
-      success: true,
-      suggestion,
-      title,
-      category: rawCatName,
-      brand: rawBrandName,
-      shoeType,
-    });
-  } catch (err: any) {
-    const errorMsg = err?.message || 'Failed to analyze shoe image.';
-    return res.status(500).json({
-      success: false,
-      error: errorMsg,
-    });
-  }
-}
-
-router.post('/ai-suggest', requireAuth, handleAiProductSuggestion);
-router.post('/ai-suggest-from-image', requireAuth, handleAiProductSuggestion);
-
 
 let productColumnsVerified = false;
 let productColumnsPromise: Promise<void> | null = null;
@@ -730,8 +402,16 @@ async function ensureProductAndSettingsColumns() {
       }
       if (reg.rows[0]?.has_settings) {
         await pgClient.query("ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS pricing_mode VARCHAR(30) NOT NULL DEFAULT 'FIXED'");
-        await pgClient.query("ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS pricing_policy_locked BOOLEAN NOT NULL DEFAULT false");
-        await pgClient.query("UPDATE company_settings SET pricing_policy_locked = false");
+        await pgClient.query(`DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='company_settings' AND column_name='low_stock_limit')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='company_settings' AND column_name='low_stock_threshold') THEN
+            ALTER TABLE company_settings RENAME COLUMN low_stock_limit TO low_stock_threshold;
+          ELSE
+            ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 5;
+          END IF;
+        END $$`).catch(() => {});
+        await pgClient.query("ALTER TABLE company_settings DROP COLUMN IF EXISTS pricing_policy_locked");
+        await pgClient.query("ALTER TABLE company_settings DROP COLUMN IF EXISTS min_selling_quantity");
         await pgClient.exec(`
           DO $$
           BEGIN
@@ -853,6 +533,7 @@ async function ensureProductAndSettingsColumns() {
         END $$`);
         await pgClient.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS allow_half_carton BOOLEAN NOT NULL DEFAULT true");
         await pgClient.query("ALTER TABLE products DROP COLUMN IF EXISTS min_selling_quantity");
+        await pgClient.query("ALTER TABLE products DROP COLUMN IF EXISTS low_stock_limit");
         await pgClient.query(`
           UPDATE products p
           SET allow_half_carton = false
@@ -877,7 +558,7 @@ async function ensureProductAndSettingsColumns() {
 // Company pricing settings helper
 export async function getCompanyPricingSettings(tenantId: number = 1): Promise<{
   pricingMode: 'FIXED' | 'NEGOTIABLE';
-  pricingPolicyLocked: boolean;
+  lowStockThreshold: number;
   businessType?: 'RETAIL' | 'WHOLESALE';
   allowHalfCarton?: boolean;
   allow_half_carton?: boolean;
@@ -886,16 +567,17 @@ export async function getCompanyPricingSettings(tenantId: number = 1): Promise<{
   try {
     await ensureProductAndSettingsColumns();
     const res = await pgClient.query<any>(
-      'SELECT pricing_mode, pricing_policy_locked, currency_symbol, business_type, allow_half_carton FROM company_settings WHERE COALESCE(tenant_id, 1) = $1 LIMIT 1',
+      'SELECT pricing_mode, low_stock_threshold, currency_symbol, business_type, allow_half_carton FROM company_settings WHERE COALESCE(tenant_id, 1) = $1 LIMIT 1',
       [tenantId]
     );
     const row = res.rows[0];
     const mode = String(row?.pricing_mode || 'FIXED').toUpperCase() === 'NEGOTIABLE' ? 'NEGOTIABLE' : 'FIXED';
     const bType = String(row?.business_type || 'RETAIL').toUpperCase() === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
     const halfAllowed = row?.allow_half_carton !== undefined ? Boolean(row.allow_half_carton) : true;
+    const lowStockThreshold = Math.max(1, Number(row?.low_stock_threshold ?? 5) || 5);
     return {
       pricingMode: mode,
-      pricingPolicyLocked: false,
+      lowStockThreshold,
       businessType: bType,
       allowHalfCarton: halfAllowed,
       allow_half_carton: halfAllowed,
@@ -904,7 +586,7 @@ export async function getCompanyPricingSettings(tenantId: number = 1): Promise<{
   } catch {
     return {
       pricingMode: 'FIXED',
-      pricingPolicyLocked: false,
+      lowStockThreshold: 5,
       businessType: 'RETAIL',
       allowHalfCarton: true,
       allow_half_carton: true,
@@ -988,9 +670,6 @@ function mapProductRow(row: any, settings: {
     minSalePrice: minPrice,
     maxSalePrice: maxPrice,
     totalStock: row.total_stock,
-    lowStockLimit: row.low_stock_limit,
-    lowStockAlert: row.low_stock_limit,
-    low_stock_limit: row.low_stock_limit,
     active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1010,7 +689,7 @@ router.get(['/lookup/:barcode', '/barcode/:barcode', '/scan/:barcode'], requireA
                 p.primary_image_url, p.description, COALESCE(p.cost_price, 0) as cost_price,
                 COALESCE(p.min_price, 0) as min_price,
                 COALESCE(p.max_price, 0) as max_price,
-                p.total_stock, COALESCE(p.low_stock_limit, 5) as low_stock_limit, p.active, p.created_at, p.updated_at
+                p.total_stock, p.active, p.created_at, p.updated_at
          FROM products p
          WHERE COALESCE(p.tenant_id, 1) = $2
            AND (
@@ -1049,7 +728,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
              p.pairs_per_carton, p.allow_half_carton, p.primary_image_url, p.description, COALESCE(p.cost_price, 0) as cost_price,
              COALESCE(p.min_price, 0) as min_price,
              COALESCE(p.max_price, 0) as max_price,
-             p.total_stock, COALESCE(p.low_stock_limit, 5) as low_stock_limit, p.active, p.created_at, p.updated_at
+             p.total_stock, p.active, p.created_at, p.updated_at
       FROM products p
       WHERE COALESCE(p.tenant_id, 1) = $1
     `;
@@ -1073,7 +752,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
     }
 
     if (lowStockOnly === 'true') {
-      query += ` AND p.total_stock <= COALESCE(p.low_stock_limit, 5)`;
+      query += ` AND p.total_stock <= COALESCE((SELECT cs.low_stock_threshold FROM company_settings cs WHERE COALESCE(cs.tenant_id, 1) = COALESCE(p.tenant_id, 1) LIMIT 1), 5)`;
     }
 
     query += ` ORDER BY p.id DESC`;
@@ -1154,7 +833,6 @@ router.post('/', requireAuth, requireAdmin, async (req: AuthenticatedRequest, re
       max_sale_price,
       totalStock = 0,
       initialStock,
-      lowStockLimit,
     } = req.body;
 
     const rawPairsPerCarton = req.body.pairsPerCarton ?? req.body.pairs_per_carton ?? req.body.lotSize;
@@ -1259,29 +937,6 @@ router.post('/', requireAuth, requireAdmin, async (req: AuthenticatedRequest, re
 
     const physicalStock = parseInt(String(totalStock ?? initialStock ?? 0), 10) || 0;
 
-    // Calculate store-type-aware low stock limit
-    const rawLowStock = lowStockLimit ?? req.body.low_stock_limit ?? req.body.lowStockAlert ?? req.body.low_stock_alert;
-    const cartonThresholdInput = req.body.lowStockThresholdCartons ?? req.body.lowStockCartons ?? req.body.low_stock_cartons;
-    let finalLowStockLimit: number = 5;
-
-    if (cartonThresholdInput !== undefined && cartonThresholdInput !== null && String(cartonThresholdInput).trim() !== '') {
-      const parsedCartons = parseInt(String(cartonThresholdInput), 10);
-      if (!isNaN(parsedCartons) && parsedCartons > 0) {
-        finalLowStockLimit = parsedCartons * finalPairsPerCarton;
-      }
-    } else if (rawLowStock !== undefined && rawLowStock !== null && String(rawLowStock).trim() !== '') {
-      const parsed = parseInt(String(rawLowStock), 10);
-      if (!isNaN(parsed) && parsed > 0) finalLowStockLimit = parsed;
-    } else {
-      const setRes = await pgClient.query<{ low_stock_limit: number; business_type?: string }>(
-        'SELECT low_stock_limit, business_type FROM company_settings WHERE COALESCE(tenant_id, 1) = $1 LIMIT 1',
-        [tenantId]
-      );
-      const isStoreWholesale = String(setRes.rows[0]?.business_type || '').toUpperCase() === 'WHOLESALE';
-      const defaultLimit = Number(setRes.rows[0]?.low_stock_limit) || (isStoreWholesale ? finalPairsPerCarton : 5);
-      finalLowStockLimit = defaultLimit;
-    }
-
     const rawAllowHalf = req.body.allowHalfCarton ?? req.body.allow_half_carton;
     const finalAllowHalfCarton = rawAllowHalf !== undefined ? Boolean(rawAllowHalf) : true;
 
@@ -1292,8 +947,8 @@ router.post('/', requireAuth, requireAdmin, async (req: AuthenticatedRequest, re
         `INSERT INTO products (
           tenant_id, tenant_product_no, name, brand, category, article, barcode, primary_image_url,
           description, cost_price, min_price, max_price, pairs_per_carton,
-          total_stock, low_stock_limit, active, allow_half_carton
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, true, $16)
+          total_stock, active, allow_half_carton
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, $15)
         RETURNING id`,
         [
           tenantId,
@@ -1310,7 +965,6 @@ router.post('/', requireAuth, requireAdmin, async (req: AuthenticatedRequest, re
           finalMaxPrice,
           finalPairsPerCarton,
           physicalStock,
-          finalLowStockLimit,
           finalAllowHalfCarton,
         ]
       );
@@ -1495,22 +1149,6 @@ router.put('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, 
     const currentPairsPerCarton = Number(current.pairs_per_carton);
     const finalPairsPerCarton = normalizedPairsPerCarton ?? (currentPairsPerCarton === 16 ? 16 : 12);
 
-    const rawLowStock = req.body.lowStockLimit ?? req.body.low_stock_limit ?? req.body.lowStockAlert ?? req.body.low_stock_alert;
-    const cartonThresholdInput = req.body.lowStockThresholdCartons ?? req.body.lowStockCartons ?? req.body.low_stock_cartons;
-    let finalLowStockLimitToUpdate: number = current.low_stock_limit;
-
-    if (cartonThresholdInput !== undefined && cartonThresholdInput !== null && String(cartonThresholdInput).trim() !== '') {
-      const parsedCartons = parseInt(String(cartonThresholdInput), 10);
-      if (!isNaN(parsedCartons) && parsedCartons > 0) {
-        finalLowStockLimitToUpdate = parsedCartons * finalPairsPerCarton;
-      }
-    } else if (rawLowStock !== undefined && rawLowStock !== null && String(rawLowStock).trim() !== '') {
-      const parsed = parseInt(String(rawLowStock), 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        finalLowStockLimitToUpdate = parsed;
-      }
-    }
-
     const rawAllowHalf = req.body.allowHalfCarton ?? req.body.allow_half_carton;
     const finalAllowHalfCarton = rawAllowHalf !== undefined ? Boolean(rawAllowHalf) : (current.allow_half_carton !== false);
 
@@ -1519,11 +1157,10 @@ router.put('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, 
         name = $1, brand = $2, category = $3, article = $4, barcode = $5,
         pairs_per_carton = $6,
         primary_image_url = $7, description = $8, cost_price = $9, total_stock = $10,
-        low_stock_limit = $11, active = $12,
-        min_price = $13, max_price = $14,
-        allow_half_carton = $15,
+        active = $11, min_price = $12, max_price = $13,
+        allow_half_carton = $14,
         updated_at = NOW()
-      WHERE id = $16 AND COALESCE(tenant_id, 1) = $17`,
+      WHERE id = $15 AND COALESCE(tenant_id, 1) = $16`,
       [
         finalName,
         finalBrand,
@@ -1535,7 +1172,6 @@ router.put('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, 
         description !== undefined ? description : current.description,
         finalCostPrice,
         updatedStock,
-        finalLowStockLimitToUpdate,
         active !== undefined ? Boolean(active) : current.active,
         finalMinPrice,
         finalMaxPrice,
@@ -1612,11 +1248,6 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
     }
 
     const settings = await getCompanyPricingSettings(tenantId);
-    const settingsRes = await pgClient.query<{ low_stock_limit: number }>(
-      'SELECT low_stock_limit FROM company_settings WHERE COALESCE(tenant_id, 1) = $1 LIMIT 1',
-      [tenantId]
-    );
-    const defaultLowStockLimit = settingsRes.rows[0]?.low_stock_limit || 5;
 
     let createdCount = 0;
     let mergedCount = 0;
@@ -1716,16 +1347,6 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
           0,
           parseInt(String(rawItem.total_stock ?? rawItem.totalStock ?? 0), 10) || 0
         );
-        const importedLowStock =
-          rawItem.low_stock_limit !== undefined &&
-          rawItem.low_stock_limit !== null &&
-          String(rawItem.low_stock_limit).trim() !== ''
-            ? parseInt(String(rawItem.low_stock_limit), 10) || defaultLowStockLimit
-            : rawItem.lowStockLimit !== undefined &&
-              rawItem.lowStockLimit !== null &&
-              String(rawItem.lowStockLimit).trim() !== ''
-            ? parseInt(String(rawItem.lowStockLimit), 10) || defaultLowStockLimit
-            : defaultLowStockLimit;
 
         const rawImageUrl = String(rawItem.primary_image_url ?? rawItem.primaryImageUrl ?? '').trim();
         const rawDesc = String(rawItem.description ?? '').trim();
@@ -1751,12 +1372,11 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 min_price = $5,
                 max_price = $6,
                 total_stock = $7,
-                low_stock_limit = $8,
-                primary_image_url = $9,
-                description = $10,
+                primary_image_url = $8,
+                description = $9,
                 active = true,
                 updated_at = NOW()
-              WHERE id = $11`,
+              WHERE id = $10`,
               [
                 mergedName,
                 rawBrand ? finalBrand : existingProduct.brand,
@@ -1765,7 +1385,6 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 finalMinPrice,
                 finalMaxPrice,
                 newStock,
-                importedLowStock,
                 rawImageUrl || existingProduct.primary_image_url || '',
                 rawDesc || existingProduct.description || '',
                 existingProduct.id,
@@ -1797,12 +1416,11 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 min_price = $6,
                 max_price = $7,
                 total_stock = $8,
-                low_stock_limit = $9,
-                primary_image_url = $10,
-                description = $11,
+                primary_image_url = $9,
+                description = $10,
                 active = true,
                 updated_at = NOW()
-              WHERE id = $12`,
+              WHERE id = $11`,
               [
                 finalName,
                 finalBrand,
@@ -1812,7 +1430,6 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
                 finalMinPrice,
                 finalMaxPrice,
                 importedStock,
-                importedLowStock,
                 rawImageUrl,
                 rawDesc,
                 existingProduct.id,
@@ -1877,9 +1494,9 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
         const insertRes = await pgClient.query<{ id: number }>(
           `INSERT INTO products (
             tenant_id, tenant_product_no, name, brand, category, article, barcode, primary_image_url,
-            description, cost_price, min_price, max_price,
-            total_stock, low_stock_limit, pairs_per_carton, active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, true)
+            description, cost_price, min_price, max_price, pairs_per_carton,
+            total_stock, active, allow_half_carton
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, $15)
           RETURNING id`,
           [
             tenantId,
@@ -1894,9 +1511,9 @@ router.post('/bulk-import', requireAuth, requireAdmin, async (req: Authenticated
             finalCostPrice,
             finalMinPrice,
             finalMaxPrice,
-            importedStock,
-            importedLowStock,
             importedPairsPerCarton,
+            importedStock,
+            true,
           ]
         );
 

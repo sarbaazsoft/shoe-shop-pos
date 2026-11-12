@@ -32,6 +32,8 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
     companySettings?.companyName ||
     'Retail Store';
   const currencySymbol = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
+  const globalLowStockThreshold =
+    Number(companySettings?.lowStockThreshold ?? companySettings?.low_stock_threshold ?? 5) || 5;
 
   // Modes: 'catalog' = choose from existing inventory, 'custom' = create ad-hoc barcode
   const [activeTab, setActiveTab] = useState<'catalog' | 'custom'>(
@@ -129,7 +131,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
       (p.brandName || p.brand_name) === filterBrand;
 
     const matchesLowStock =
-      !filterLowStock || p.totalStock <= (p.lowStockLimit || 5);
+      !filterLowStock || p.totalStock <= globalLowStockThreshold;
 
     return matchesSearch && matchesBrand && matchesLowStock;
   });
@@ -659,7 +661,7 @@ export const BarcodeGeneratorTool: React.FC<BarcodeGeneratorToolProps> = ({
                                   className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
                                     p.totalStock <= 0
                                       ? 'bg-red-100 text-red-700'
-                                      : p.totalStock <= p.lowStockLimit
+                                      : p.totalStock <= globalLowStockThreshold
                                       ? 'bg-amber-100 text-amber-800'
                                       : 'bg-emerald-100 text-emerald-800'
                                   }`}

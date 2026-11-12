@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer';
 import { pgClient } from '../../db/index.ts';
 import { getCachedAppSetting } from './appSettingsService.ts';
 import { sendEmail } from '../utils/email.ts';
@@ -32,41 +31,25 @@ export async function dispatchPosEmailAlert(
       pgClient.query<{
         company_name: string | null;
         email: string | null;
-        email_alerts_enabled: boolean | null;
-        gmail_user: string | null;
-        gmail_app_password: string | null;
-        gmail_from_name: string | null;
-        active_alert_provider: string | null;
       }>(
-        `SELECT cs.company_name, cs.email, cs.email_alerts_enabled,
-                cs.gmail_user, cs.gmail_app_password, cs.gmail_from_name, cs.active_alert_provider
+        `SELECT t.name AS company_name, cs.email
          FROM company_settings cs
+         LEFT JOIN tenants t ON t.id = cs.tenant_id
          WHERE cs.tenant_id = $1 LIMIT 1`,
         [cleanTenantId]
       ),
       pgClient.query<{ email: string }>(
         `SELECT email FROM users
-         WHERE tenant_id = $1 AND role = 'ADMIN' AND status = 'ACTIVE'`,
+         WHERE tenant_id = $1 AND role = 'ADMIN' AND status IN ('ACTIVE', 'APPROVED')`,
         [cleanTenantId]
       ),
     ]);
 
     const cs = csRes.rows[0];
-    if (cs) {
-      if (cs.email_alerts_enabled === false) return false;
-      const provider = String(cs.active_alert_provider || 'both').toLowerCase();
-      if (provider === 'telegram' || provider === 'none') {
-        return false; // Email alerts silenced per provider toggle
-      }
-    }
-
     const recipients = new Set<string>();
 
     if (cs?.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cs.email.trim())) {
       recipients.add(cs.email.trim().toLowerCase());
-    }
-    if (cs?.gmail_user && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cs.gmail_user.trim())) {
-      recipients.add(cs.gmail_user.trim().toLowerCase());
     }
 
     for (const u of usersRes.rows) {
@@ -179,40 +162,6 @@ export async function dispatchPosEmailAlert(
 </html>
     `;
 
-    // 3. Priority Dispatch: Use store's dedicated notification Gmail credentials if configured
-    const storeGmailUser = (cs?.gmail_user || '').trim();
-    const storeGmailPass = (cs?.gmail_app_password || '').trim();
-    const storeFromName = (cs?.gmail_from_name || storeName || 'SarbaazSoft Store Alerts').trim();
-
-    if (storeGmailUser && storeGmailPass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          auth: {
-            user: storeGmailUser,
-            pass: storeGmailPass,
-          },
-        });
-
-        const fromHeader = storeFromName ? `"${storeFromName}" <${storeGmailUser}>` : storeGmailUser;
-        const mailInfo = await transporter.sendMail({
-          from: fromHeader,
-          to: recipientList,
-          subject: `[${storeName}] ${actionTitle}`,
-          html: htmlBody,
-          text: `[${storeName}] ${actionTitle} - Invoice #${invoiceNum}`,
-        });
-
-        console.log(`✉️ POS transaction email alert delivered to ${recipientList.join(', ')} via store notification Gmail (${storeGmailUser}) [ID: ${mailInfo.messageId || 'ok'}]`);
-        return true;
-      } catch (storeSmtpErr: any) {
-        console.warn(`[emailAlertService] Store notification Gmail SMTP failed (${storeGmailUser}), falling back to system provider:`, storeSmtpErr?.message || storeSmtpErr);
-      }
-    }
-
-    // Fallback to platform transactional email provider if store has not configured a custom notification Gmail account
     const sendRes = await sendEmail({
       to: recipientList,
       subject: `[${storeName}] ${actionTitle}`,

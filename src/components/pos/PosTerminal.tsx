@@ -1802,7 +1802,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         <p className="font-bold text-sm text-slate-900 dark:text-white">
                           {currencySymbol} {formatStockPrice(getProductRetailPrice(prod))}
                         </p>
-                        <p className={`text-xs ${prod.totalStock <= prod.lowStockLimit ? 'text-amber-600 font-semibold' : 'text-emerald-600'}`}>
+                        <p className={`text-xs ${prod.totalStock <= (Number(companySettings?.lowStockThreshold ?? companySettings?.low_stock_threshold ?? 5) || 5) ? 'text-amber-600 font-semibold' : 'text-emerald-600'}`}>
                           In Stock: {prod.totalStock}
                         </p>
                       </div>

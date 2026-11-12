@@ -2,10 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import {
-  getVapidPublicKey,
   registerSseClient,
-  savePushSubscription,
-  removePushSubscription,
   saveFcmToken,
   removeFcmToken,
   getFcmStats,
@@ -1198,50 +1195,6 @@ router.post(['/test-fcm', '/test-push'], async (req: Request, res: Response) => 
   }
 });
 
-// Backward-compatible VAPID and Web Push endpoints
-router.get('/vapid-public-key', (_req: Request, res: Response) => {
-  try {
-    const publicKey = getVapidPublicKey();
-    res.json({ publicKey });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to retrieve VAPID key' });
-  }
-});
-
-router.post('/subscribe', async (req: Request, res: Response) => {
-  try {
-    const identity = resolveRequestIdentity(req);
-    const subscription = req.body?.subscription || req.body;
-    const userAgent = req.headers['user-agent'] || '';
-
-    if (!subscription || !subscription.endpoint) {
-      return res.status(400).json({ success: false, error: 'Invalid subscription object' });
-    }
-
-    const tenantId = Number(req.body?.tenantId || req.body?.subscription?.tenantId || identity.tenantId) || 1;
-    const userId = Number(req.body?.userId || req.body?.subscription?.userId || identity.userId) || 0;
-    const rawRole = req.body?.userRole || req.body?.role || req.body?.subscription?.userRole || identity.role || 'ADMIN';
-    const role = String(rawRole).toUpperCase();
-
-    const success = await savePushSubscription(tenantId, userId, role, subscription, userAgent);
-    res.json({ success, tenantId, role });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to save subscription' });
-  }
-});
-
-router.post('/unsubscribe', async (req: Request, res: Response) => {
-  try {
-    const endpoint = req.body?.endpoint || req.query?.endpoint;
-    if (!endpoint) {
-      return res.status(400).json({ success: false, error: 'Endpoint is required' });
-    }
-    const success = await removePushSubscription(String(endpoint));
-    res.json({ success });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to remove subscription' });
-  }
-});
 
 // GET /api/notifications/stream - Server-Sent Events (SSE) real-time stream with role isolation
 router.get('/stream', (req: Request, res: Response) => {

@@ -161,7 +161,6 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         min_price: r.min_price,
         max_price: r.max_price,
         total_stock: r.total_stock,
-        low_stock_limit: r.low_stock_limit,
         pairs_per_carton: r.pairs_per_carton,
         primary_image_url: r.primary_image_url,
         description: r.description,
@@ -578,7 +577,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                               {renderFieldError(r, 'max_price')}
                             </td>
 
-                            {/* total_stock & low_stock_limit */}
+                            {/* total_stock */}
                             <td className="py-2.5 px-3 text-center font-mono">
                               <div className="flex items-center justify-center flex-wrap">
                                 <span className="font-bold text-slate-900 dark:text-white">
@@ -586,12 +585,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                                 </span>
                                 {renderAutoBadge(r, 'total_stock')}
                               </div>
-                              <div className="flex items-center justify-center flex-wrap text-[10px] text-slate-400 mt-0.5">
-                                <span>Low limit: {r.low_stock_limit}</span>
-                                {renderAutoBadge(r, 'low_stock_limit')}
-                              </div>
                               {renderFieldError(r, 'total_stock')}
-                              {renderFieldError(r, 'low_stock_limit')}
                             </td>
 
                             {/* Remove row */}

@@ -70,14 +70,33 @@
   <body>
     <div id="root"></div>
 
-    <!-- PWA Root Service Worker Registration (PWABuilder & Chromium WebAPK compliant) -->
+    <!-- PWA Install Prompt Capture & Root Service Worker Registration (PWABuilder & Chromium WebAPK compliant) -->
     <script>
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__deferredPwaPrompt = e;
+        window.dispatchEvent(new Event('pwa-prompt-captured'));
+      });
+
+      window.addEventListener('appinstalled', function () {
+        window.__deferredPwaPrompt = null;
+      });
+
       if ('serviceWorker' in navigator) {
         var registerRootServiceWorker = function () {
+          var hadController = Boolean(navigator.serviceWorker.controller);
+          var refreshing = false;
+
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (hadController && !refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+
           navigator.serviceWorker
             .register('/sw.js', { scope: '/' })
             .then(function (registration) {
-              // Ensure immediate updates if new version is waiting
               if (registration.waiting) {
                 registration.waiting.postMessage({ type: 'SKIP_WAITING' });
               }
@@ -89,6 +108,12 @@
                       newWorker.postMessage({ type: 'SKIP_WAITING' });
                     }
                   });
+                }
+              });
+              registration.update().catch(function () {});
+              document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                  registration.update().catch(function () {});
                 }
               });
             })

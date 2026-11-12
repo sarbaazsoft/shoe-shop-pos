@@ -210,11 +210,9 @@ const mockStore: Record<string, any[]> = {
       invoice_footer: 'Thank you for shopping with us!',
       show_receipt_logo: false,
       receipt_logo: '',
-      low_stock_limit: 5,
+      low_stock_threshold: 5,
       pricing_mode: 'FIXED',
-      pricing_policy_locked: true,
       business_type: 'RETAIL',
-      min_selling_quantity: 1.0,
       allow_half_carton: true,
       updated_at: new Date().toISOString(),
     },
@@ -236,11 +234,9 @@ const mockStore: Record<string, any[]> = {
       invoice_footer: 'Quality footwear for every step.',
       show_receipt_logo: false,
       receipt_logo: '',
-      low_stock_limit: 5,
+      low_stock_threshold: 5,
       pricing_mode: 'NEGOTIABLE',
-      pricing_policy_locked: true,
       business_type: 'RETAIL',
-      min_selling_quantity: 1.0,
       allow_half_carton: true,
       updated_at: new Date().toISOString(),
     },
@@ -262,11 +258,9 @@ const mockStore: Record<string, any[]> = {
       invoice_footer: 'Style and comfort combined.',
       show_receipt_logo: false,
       receipt_logo: '',
-      low_stock_limit: 5,
+      low_stock_threshold: 5,
       pricing_mode: 'FIXED',
-      pricing_policy_locked: true,
       business_type: 'RETAIL',
-      min_selling_quantity: 1.0,
       allow_half_carton: true,
       updated_at: new Date().toISOString(),
     },
@@ -288,11 +282,9 @@ const mockStore: Record<string, any[]> = {
       invoice_footer: 'Walk with confidence.',
       show_receipt_logo: false,
       receipt_logo: '',
-      low_stock_limit: 5,
+      low_stock_threshold: 5,
       pricing_mode: 'FIXED',
-      pricing_policy_locked: true,
       business_type: 'RETAIL',
-      min_selling_quantity: 1.0,
       allow_half_carton: true,
       updated_at: new Date().toISOString(),
     },
@@ -319,9 +311,8 @@ const mockStore: Record<string, any[]> = {
       cost_price: 2500,
       min_price: 3800,
       max_price: 4200,
-      pairs_per_carton: 6,
+      pairs_per_carton: 12,
       total_stock: 20,
-      low_stock_limit: 5,
       allow_half_carton: true,
       active: true,
       created_at: new Date().toISOString(),
@@ -374,9 +365,6 @@ const mockStore: Record<string, any[]> = {
     { key: 'EMAIL_WEBHOOK_URL', value: '', category: 'email', description: 'Custom webhook URL to receive outgoing email payloads', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'RESEND_WEBHOOK_URL', value: '', category: 'email', description: 'Resend delivery webhook URL', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'REQUIRE_EMAIL_VERIFICATION_FOR_FREE_TRIAL', value: 'true', category: 'email', description: 'Require email verification for new free trial registrations before access is activated', is_secret: false, updated_at: new Date().toISOString() },
-    { key: 'VAPID_PUBLIC_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Public Key for browser and PWA push notifications', is_secret: false, updated_at: new Date().toISOString() },
-    { key: 'VAPID_PRIVATE_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Private Key for server notification signing', is_secret: true, updated_at: new Date().toISOString() },
-    { key: 'VAPID_SUBJECT', value: 'mailto:support@sarbaazsoft.com', category: 'notifications', description: 'Web Push contact subject URI or mailto link', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'DISABLE_HMR', value: 'false', category: 'system', description: 'Disable Vite Hot Module Reloading in sandbox environments', is_secret: false, updated_at: new Date().toISOString() },
   ],
   platform_notifications: [],
@@ -1110,10 +1098,9 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
           category: p.category || 'General',
           primary_image_url: p.primary_image_url || '',
           max_price: String(p.max_price || 0),
-          selling_price: String(p.max_price || 0),
           cost_price: String(p.cost_price || 0),
           total_stock: String(p.total_stock || 0),
-          low_stock_limit: String(p.low_stock_limit || 5),
+          low_stock_threshold: String(cs?.low_stock_threshold ?? 5),
           units_sold: String(unitsSold),
           total_revenue: String(totalRev),
           gross_revenue: String(totalRev),
@@ -1190,9 +1177,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         ),
       };
 
-      if (upper.includes('MIN_SELLING_QUANTITY') || upper.includes('CS.MIN_SELLING_QUANTITY')) {
-        rowResult.min_selling_quantity = cs?.min_selling_quantity !== undefined ? Number(cs.min_selling_quantity) : 1.0;
-      }
       if (upper.includes('ALLOW_HALF_CARTON') || upper.includes('CS.ALLOW_HALF_CARTON')) {
         rowResult.allow_half_carton = cs?.allow_half_carton !== undefined ? Boolean(cs.allow_half_carton) : true;
       }
@@ -1408,8 +1392,8 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     let invoice_footer = 'Thank you for shopping with us! Exchanges within 7 days with original receipt.';
     let pricing_mode = 'FIXED';
     let business_type = 'RETAIL';
-    let min_selling_quantity = 1.0;
     let allow_half_carton = true;
+    let low_stock_threshold = 5;
 
     const colMatch = upper.match(/INSERT\s+INTO\s+COMPANY_SETTINGS\s*\(([^)]+)\)/i);
     const valMatch = upper.match(/VALUES\s*\(([^)]+)\)/i);
@@ -1438,8 +1422,8 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         else if (col === 'invoice_footer') invoice_footer = String(v || '');
         else if (col === 'pricing_mode') pricing_mode = String(v || 'FIXED');
         else if (col === 'business_type') business_type = String(v || 'RETAIL');
-        else if (col === 'min_selling_quantity') min_selling_quantity = Number(v || 1.0);
         else if (col === 'allow_half_carton') allow_half_carton = Boolean(v);
+        else if (col === 'low_stock_threshold') low_stock_threshold = Math.max(1, Number(v || 5));
       });
     }
 
@@ -1461,11 +1445,9 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       invoice_footer,
       show_receipt_logo: false,
       receipt_logo: '',
-      low_stock_limit: 5,
+      low_stock_threshold,
       pricing_mode,
-      pricing_policy_locked: false,
       business_type,
-      min_selling_quantity,
       allow_half_carton,
       updated_at: new Date().toISOString(),
     };
@@ -1477,25 +1459,25 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
     const tid = Number(params[params.length - 1]) || 1;
     const cs = mockStore.company_settings.find((c) => Number(c.tenant_id) === tid);
     if (cs) {
-      if (params.length >= 16) {
-        cs.logo = params[0] ?? cs.logo;
-        cs.address = params[1] ?? cs.address;
-        cs.tax_id = params[2] ?? cs.tax_id;
-        cs.strn = params[3] ?? cs.strn;
-        cs.tax_rate = Number(params[4] ?? cs.tax_rate);
-        cs.currency = params[5] ?? cs.currency;
-        cs.currency_symbol = params[6] ?? cs.currency_symbol;
-        if (params[7]) cs.phone = params[7];
-        if (params[8]) cs.email = params[8];
-        cs.invoice_footer = params[10] ?? cs.invoice_footer;
-        cs.low_stock_limit = Number(params[11] ?? cs.low_stock_limit);
-        cs.pricing_mode = params[12] ?? cs.pricing_mode;
-        cs.pricing_policy_locked = true;
-        if (upper.includes('MIN_SELLING_QUANTITY')) {
-          const foundMin = params.find((p, i) => i >= 13 && typeof p === 'number' && (p === 0.5 || p === 1 || p === 1.0));
-          if (foundMin !== undefined) cs.min_selling_quantity = foundMin;
-          const foundHalf = params.find((p, i) => i >= 14 && typeof p === 'boolean');
-          if (foundHalf !== undefined) cs.allow_half_carton = foundHalf;
+      const setMatch = sql.match(/SET\s+([\s\S]+?)\s+WHERE\s+/i);
+      if (setMatch) {
+        const setBody = setMatch[1];
+        const assignRegex = /([a-z_]+)\s*=\s*(?:COALESCE\(NULLIF\(\$(\d+),\s*''\),\s*[a-z_]+\)|\$(\d+))/gi;
+        let m: RegExpExecArray | null;
+        while ((m = assignRegex.exec(setBody)) !== null) {
+          const col = m[1].toLowerCase();
+          const pIdx = Number(m[2] || m[3]) - 1;
+          const val = params[pIdx];
+          if (m[2] && !val) continue;
+          if (col === 'low_stock_threshold') {
+            cs.low_stock_threshold = Math.max(1, Number(val || 5));
+          } else if (col === 'allow_half_carton' || col === 'show_receipt_logo') {
+            (cs as any)[col] = Boolean(val);
+          } else if (col === 'tax_rate') {
+            (cs as any)[col] = Number(val || 0);
+          } else if (val !== undefined) {
+            (cs as any)[col] = val;
+          }
         }
       }
       cs.updated_at = new Date().toISOString();
@@ -1799,13 +1781,16 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       (p) => p.active !== false && (!tid || Number(p.tenant_id) === tid)
     );
     if (upper.includes('AS TOTAL_PRODUCTS') && upper.includes('AS OUT_OF_STOCK_COUNT')) {
+      const storeThreshold = Number(
+        mockStore.company_settings.find((c) => !tid || Number(c.tenant_id) === tid)?.low_stock_threshold ?? 5
+      );
       return {
         rows: [
           {
             total_products: String(storeProds.length),
             total_stock_units: String(storeProds.reduce((s, p) => s + Number(p.total_stock || 0), 0)),
             low_stock_count: String(
-              storeProds.filter((p) => Number(p.total_stock || 0) <= Number(p.low_stock_limit || 5) && Number(p.total_stock || 0) > 0).length
+              storeProds.filter((p) => Number(p.total_stock || 0) <= storeThreshold && Number(p.total_stock || 0) > 0).length
             ),
             out_of_stock_count: String(storeProds.filter((p) => Number(p.total_stock || 0) <= 0).length),
           } as unknown as T,
@@ -1851,7 +1836,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
   if (upper.startsWith('INSERT INTO PRODUCTS')) {
     const tid = Number(params[0]) || 1;
     const storeProds = mockStore.products.filter((p) => Number(p.tenant_id) === tid);
-    const isFullInsert = params.length >= 15;
+    const isFullInsert = params.length >= 14;
     const hasAllowHalfCarton = upper.includes('ALLOW_HALF_CARTON');
     const newProd = isFullInsert
       ? {
@@ -1861,17 +1846,16 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
           name: String(params[2] || 'Shoe Product'),
           brand: String(params[3] || 'Unbranded'),
           category: String(params[4] || 'Men'),
-          article: String(params[6] || 'SH-01'),
-          barcode: String(params[7] || `BC-${Date.now()}`),
-          primary_image_url: String(params[8] || ''),
-          description: String(params[9] || ''),
-          cost_price: Number(params[10] || 0),
-          min_price: Number(params[11] || 0),
-          max_price: Number(params[12] || 0),
-          pairs_per_carton: params.length >= 16 ? Number(params[13] || 12) : 12,
+          article: String(params[5] || 'SH-01'),
+          barcode: String(params[6] || `BC-${Date.now()}`),
+          primary_image_url: String(params[7] || ''),
+          description: String(params[8] || ''),
+          cost_price: Number(params[9] || 0),
+          min_price: Number(params[10] || 0),
+          max_price: Number(params[11] || 0),
+          pairs_per_carton: Number(params[12] || 12),
           allow_half_carton: hasAllowHalfCarton ? Boolean(params.find((p, idx) => idx >= 13 && typeof p === 'boolean') ?? true) : true,
-          total_stock: params.length >= 16 ? Number(params[14] || 0) : Number(params[13] || 0),
-          low_stock_limit: params.length >= 16 ? Number(params[15] || 5) : Number(params[14] || 5),
+          total_stock: Number(params[13] || 0),
           active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -1882,16 +1866,15 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
           tenant_product_no: storeProds.length + 1,
           name: String(params[1] || 'Shoe Product'),
           article: String(params[1] || 'SH-01'),
-          barcode: String(params[3] || `BC-${Date.now()}`),
-          brand: String(params[4] || 'Unbranded'),
-          category: String(params[5] || 'Casual Shoes'),
-          cost_price: Number(params[6] || 2000),
-          min_price: Number(params[7] || 3000),
-          max_price: Number(params[8] || 3500),
+          barcode: String(params[2] || `BC-${Date.now()}`),
+          brand: String(params[3] || 'Unbranded'),
+          category: String(params[4] || 'Casual Shoes'),
+          cost_price: Number(params[5] || 2000),
+          min_price: Number(params[6] || 3000),
+          max_price: Number(params[7] || 3500),
           pairs_per_carton: 12,
           allow_half_carton: true,
-          total_stock: Number(params[9] || 15),
-          low_stock_limit: Number(params[10] || 5),
+          total_stock: Number(params[8] || 15),
           primary_image_url: '',
           description: '',
           active: true,
@@ -1912,7 +1895,7 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       }
       return { rows: [], rowCount: 1 };
     }
-    if (upper.includes('WHERE ID = $17 AND COALESCE(TENANT_ID, 1) = $18') || upper.includes('WHERE ID = $16 AND COALESCE(TENANT_ID, 1) = $17') || upper.includes('WHERE ID = $15 AND COALESCE(TENANT_ID, 1) = $16')) {
+    if (upper.includes('WHERE ID = $15 AND COALESCE(TENANT_ID, 1) = $16')) {
       const targetId = Number(params[params.length - 2]);
       const tid = Number(params[params.length - 1]) || 1;
       const prod = mockStore.products.find((p) => Number(p.id) === targetId && Number(p.tenant_id || 1) === tid);
@@ -1920,21 +1903,17 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
         prod.name = String(params[0] ?? prod.name);
         prod.brand = String(params[1] ?? prod.brand);
         prod.category = String(params[2] ?? prod.category);
-        prod.article = String(params[4] ?? prod.article);
-        prod.barcode = String(params[5] ?? prod.barcode);
-        prod.pairs_per_carton = Number(params[6] ?? prod.pairs_per_carton ?? 12);
-        prod.primary_image_url = String(params[7] ?? prod.primary_image_url);
-        prod.description = String(params[8] ?? prod.description);
-        prod.cost_price = Number(params[9] ?? prod.cost_price);
-        prod.total_stock = Number(params[10] ?? prod.total_stock);
-        prod.low_stock_limit = Number(params[11] ?? prod.low_stock_limit);
-        prod.active = Boolean(params[12] ?? prod.active);
-        prod.min_price = Number(params[13] ?? prod.min_price);
-        prod.max_price = Number(params[14] ?? prod.max_price);
-        if (upper.includes('ALLOW_HALF_CARTON = $')) {
-          const foundBool = params.find((x) => typeof x === 'boolean');
-          if (foundBool !== undefined) prod.allow_half_carton = foundBool;
-        }
+        prod.article = String(params[3] ?? prod.article);
+        prod.barcode = String(params[4] ?? prod.barcode);
+        prod.pairs_per_carton = Number(params[5] ?? prod.pairs_per_carton ?? 12);
+        prod.primary_image_url = String(params[6] ?? prod.primary_image_url);
+        prod.description = String(params[7] ?? prod.description);
+        prod.cost_price = Number(params[8] ?? prod.cost_price);
+        prod.total_stock = Number(params[9] ?? prod.total_stock);
+        prod.active = Boolean(params[10] ?? prod.active);
+        prod.min_price = Number(params[11] ?? prod.min_price);
+        prod.max_price = Number(params[12] ?? prod.max_price);
+        prod.allow_half_carton = Boolean(params[13] ?? prod.allow_half_carton ?? true);
         prod.updated_at = new Date().toISOString();
         return { rows: [prod as unknown as T], rowCount: 1 };
       }

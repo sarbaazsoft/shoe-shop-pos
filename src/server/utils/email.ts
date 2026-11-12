@@ -143,11 +143,7 @@ export async function getActiveEmailProvider(): Promise<'resend' | 'gmail'> {
   try {
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT value FROM public.app_settings WHERE UPPER(key) IN ('ACTIVE_EMAIL_PROVIDER', 'ACTIVE_PROVIDER') LIMIT 1`
-    ).catch(async () => {
-      return await pgClient.query<{ key: string; value: string }>(
-        `SELECT value FROM public.app_setting WHERE UPPER(key) IN ('ACTIVE_EMAIL_PROVIDER', 'ACTIVE_PROVIDER') LIMIT 1`
-      );
-    });
+    );
     if (res.rows.length > 0 && res.rows[0].value) {
       const val = res.rows[0].value.trim().toLowerCase();
       if (val === 'gmail') return 'gmail';
@@ -162,7 +158,7 @@ export async function getActiveEmailProvider(): Promise<'resend' | 'gmail'> {
 }
 
 /**
- * Dynamically retrieves Gmail SMTP credentials directly from the database app_setting / app_settings table.
+ * Dynamically retrieves Gmail SMTP credentials directly from the database app_settings table.
  */
 export async function getDynamicGmailCredentials(): Promise<{ user: string; pass: string; fromName: string }> {
   let user = '';
@@ -171,11 +167,7 @@ export async function getDynamicGmailCredentials(): Promise<{ user: string; pass
   try {
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT key, value FROM public.app_settings WHERE UPPER(key) IN ('GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_FROM_NAME', 'GMAIL_SENDER_NAME')`
-    ).catch(async () => {
-      return await pgClient.query<{ key: string; value: string }>(
-        `SELECT key, value FROM public.app_setting WHERE UPPER(key) IN ('GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_FROM_NAME', 'GMAIL_SENDER_NAME')`
-      );
-    });
+    );
     for (const row of res.rows) {
       const k = row.key.toUpperCase();
       if (k === 'GMAIL_USER') user = (row.value || '').trim();
@@ -194,23 +186,19 @@ export async function getDynamicGmailCredentials(): Promise<{ user: string; pass
 }
 
 /**
- * Dynamically retrieves the Resend API key directly from the database app_setting / app_settings table.
+ * Dynamically retrieves the Resend API key directly from the database app_settings table.
  * Strictly adheres to requirement: Do NOT use .env for resend_api_key.
  */
 export async function getDynamicResendApiKey(): Promise<string> {
   try {
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT key, value FROM public.app_settings WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
-    ).catch(async () => {
-      return await pgClient.query<{ key: string; value: string }>(
-        `SELECT key, value FROM public.app_setting WHERE UPPER(key) = 'RESEND_API_KEY' LIMIT 1`
-      );
-    });
+    );
     if (res.rows.length > 0 && res.rows[0].value) {
       return res.rows[0].value.trim();
     }
   } catch (dbErr) {
-    console.error('[email.ts] Error dynamically querying app_setting table for resend_api_key:', dbErr);
+    console.error('[email.ts] Error dynamically querying app_settings table for resend_api_key:', dbErr);
   }
 
   // Fallback to database-synced cache only (never process.env / .env)
@@ -267,12 +255,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
     const res = await pgClient.query<{ key: string; value: string }>(
       `SELECT key, value FROM public.app_settings 
        WHERE key IN ('RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
-    ).catch(async () => {
-      return await pgClient.query<{ key: string; value: string }>(
-        `SELECT key, value FROM public.app_setting 
-         WHERE key IN ('RESEND_FROM', 'RESEND_FROM_EMAIL', 'EMAIL_WEBHOOK_URL', 'RESEND_WEBHOOK_URL')`
-      );
-    });
+    );
     for (const row of res.rows) {
       if (row.key === 'RESEND_FROM' && row.value?.trim()) resendFrom = row.value.trim();
       else if (row.key === 'RESEND_FROM_EMAIL' && row.value?.trim()) resendFromEmail = row.value.trim();

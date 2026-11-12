@@ -46,6 +46,8 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   const [visibleSalesCount, setVisibleSalesCount] = useState<number>(25);
 
   const currencySymbol = companySettings?.currency_symbol || companySettings?.currencySymbol || 'Rs.';
+  const globalLowStockThreshold =
+    Number(companySettings?.lowStockThreshold ?? companySettings?.low_stock_threshold ?? 5) || 5;
 
   const isRefreshingRef = useRef(false);
   const isRefreshingPLRef = useRef(false);
@@ -873,7 +875,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400">
-                            {p.low_stock_limit ?? p.lowStockLimit ?? 5}
+                            {globalLowStockThreshold}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                             {currencySymbol} {formatStockPrice(p.minSalePrice || p.min_sale_price || 0)}
@@ -1274,7 +1276,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 ) : (
                   lowStockList.map((p: any) => {
                     const remaining = p.total_stock ?? p.totalStock ?? 0;
-                    const limit = p.low_stock_limit ?? p.lowStockLimit ?? 5;
+                    const limit = globalLowStockThreshold;
                     const isOut = remaining <= 0;
                     return (
                       <tr key={p.id} className="table-row-hover border-b border-slate-100 dark:border-slate-800/80">

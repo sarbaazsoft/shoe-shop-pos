@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pgClient } from '../../db/index.ts';
-import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions, ensureTelegramSettingsSchema } from '../../db/schemaInit.ts';
+import { ensureSaasControlPlane, normalizeSubscriptionPlan, normalizeSubscriptionType, calculateSubscriptionEndDate, calculateDaysLeft, syncExpiredTenantSubscriptions } from '../../db/schemaInit.ts';
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
@@ -183,14 +183,8 @@ function buildSubscriptionInfo(tenantRow?: any) {
 }
 
 function formatSettingsResponse(s: any, tenantRow?: any) {
-  const isLocked = tenantRow
-    ? Boolean(tenantRow.onboarding_completed)
-    : Boolean(s.pricing_policy_locked ?? true);
+  const isSetupLocked = tenantRow ? Boolean(tenantRow.onboarding_completed) : false;
   const mode = String(s.pricing_mode || 'FIXED').toUpperCase() === 'NEGOTIABLE' ? 'NEGOTIABLE' : 'FIXED';
-  const isSetupLocked = tenantRow
-    ? Boolean(tenantRow.onboarding_completed)
-    : Boolean(s.pricing_policy_locked ?? true);
-  const locked = isLocked;
   const logo = s.logo || '';
   const receiptLogo = s.receipt_logo || logo || '';
   const showReceiptLogo = Boolean(s.show_receipt_logo);
@@ -200,14 +194,8 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     String(s.business_type || 'RETAIL').toUpperCase() === 'WHOLESALE'
       ? 'WHOLESALE'
       : 'RETAIL';
-  const allowHalfCarton = s.allow_half_carton !== undefined
-    ? Boolean(s.allow_half_carton)
-    : (s.min_selling_quantity !== undefined && s.min_selling_quantity !== null
-        ? parseFloat(String(s.min_selling_quantity)) <= 0.5
-        : true);
-  const minSellingQuantity = s.min_selling_quantity !== undefined && s.min_selling_quantity !== null
-    ? parseFloat(String(s.min_selling_quantity))
-    : (allowHalfCarton ? 0.5 : 1.0);
+  const allowHalfCarton = s.allow_half_carton !== undefined ? Boolean(s.allow_half_carton) : true;
+  const lowStockThreshold = Math.max(1, Number(s.low_stock_threshold ?? 5) || 5);
 
   return {
     id: s.id,
@@ -215,9 +203,8 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     tenantStatus: tenantRow?.status || 'ACTIVE',
     businessType,
     business_type: businessType,
-    minSellingQuantity,
-    min_selling_quantity: minSellingQuantity,
     allowHalfCarton,
+    allow_half_carton: allowHalfCarton,
     subscriptionPlan: subInfo.subscriptionPlan,
     subscription_plan: subInfo.subscriptionPlan,
     subscriptionType: subInfo.subscriptionType,
@@ -229,7 +216,7 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     daysRemaining: subInfo.daysRemaining,
     pendingRenewalRequest: subInfo.pendingRenewalRequest,
     subscriptionInfo: subInfo,
-    isOnboarded: tenantRow ? Boolean(tenantRow.onboarding_completed) : true,
+    isOnboarded: isSetupLocked,
     onboardingCompleted: isSetupLocked,
     initialSetupLocked: isSetupLocked,
     welcomeDismissed: Boolean(tenantRow?.welcome_dismissed),
@@ -250,10 +237,9 @@ function formatSettingsResponse(s: any, tenantRow?: any) {
     currencyName: s.currency_name || 'Pakistani Rupee',
     currencySymbol: s.currency_symbol || 'Rs.',
     invoiceFooter: s.invoice_footer || '',
-    lowStockLimit: s.low_stock_limit,
+    lowStockThreshold,
+    low_stock_threshold: lowStockThreshold,
     pricingMode: mode,
-    pricingPolicyLocked: locked,
-    pricing_policy_locked: locked,
     updatedAt: s.updated_at,
   };
 }
@@ -392,8 +378,8 @@ function filterAppLevelSettings(data: { byKey: Record<string, string>; grouped: 
   };
 }
 
-// GET /api/settings/app, /api/settings/system, /api/settings/global, /api/settings/root - Exclusively Platform Owner
-router.get(['/app', '/system', '/global', '/root', '/system-settings'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/settings/app - Exclusively Platform Owner
+router.get('/app', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const appSettingsData = await getAllAppSettings(req.user?.role);
     const filtered = filterAppLevelSettings(appSettingsData);
@@ -404,32 +390,8 @@ router.get(['/app', '/system', '/global', '/root', '/system-settings'], requireA
   }
 });
 
-// PUT /api/settings/app, /api/settings/system, /api/settings/global, /api/settings/root - Exclusively Platform Owner
-router.put(['/app', '/system', '/global', '/root', '/system-settings'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const updates = req.body?.appSettings || req.body || {};
-    if (!updates || typeof updates !== 'object') {
-      return res.status(400).json({ error: 'appSettings payload object is required.' });
-    }
-    // Remove store-level prefixes if sent
-    delete updates.INVOICE_PREFIX;
-    delete updates.PURCHASE_PREFIX;
-
-    await updateAppSettings(updates, req.user?.role);
-    const allAppSettings = await getAllAppSettings(req.user?.role);
-    const filtered = filterAppLevelSettings(allAppSettings);
-    return res.json({
-      message: 'Application settings updated successfully.',
-      ...filtered,
-    });
-  } catch (err: any) {
-    const status = err.statusCode || 500;
-    return res.status(status).json({ error: 'Failed to update app settings: ' + err.message });
-  }
-});
-
-// POST /api/settings/app, /api/settings/system, /api/settings/global, /api/settings/root - Exclusively Platform Owner
-router.post(['/app', '/system', '/global', '/root', '/system-settings'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+// PUT /api/settings/app - Exclusively Platform Owner
+router.put('/app', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const updates = req.body?.appSettings || req.body || {};
     if (!updates || typeof updates !== 'object') {
@@ -451,8 +413,31 @@ router.post(['/app', '/system', '/global', '/root', '/system-settings'], require
   }
 });
 
-// PATCH /api/settings/app, /api/settings/system, /api/settings/global, /api/settings/root - Exclusively Platform Owner
-router.patch(['/app', '/system', '/global', '/root', '/system-settings'], requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/settings/app - Exclusively Platform Owner
+router.post('/app', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const updates = req.body?.appSettings || req.body || {};
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'appSettings payload object is required.' });
+    }
+    delete updates.INVOICE_PREFIX;
+    delete updates.PURCHASE_PREFIX;
+
+    await updateAppSettings(updates, req.user?.role);
+    const allAppSettings = await getAllAppSettings(req.user?.role);
+    const filtered = filterAppLevelSettings(allAppSettings);
+    return res.json({
+      message: 'Application settings updated successfully.',
+      ...filtered,
+    });
+  } catch (err: any) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: 'Failed to update app settings: ' + err.message });
+  }
+});
+
+// PATCH /api/settings/app - Exclusively Platform Owner
+router.patch('/app', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const updates = req.body?.appSettings || req.body || {};
     if (!updates || typeof updates !== 'object') {
@@ -582,9 +567,10 @@ router.get('/', async (req: Request, res: Response) => {
         currency_name: 'Pakistani Rupee',
         currencySymbol: 'Rs.',
         currency_symbol: 'Rs.',
+        lowStockThreshold: 5,
+        low_stock_threshold: 5,
         pricingMode: 'FIXED',
-        pricingPolicyLocked: false,
-        pricing_policy_locked: false,
+        onboardingCompleted: false,
       },
     });
   }
@@ -594,8 +580,6 @@ router.get('/', async (req: Request, res: Response) => {
 const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) => {
   try {
     await ensureSettingsPricingColumns();
-
-    await ensureTelegramSettingsSchema();
 
     const userRole = String(req.user?.role || '').toUpperCase();
     const isPlatformOwner = userRole === 'SUPERADMIN';
@@ -633,27 +617,22 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
     const receiptLogo = req.body.receipt_logo ?? req.body.receiptLogo ?? logo;
     const showReceiptLogo = Boolean(req.body.show_receipt_logo ?? req.body.showReceiptLogo ?? false);
     const invoiceFooter = req.body.invoice_footer || req.body.invoiceFooter || '';
-    const lowStockLimit = parseInt(req.body.low_stock_limit || req.body.lowStockLimit, 10) || 5;
+    const lowStockThreshold = Math.max(
+      1,
+      parseInt(String(req.body.low_stock_threshold ?? req.body.lowStockThreshold ?? 5), 10) || 5
+    );
 
     const [currentSettingsRes, tenantRes] = await Promise.all([
       pgClient.query<{
         id: number;
-        pricing_policy_locked: boolean;
         pricing_mode: string;
         business_type: string;
+        allow_half_carton: boolean;
         currency: string;
         currency_name: string;
         currency_symbol: string;
-        telegram_bot_token?: string;
-        telegram_chat_id?: string;
-        telegram_alerts_enabled?: boolean;
-        email_alerts_enabled?: boolean;
-        gmail_user?: string;
-        gmail_app_password?: string;
-        gmail_from_name?: string;
-        active_alert_provider?: string;
       }>(
-        'SELECT id, pricing_policy_locked, pricing_mode, business_type, currency, currency_name, currency_symbol, telegram_bot_token, telegram_chat_id, telegram_alerts_enabled, email_alerts_enabled, gmail_user, gmail_app_password, gmail_from_name, active_alert_provider FROM company_settings WHERE tenant_id = $1 LIMIT 1',
+        'SELECT id, pricing_mode, business_type, allow_half_carton, currency, currency_name, currency_symbol FROM company_settings WHERE tenant_id = $1 LIMIT 1',
         [tenantId]
       ),
       pgClient.query<{
@@ -668,10 +647,8 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
 
     const currentRow = currentSettingsRes.rows[0];
 
-    // Core business type and pricing policy reside in company_settings and are immutable once setup is locked.
-    const isLocked = tenantRes.rows[0]
-      ? Boolean(tenantRes.rows[0].onboarding_completed)
-      : Boolean(currentRow?.pricing_policy_locked ?? false);
+    // Core business type and pricing policy are immutable once store onboarding is completed.
+    const isLocked = Boolean(tenantRes.rows[0]?.onboarding_completed);
 
     const requestedBusinessType = String(
       isLocked ? currentRow?.business_type || 'RETAIL' : req.body.business_type || req.body.businessType || currentRow?.business_type || 'RETAIL'
@@ -712,24 +689,13 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(400).json({ error: 'currency_symbol is required (e.g., "Rs.", "$", "PKR").' });
     }
 
-    const rawMinQty = req.body.min_selling_quantity ?? req.body.minSellingQuantity;
     const rawAllowHalf = req.body.allow_half_carton ?? req.body.allowHalfCarton;
-    let finalMinSellingQuantity = (currentRow as any)?.min_selling_quantity !== undefined && (currentRow as any)?.min_selling_quantity !== null
-      ? parseFloat(String((currentRow as any).min_selling_quantity))
-      : 1.0;
-    let finalAllowHalfCarton = (currentRow as any)?.allow_half_carton !== undefined
-      ? Boolean((currentRow as any).allow_half_carton)
+    let finalAllowHalfCarton = currentRow?.allow_half_carton !== undefined
+      ? Boolean(currentRow.allow_half_carton)
       : true;
 
-    if (finalBusinessType === 'WHOLESALE') {
-      if (rawMinQty !== undefined && rawMinQty !== null && String(rawMinQty).trim() !== '') {
-        const parsed = parseFloat(String(rawMinQty));
-        finalMinSellingQuantity = parsed <= 0.5 ? 0.5 : 1.0;
-        finalAllowHalfCarton = finalMinSellingQuantity <= 0.5;
-      } else if (rawAllowHalf !== undefined && rawAllowHalf !== null) {
-        finalAllowHalfCarton = String(rawAllowHalf) === 'true' || rawAllowHalf === true;
-        finalMinSellingQuantity = finalAllowHalfCarton ? 0.5 : 1.0;
-      }
+    if (finalBusinessType === 'WHOLESALE' && rawAllowHalf !== undefined && rawAllowHalf !== null) {
+      finalAllowHalfCarton = String(rawAllowHalf) === 'true' || rawAllowHalf === true;
     }
 
     let updateRes;
@@ -739,12 +705,12 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
            phone = $1, email = $2, address = $3,
            strn = $4, tax_id = $5, website = $6, logo = $7,
            currency_name = $8, currency = $9, currency_symbol = $10,
-           invoice_footer = $11, low_stock_limit = $12,
-           pricing_mode = $13, business_type = $14, pricing_policy_locked = $15,
-           min_selling_quantity = $16, allow_half_carton = $17,
-           show_receipt_logo = $18, receipt_logo = $19,
+           invoice_footer = $11, low_stock_threshold = $12,
+           pricing_mode = $13, business_type = $14,
+           allow_half_carton = $15,
+           show_receipt_logo = $16, receipt_logo = $17,
            updated_at = NOW()
-         WHERE id = $20 AND tenant_id = $21
+         WHERE id = $18 AND tenant_id = $19
          RETURNING *`,
         [
           effectiveCompanyPhone,
@@ -758,11 +724,9 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           finalCurrencyCode,
           finalCurrencySymbol,
           invoiceFooter,
-          lowStockLimit,
+          lowStockThreshold,
           finalPricingMode,
           finalBusinessType,
-          isLocked,
-          finalMinSellingQuantity,
           finalAllowHalfCarton,
           showReceiptLogo,
           receiptLogo,
@@ -775,8 +739,8 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
         `INSERT INTO company_settings (
            tenant_id, phone, email, address, strn, tax_id, website, logo,
            currency_name, currency, currency_symbol,
-           invoice_footer, low_stock_limit, pricing_mode, business_type, min_selling_quantity, allow_half_carton, pricing_policy_locked, show_receipt_logo, receipt_logo
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+           invoice_footer, low_stock_threshold, pricing_mode, business_type, allow_half_carton, show_receipt_logo, receipt_logo
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING *`,
         [
           tenantId,
@@ -791,12 +755,10 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
           finalCurrencyCode,
           finalCurrencySymbol,
           invoiceFooter,
-          lowStockLimit,
+          lowStockThreshold,
           finalPricingMode,
           finalBusinessType,
-          finalMinSellingQuantity,
           finalAllowHalfCarton,
-          isLocked,
           showReceiptLogo,
           receiptLogo,
         ]
@@ -812,7 +774,7 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
       .catch(() => {});
 
     // For wholesale stores that globally disallow half cartons, set allow_half_carton = false across the entire product catalog
-    if (finalBusinessType === 'WHOLESALE' && (!finalAllowHalfCarton || finalMinSellingQuantity > 0.5)) {
+    if (finalBusinessType === 'WHOLESALE' && !finalAllowHalfCarton) {
       await pgClient.query('UPDATE products SET allow_half_carton = false WHERE COALESCE(tenant_id, 1) = $1', [tenantId]).catch(() => {});
     }
 
@@ -830,82 +792,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
 router.post('/', requireAuth, requireAdmin, handleUpdateSettings);
 router.put('/', requireAuth, requireAdmin, handleUpdateSettings);
 router.patch('/', requireAuth, requireAdmin, handleUpdateSettings);
-router.post('/change', requireAuth, requireAdmin, handleUpdateSettings);
-router.patch('/change', requireAuth, requireAdmin, handleUpdateSettings);
-router.put('/change', requireAuth, requireAdmin, handleUpdateSettings);
-router.post('/changeSetting', requireAuth, requireAdmin, handleUpdateSettings);
-router.put('/changeSetting', requireAuth, requireAdmin, handleUpdateSettings);
-router.patch('/changeSetting', requireAuth, requireAdmin, handleUpdateSettings);
-router.post('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
-router.put('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
-router.patch('/change-setting', requireAuth, requireAdmin, handleUpdateSettings);
-
-// POST /api/settings/alert-providers - Exclusively SuperAdmin configuration for System Alert Notification Providers
-router.post('/alert-providers', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    await ensureTelegramSettingsSchema();
-    const tenantId = await resolvePublicOrAuthTenantId(req);
-
-    const telegramBotToken = req.body.telegram_bot_token !== undefined ? String(req.body.telegram_bot_token).trim() : undefined;
-    const telegramChatId = req.body.telegram_chat_id !== undefined ? String(req.body.telegram_chat_id).trim() : undefined;
-    const telegramAlertsEnabled = req.body.telegram_alerts_enabled !== undefined ? Boolean(req.body.telegram_alerts_enabled) : undefined;
-    const emailAlertsEnabled = req.body.email_alerts_enabled !== undefined ? Boolean(req.body.email_alerts_enabled) : undefined;
-    const gmailUser = req.body.gmail_user !== undefined ? String(req.body.gmail_user).trim() : undefined;
-    const gmailAppPassword = req.body.gmail_app_password !== undefined ? String(req.body.gmail_app_password).trim() : undefined;
-    const gmailFromName = req.body.gmail_from_name !== undefined ? String(req.body.gmail_from_name).trim() : undefined;
-    const activeAlertProvider = req.body.active_alert_provider !== undefined ? String(req.body.active_alert_provider).trim().toLowerCase() : undefined;
-
-    // 1. Update company_settings for current/primary tenant
-    await pgClient.query(
-      `UPDATE company_settings
-       SET telegram_bot_token = COALESCE($1, telegram_bot_token),
-           telegram_chat_id = COALESCE($2, telegram_chat_id),
-           telegram_alerts_enabled = COALESCE($3, telegram_alerts_enabled),
-           email_alerts_enabled = COALESCE($4, email_alerts_enabled),
-           gmail_user = COALESCE($5, gmail_user),
-           gmail_app_password = COALESCE($6, gmail_app_password),
-           gmail_from_name = COALESCE($7, gmail_from_name),
-           active_alert_provider = COALESCE($8, active_alert_provider),
-           updated_at = NOW()
-       WHERE tenant_id = $9`,
-      [
-        telegramBotToken,
-        telegramChatId,
-        telegramAlertsEnabled,
-        emailAlertsEnabled,
-        gmailUser,
-        gmailAppPassword,
-        gmailFromName,
-        activeAlertProvider,
-        tenantId,
-      ]
-    );
-
-    // 2. Synchronize Telegram provider defaults in app_settings without overwriting platform transactional email credentials
-    const appUpdates: Record<string, any> = {};
-    if (telegramBotToken !== undefined) appUpdates.TELEGRAM_BOT_TOKEN = telegramBotToken;
-    if (telegramChatId !== undefined) appUpdates.TELEGRAM_SUPERADMIN_CHAT_ID = telegramChatId;
-    if (telegramAlertsEnabled !== undefined) appUpdates.TELEGRAM_ALERTS_ENABLED = String(telegramAlertsEnabled);
-    if (activeAlertProvider !== undefined) appUpdates.ACTIVE_ALERT_PROVIDER = activeAlertProvider;
-    if (emailAlertsEnabled !== undefined) appUpdates.EMAIL_POS_ALERTS_ENABLED = String(emailAlertsEnabled);
-
-    if (Object.keys(appUpdates).length > 0) {
-      await updateAppSettings(appUpdates, 'SUPERADMIN', { allowInternal: true });
-    }
-
-    const csRes = await pgClient.query('SELECT * FROM company_settings WHERE tenant_id = $1 LIMIT 1', [tenantId]);
-    return res.json({
-      success: true,
-      message: 'System alert notification providers updated successfully.',
-      settings: csRes.rows[0] || {},
-    });
-  } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update alert providers: ' + (err?.message || 'Unknown error'),
-    });
-  }
-});
 
 // POST /api/settings/test-fcm - SuperAdmin verification endpoint to test Firebase Cloud Messaging
 router.post('/test-fcm', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -919,21 +805,6 @@ router.post('/test-fcm', requireAuth, requireSuperAdmin, async (req: Authenticat
       error: err?.message,
     });
   }
-});
-
-// Legacy endpoint redirects for backward-compatibility
-router.post('/test-telegram', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
-  res.status(410).json({
-    success: false,
-    message: 'Telegram push notifications have been retired. Firebase Cloud Messaging (FCM) is now the exclusive push provider.',
-  });
-});
-
-router.post('/test-gmail', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
-  res.status(410).json({
-    success: false,
-    message: 'Gmail web push alerts have been retired. Firebase Cloud Messaging (FCM) is now the exclusive push provider.',
-  });
 });
 
 
