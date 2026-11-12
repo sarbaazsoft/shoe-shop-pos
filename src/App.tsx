@@ -19,6 +19,7 @@ import { OfflineToastNotification } from './components/common/OfflineToastNotifi
 import { PushNotificationSoftPrompt } from './components/notifications/PushNotificationSoftPrompt.tsx';
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
+import { LoadingWindow } from './components/common/LoadingWindow.tsx';
 import { SammiAssistantView } from './components/chat/SammiAssistantView.tsx';
 import { UnknownStore404View } from './components/saas/UnknownStore404View.tsx';
 import { SuspendedStoreView } from './components/saas/SuspendedStoreView.tsx';
@@ -1333,17 +1334,22 @@ export default function App() {
       {/* 0. AUTH ROUTE (/auth?tenantId=...) */}
       {saasMode === 'AUTH' && (
         shouldShowTenantLoading ? (
-          <TenantWorkspaceSkeleton
+          <LoadingWindow
+            isAdmin={false}
             storeName={
               isRequestedTenantVerified
                 ? storeLoginTarget?.name || effectiveStoreName
                 : (tenantIdParam ? `Store #${tenantIdParam}` : 'Store Workspace')
             }
-            activeTab={currentTab}
             statusMessage={
               isRequestedTenantVerified
                 ? `Loading ${storeLoginTarget?.name || 'Store'}...`
                 : (tenantIdParam ? `Connecting to store #${tenantIdParam}...` : 'Loading sign in...')
+            }
+            logoSrc={
+              storeLoginTarget
+                ? ((storeLoginTarget as any).logo || (storeLoginTarget as any).logo_url || storeLoginTarget.logoUrl)
+                : null
             }
           />
         ) : (
@@ -1372,34 +1378,31 @@ export default function App() {
       {saasMode === 'LANDING' && (
         shouldShowTenantLoading ? (
           Boolean(tenantIdParam) ? (
-            <TenantWorkspaceSkeleton
+            <LoadingWindow
+              isAdmin={false}
               storeName={
                 isRequestedTenantVerified
                   ? storeLoginTarget?.name || effectiveStoreName
                   : (tenantIdParam ? `Store #${tenantIdParam}` : 'Store Workspace')
               }
-              activeTab={currentTab}
               statusMessage={
                 isRequestedTenantVerified
                   ? `Loading ${storeLoginTarget?.name || 'Store'}...`
                   : `Connecting to store #${tenantIdParam}...`
               }
+              logoSrc={
+                storeLoginTarget
+                  ? ((storeLoginTarget as any).logo || (storeLoginTarget as any).logo_url || storeLoginTarget.logoUrl)
+                  : null
+              }
             />
           ) : (
-            <PublicLayout
+            <LoadingWindow
+              isAdmin={false}
               storeName="SarbaazSoft Shoe POS"
-              badgeText="Connecting..."
-              badgeVariant="connecting"
+              statusMessage="Loading SarbaazSoft Shoe POS..."
               subtitle="Dual-engine wholesale shoe shop POS"
-              dbText="Secure platform sign-in"
-            >
-              <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">
-                <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-4">
-                  Loading SarbaazSoft Shoe POS...
-                </p>
-              </div>
-            </PublicLayout>
+            />
           )
         ) : isLoginModalOpen ? (
           <>
@@ -1512,18 +1515,12 @@ export default function App() {
       {/* 2. SUPERADMIN CONTROL PANEL (`/admin`) */}
       {saasMode === 'SUPERADMIN' && (
         isInitializing ? (
-          <PublicLayout
+          <LoadingWindow
+            isAdmin={true}
             storeName="POS SaaS C-Panel"
-            badgeText="Connecting..."
-            badgeVariant="connecting"
-            subtitle="Loading platform control plane"
-            dbText="Platform Online"
-          >
-            <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">
-              <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-4">Loading platform...</p>
-            </div>
-          </PublicLayout>
+            statusMessage="Loading SuperAdmin Control Plane..."
+            subtitle="Loading platform telemetry, tenant directory, and security controls..."
+          />
         ) : (
           <SuperAdminControlPanel
             currentUser={currentUser}
@@ -1619,24 +1616,20 @@ export default function App() {
       {saasMode === 'TENANT_ACTIVE' && (
         <>
           {(isInitializing || !isRequestedTenantVerified) ? (
-            <TenantWorkspaceSkeleton
+            <LoadingWindow
+              isAdmin={false}
               storeName={effectiveStoreName || (activeTenant?.name ? activeTenant.name : 'Store Workspace')}
-              activeTab={currentTab}
               statusMessage={effectiveStoreName ? `Loading ${effectiveStoreName} Workspace...` : 'Synchronizing Store Workspace...'}
+              logoSrc={(activeTenant as any)?.logo || (activeTenant as any)?.logo_url || activeTenant?.logoUrl}
             />
           ) : !currentUser ? (
-            <PublicLayout
+            <LoadingWindow
+              isAdmin={false}
               storeName={effectiveStoreName || 'Store Workspace'}
-              badgeText="Store sign-in"
-              badgeVariant="connecting"
+              statusMessage="Redirecting to the shared sign-in page…"
               subtitle="Powered by SarbaazSoft Shoe POS"
-              dbText="Tenant Scoped"
-            >
-              <div className="bg-white/95 dark:bg-[#131B2E]/95 rounded-3xl p-8 shadow-2xl border border-white/30 dark:border-purple-800/60 flex flex-col items-center max-w-sm w-full mx-4 text-center">
-                <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-4">Redirecting to the shared sign-in page…</p>
-              </div>
-            </PublicLayout>
+              logoSrc={(activeTenant as any)?.logo || (activeTenant as any)?.logo_url || activeTenant?.logoUrl}
+            />
           ) : (
             <div
               key={`tenant-app-${activeTenant?.id || currentUser?.tenantId || 'none'}-${currentUser?.id || 'anon'}`}

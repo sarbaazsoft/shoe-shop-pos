@@ -2,7 +2,7 @@
   "name": "sarbaazsoft-shoe-pos",
   "description": "Multi-tenant dual-engine wholesale shoe shop POS and inventory management system",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.2.4",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
