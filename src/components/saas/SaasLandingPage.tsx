@@ -674,8 +674,10 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
     'Secure data backup',
   ];
 
-  const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 dark:from-purple-600 dark:to-indigo-600 dark:hover:from-purple-500 dark:hover:to-indigo-500 text-white font-bold border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]';
-  const outlineBtn = 'inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-400/50 lt:border-indigo-300 bg-transparent hover:bg-indigo-500/10 lt:hover:bg-indigo-50 text-white lt:text-slate-900 font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300';
+  const primaryBtn =
+    'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 dark:from-purple-600 dark:to-indigo-600 dark:hover:from-purple-500 dark:hover:to-indigo-500 text-white font-semibold border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_18px_rgba(147,51,234,0.35)] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]';
+  const outlineBtn =
+    'inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-400/50 lt:border-slate-300 bg-transparent hover:bg-indigo-500/10 lt:hover:bg-slate-100 text-white lt:text-slate-900 font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300 active:scale-[0.98]';
 
   const handleStoreCreated = (tenantId: number, loginUrl: string, user?: any, token?: string) => {
     const createdStoreName = user?.storeName || 'New Registered Store';
@@ -779,11 +781,21 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                 SarbaazSoft POS gives you everything you need to manage sales, track inventory, and grow your footwear business — all in one powerful, easy-to-use platform.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <button type="button" onClick={() => openGetStartedWithPlan('TRIAL')} className={`${primaryBtn} px-7 py-3.5 text-sm`}>
-                  Start Free Trial <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => openGetStartedWithPlan('TRIAL')}
+                  className={`${primaryBtn} h-11 sm:h-12 px-6 sm:px-7 text-sm sm:text-base font-semibold tracking-normal`}
+                >
+                  <span>Start Free Trial</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={onGlobalLogin} className={`${outlineBtn} px-7 py-3.5 text-sm`}>
-                  <LogIn className="w-4 h-4" aria-hidden="true" /> Login
+                <button
+                  type="button"
+                  onClick={onGlobalLogin}
+                  className={`${outlineBtn} h-11 sm:h-12 px-6 sm:px-7 text-sm sm:text-base font-semibold tracking-normal`}
+                >
+                  <LogIn className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>Login</span>
                 </button>
               </div>
               <ul className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -850,7 +862,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                     {['h-2 bg-violet-300/70', 'h-3 bg-violet-300', 'h-4 bg-violet-400', 'h-5 bg-[#8B7CFF]', 'h-6 bg-[#7C6CFF]', 'h-7 bg-[#6D5CFF]'].map((c) => <span key={c} className={`flex-1 rounded-t ${c}`} />)}
                   </div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">Executive dashboard</div>
+                <div className="mt-2 text-xs font-semibold text-white lt:text-slate-800">Executive dashboard</div>
               </div>
 
               {/* POS counter */}
@@ -866,7 +878,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                   </div>
                   <div className="rounded bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 py-0.5 text-center text-[7px] font-bold text-white shadow-xs">Checkout · Rs. 16,699</div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">POS counter</div>
+                <div className="mt-2 text-xs font-semibold text-white lt:text-slate-800">POS counter</div>
               </div>
 
               {/* Barcode labels */}
@@ -879,7 +891,7 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
                     <div className="font-mono text-[6px] text-slate-600">0108923000012</div>
                   </div>
                 </div>
-                <div className="mt-2 text-xs font-semibold text-white">Barcode labels</div>
+                <div className="mt-2 text-xs font-semibold text-white lt:text-slate-800">Barcode labels</div>
               </div>
             </div>
             {/* keep-dark:end */}

@@ -229,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               (Unified 3-way theme switcher like PublicHeader / Header)
              ======================================================== */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* 3-Way Theme Dropdown Menu (Light, Dark, System) - Courgette Styled */}
+            {/* 3-Way Theme Dropdown Menu (Light, Dark, System) */}
             <div
               className="relative font-courgette font-courgate theme-dropdown-courgette"
               style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
@@ -240,6 +240,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 showLabel={true}
                 font="courgette"
                 className="font-courgette font-courgate theme-dropdown-courgette"
+                triggerClassName={(open) =>
+                  `h-9 lg:h-9.5 flex items-center gap-1.5 lg:gap-2 px-3 lg:px-3.5 rounded-xl border text-xs lg:text-sm font-semibold tracking-normal transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+                    open
+                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400/50 shadow-md shadow-purple-600/25 ring-2 ring-purple-400/40'
+                      : isDark
+                      ? 'border-slate-700/80 bg-slate-800/50 hover:bg-slate-800 text-slate-100 hover:text-white hover:border-purple-500/50'
+                      : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-900 hover:border-purple-300'
+                  }`
+                }
               />
             </div>
 
@@ -249,13 +258,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={onLogin}
-                  className={`inline-flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl font-semibold transition-all cursor-pointer whitespace-nowrap text-xs lg:text-sm px-3 lg:px-3.5 py-2 border font-courgette ${
+                  className={`inline-flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl h-9 lg:h-9.5 px-3.5 lg:px-4 text-xs lg:text-sm font-semibold tracking-normal transition-all cursor-pointer whitespace-nowrap border active:scale-[0.98] font-courgette ${
                     isDark
                       ? 'border-slate-700/80 bg-slate-800/50 hover:bg-slate-800 text-white hover:border-purple-500/50'
-                      : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-black hover:border-purple-300'
+                      : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-900 hover:border-purple-300'
                   }`}
                 >
-                  <LogIn className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <LogIn className="w-3.5 h-3.5 lg:w-4 lg:h-4 shrink-0" />
                   <span>Login</span>
                 </button>
               )}
@@ -264,10 +273,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={onStartFreeTrial}
-                  className="inline-flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 text-white font-bold border border-purple-400/40 shadow-md shadow-purple-600/25 transition-all cursor-pointer whitespace-nowrap text-xs lg:text-sm px-3.5 lg:px-4 py-2 active:scale-[0.98] font-courgette"
+                  className="inline-flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl h-9 lg:h-9.5 px-3.5 lg:px-4 text-xs lg:text-sm font-semibold tracking-normal bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 active:from-purple-800 active:to-indigo-800 text-white border border-purple-400/40 shadow-md shadow-purple-600/25 transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] font-courgette"
                 >
                   <span>Free Trial</span>
-                  <ArrowRight className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 lg:w-4 lg:h-4 shrink-0" />
                 </button>
               )}
             </div>
@@ -366,11 +375,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMobileMenuOpen(false);
                       onStartFreeTrial();
                     }}
-                    className="w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg shadow-purple-600/30 transition-all cursor-pointer font-courgette"
+                    className="w-full h-11 text-sm font-semibold tracking-normal flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg shadow-purple-600/30 transition-all cursor-pointer active:scale-[0.98] font-courgette"
                   >
-                    <Sparkles className="w-4 h-4 text-purple-200" />
+                    <Sparkles className="w-4 h-4 text-purple-200 shrink-0" />
                     <span>Start 30-Day Free Trial</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 shrink-0" />
                   </button>
                 )}
 
@@ -381,13 +390,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMobileMenuOpen(false);
                       onLogin();
                     }}
-                    className={`w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2 rounded-xl border transition cursor-pointer font-courgette ${
+                    className={`w-full h-11 text-sm font-semibold tracking-normal flex items-center justify-center gap-2 rounded-xl border transition-all cursor-pointer active:scale-[0.98] font-courgette ${
                       isDark
                         ? 'border-slate-700 bg-slate-800/50 text-white hover:bg-slate-800'
-                        : 'border-slate-300 bg-slate-100 text-black hover:bg-slate-200'
+                        : 'border-slate-300 bg-slate-100 text-slate-900 hover:bg-slate-200'
                     }`}
                   >
-                    <LogIn className="w-4 h-4" />
+                    <LogIn className="w-4 h-4 shrink-0" />
                     <span>Store Login &amp; Cashier Sign In</span>
                   </button>
                 )}
