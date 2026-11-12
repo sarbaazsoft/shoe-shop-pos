@@ -356,7 +356,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div
                   id="auth-card-heading"
-                  className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1"
+                  className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-1"
                 >
                   SarbaazSoft Shoe POS
                 </div>

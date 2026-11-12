@@ -1210,8 +1210,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
               <div className="app-card bg-white/95 dark:bg-gradient-to-b dark:from-slate-900/95 dark:via-indigo-950/90 dark:to-slate-900/95 backdrop-blur-xl border border-purple-200/80 dark:border-purple-800/80 shadow-2xl shadow-purple-950/10 dark:shadow-[0_10px_35px_rgba(15,23,42,0.8),0_0_25px_rgba(147,51,234,0.2)] rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-slate-800 dark:text-slate-100 transition-colors">
                 {/* SuperAdmin Icon Header */}
                 <div className="text-center mb-6">
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-600/30 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)] border border-purple-400/40 dark:border-purple-400/50">
-                    <Shield className="w-6 h-6" />
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-purple-600/30 border border-purple-400/40 p-2 overflow-hidden">
+                    <img src="/admin/pwa-192x192.png" alt="SuperAdmin PWA Icon" className="w-full h-full object-contain rounded-xl" />
                   </div>
                   <h2
                     id="superadmin-auth-title"
@@ -1693,8 +1693,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           }`}
         >
           <div className={`flex items-center gap-2.5 min-w-0 ${collapsed ? 'justify-center w-full' : ''}`}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-purple-400/30">
-              <Shield className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-purple-500/30 shrink-0 shadow-sm p-1 flex items-center justify-center overflow-hidden">
+              <img src="/admin/pwa-192x192.png" alt="SuperAdmin PWA Icon" className="w-full h-full object-contain rounded-md" />
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">

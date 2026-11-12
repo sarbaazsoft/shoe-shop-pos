@@ -14,17 +14,6 @@ export interface SarbaazSoftNavbarProps {
 }
 
 const renderBrandName = (name: string) => {
-  if (name.includes('SarbaazSoft')) {
-    const parts = name.split('SarbaazSoft');
-    return (
-      <span className="inline-flex items-center font-bold tracking-tight">
-        {parts[0]}
-        <span className="text-slate-900 dark:text-white">Sarbaaz</span>
-        <span className="text-purple-600 dark:text-purple-400 font-extrabold ml-0.5">Soft</span>
-        {parts[1] && <span className="text-slate-900 dark:text-white">{parts[1]}</span>}
-      </span>
-    );
-  }
   return (
     <span className="font-bold text-slate-900 dark:text-white tracking-tight">
       {name}
