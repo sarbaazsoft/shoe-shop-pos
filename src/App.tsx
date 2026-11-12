@@ -30,7 +30,7 @@ import { NotificationsView } from './components/notifications/NotificationsView.
 import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.tsx';
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
-import { getStandardDocumentTitle } from './utils/documentTitle.ts';
+import { getStandardDocumentTitle, applyBrowserFavicon } from './utils/documentTitle.ts';
 import { APP_VERSION } from './version.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
@@ -414,23 +414,16 @@ export default function App() {
       }
     });
 
-    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"]').forEach((link) => {
-      const sizes = link.getAttribute('sizes');
-      const type = link.getAttribute('type');
-      if (sizes === '192x192') {
-        link.setAttribute('href', `${iconPrefix}/pwa-192x192.png`);
-      } else if (sizes === '512x512') {
-        link.setAttribute('href', `${iconPrefix}/pwa-512x512.png`);
-      } else if (sizes === '32x32') {
-        link.setAttribute('href', `${iconPrefix}/favicon-32x32.png`);
-      } else if (sizes === '48x48') {
-        link.setAttribute('href', `${iconPrefix}/favicon.png`);
-      } else if (type === 'image/svg+xml') {
-        link.setAttribute('href', `${iconPrefix}/icon.svg`);
-      } else {
-        link.setAttribute('href', `${iconPrefix}/favicon.ico`);
-      }
+    // PWA Home Screen Icons (sizes 192x192 and 512x512)
+    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"][sizes="192x192"]').forEach((link) => {
+      link.setAttribute('href', `${iconPrefix}/pwa-192x192.png`);
     });
+    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"][sizes="512x512"]').forEach((link) => {
+      link.setAttribute('href', `${iconPrefix}/pwa-512x512.png`);
+    });
+
+    // Browser Tab Favicon: standardize /admin/favicon.ico across all routes and roles (not PWA APK icon)
+    applyBrowserFavicon('/admin/favicon.ico');
 
     if (isSuperAdminMode) {
       if (manifestLink) manifestLink.setAttribute('href', '/admin/manifest.webmanifest');

@@ -51,7 +51,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
 }) => {
   const globalTheme = useTheme();
 
-  useDocumentTitle(isOpen ? 'SarbaazSoft Shoe POS | Register' : '', [isOpen]);
+  useDocumentTitle(isOpen ? 'SarbaazSoft Shoe POS | Signup' : '', [isOpen]);
 
   // Dark mode resolution: supports propTheme, global ThemeContext, localStorage, and DOM
   const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>(() => {

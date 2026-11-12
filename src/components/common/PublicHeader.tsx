@@ -17,6 +17,25 @@ export interface PublicHeaderProps {
   logoSrc?: string | null;
 }
 
+export const renderBrandName = (name: string) => {
+  if (name.includes('SarbaazSoft')) {
+    const parts = name.split('SarbaazSoft');
+    return (
+      <span className="inline-flex items-center font-bold tracking-tight">
+        {parts[0]}
+        <span className="text-slate-900 dark:text-white">Sarbaaz</span>
+        <span className="text-purple-600 dark:text-purple-400 font-extrabold ml-0.5">Soft</span>
+        {parts[1] && <span className="text-slate-900 dark:text-white">{parts[1]}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="font-bold text-slate-900 dark:text-white tracking-tight">
+      {name}
+    </span>
+  );
+};
+
 /**
  * PublicHeader
  * Global header for onboarding, authentication, and loading routes.
@@ -25,7 +44,7 @@ export interface PublicHeaderProps {
  */
 export const PublicHeader: React.FC<PublicHeaderProps> = ({
   storeName = 'SarbaazSoft Shoe POS',
-  badgeText = 'Terminal Online',
+  badgeText,
   badgeVariant = 'online',
   subtitle = 'Dual-engine wholesale shoe shop POS',
   dbText = 'Cloud Synced',
@@ -74,6 +93,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   };
 
   const renderBadge = () => {
+    if (!badgeText || badgeText === 'Terminal Online') return null;
     switch (badgeVariant) {
       case 'wizard':
         return (
@@ -146,11 +166,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
-              {storeName}
+              {renderBrandName(storeName)}
             </span>
-            <div className="hidden sm:inline-block shrink-0">
-              {renderBadge()}
-            </div>
+            {badgeText && badgeText !== 'Terminal Online' && (
+              <div className="hidden sm:inline-block shrink-0">
+                {renderBadge()}
+              </div>
+            )}
           </div>
           <span className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5">
             {isSuperAdminView ? (

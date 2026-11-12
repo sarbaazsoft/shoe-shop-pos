@@ -37,16 +37,16 @@ const renderBrandName = (name: string) => {
   if (name.includes('SarbaazSoft')) {
     const parts = name.split('SarbaazSoft');
     return (
-      <span className="font-roboto brand-name-roboto inline-flex items-center font-bold tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+      <span className="inline-flex items-center font-bold tracking-tight">
         {parts[0]}
-        <span className="text-black dark:text-white">Sarbaaz</span>
+        <span className="text-slate-900 dark:text-white">Sarbaaz</span>
         <span className="text-purple-600 dark:text-purple-400 font-extrabold ml-0.5">Soft</span>
-        {parts[1] && <span className="text-black dark:text-white">{parts[1]}</span>}
+        {parts[1] && <span className="text-slate-900 dark:text-white">{parts[1]}</span>}
       </span>
     );
   }
   return (
-    <span className="font-roboto brand-name-roboto font-bold text-black dark:text-white tracking-tight" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
+    <span className="font-bold text-slate-900 dark:text-white tracking-tight">
       {name}
     </span>
   );
@@ -165,30 +165,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => handleNavClick('top', 'home')}
-              className="group flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-0.5 sm:p-1 cursor-pointer min-w-0"
+              className="flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-lg p-0.5 sm:p-1 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
               aria-label={`${storeName} Home`}
             >
-              {/* Brand Emblem matching store sidebars top */}
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs flex items-center justify-center overflow-hidden transition-transform duration-200 group-hover:scale-105">
+              {/* Brand Emblem matching PublicHeader and store sidebars */}
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white dark:bg-slate-900 border border-indigo-500/25 shrink-0 shadow-xs flex items-center justify-center overflow-hidden">
                 <ShoeIcon src="/pwa-192x192.png" alt={`${storeName} Logo`} className="w-full h-full object-cover rounded-xl" />
               </div>
 
-              {/* Brand Typography (Roboto font for brand name & subtitle) */}
-              <div className="min-w-0 font-roboto brand-name-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
-                <div
-                  className="font-roboto brand-name-roboto font-bold text-black dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block"
-                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
-                >
+              {/* Brand Typography aligned with PublicHeader */}
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight leading-tight truncate block">
                   {renderBrandName(storeName)}
                 </div>
-                <div
-                  className="font-roboto brand-subtitle-roboto text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5 tracking-normal"
-                  style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}
-                >
+                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-indigo-200/70 font-medium flex items-center gap-1.5 truncate mt-0.5 tracking-normal">
                   <TinyShoeIcon className="w-3.5 h-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
-                  <span className="font-roboto brand-subtitle-roboto" style={{ fontFamily: "'Roboto', system-ui, -apple-system, sans-serif" }}>
-                    {subtitle}
-                  </span>
+                  <span>{subtitle}</span>
                 </div>
               </div>
             </button>

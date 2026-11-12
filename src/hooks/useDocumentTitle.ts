@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   getStandardDocumentTitle,
   setDocumentTitle,
+  applyBrowserFavicon,
   type StandardTitleOptions,
 } from '../utils/documentTitle.ts';
 
@@ -37,11 +38,13 @@ export function useDocumentTitle(
     if (nextTitle) {
       setDocumentTitle(nextTitle);
     }
+    applyBrowserFavicon();
 
     return () => {
       // Revert to previous title if unmounting and previous title exists
       if (previousTitleRef.current && typeof document !== 'undefined') {
         document.title = previousTitleRef.current;
+        applyBrowserFavicon();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

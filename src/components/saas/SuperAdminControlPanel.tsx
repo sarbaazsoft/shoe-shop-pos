@@ -23,6 +23,7 @@ import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsToolt
 import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import { initNativeNotificationPrompt, isDeviceSubscribedToPush, getNotificationPermissionState, subscribeDeviceToWebPush, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient';
 import { NotificationStatusModal, type NotificationModalData } from '../notifications/NotificationStatusModal';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -133,6 +134,24 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
 
   // Dashboard Layout & Sidebar State (aligned with Store Sidebar & Header)
   const [activeTab, setActiveTab] = useState<SuperAdminTab>('dashboard');
+
+  const superAdminTabLabels: Record<SuperAdminTab, string> = {
+    dashboard: 'Dashboard',
+    stores: 'Stores Management',
+    trials: 'Trial Activations',
+    requests: 'Subscription Requests',
+    notifications: 'Notifications',
+    reports: 'Reports & Analytics',
+    manifests: 'WebAPK Manifests',
+    settings: 'System Settings',
+  };
+
+  useDocumentTitle(
+    isSuperAdmin
+      ? `POS Admin | ${superAdminTabLabels[activeTab] || 'Control Panel'}`
+      : 'SarbaazSoft Shoe POS | SuperAdmin Login',
+    [isSuperAdmin, activeTab]
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'ONLINE'>('ALL');
