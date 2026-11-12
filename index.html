@@ -73,7 +73,7 @@
     <!-- PWA Root Service Worker Registration (PWABuilder & Chromium WebAPK compliant) -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
+        var registerRootServiceWorker = function () {
           navigator.serviceWorker
             .register('/sw.js', { scope: '/' })
             .then(function (registration) {
@@ -95,7 +95,13 @@
             .catch(function (error) {
               console.warn('[PWA] Service Worker registration failed:', error);
             });
-        });
+        };
+
+        if (document.readyState === 'complete') {
+          registerRootServiceWorker();
+        } else {
+          window.addEventListener('load', registerRootServiceWorker);
+        }
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>

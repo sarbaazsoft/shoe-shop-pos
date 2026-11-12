@@ -38,7 +38,7 @@ import notificationRoutes from './src/server/routes/notificationRoutes.ts';
 import chatRoutes from './src/server/routes/chatRoutes.ts';
 import tenantSaasRoutes from './src/server/routes/tenantSaasRoutes.ts';
 import { transformKeysToCamelCase } from './src/utils/caseTransformer.ts';
-import { getCachedAppSetting } from './src/server/services/appSettingsService.ts';
+import { loadAppSettingsCache } from './src/server/services/appSettingsService.ts';
 import { recordApplicationBaseUrl } from './src/server/services/welcomeService.ts';
 
 const rootDir = path.resolve('.');
@@ -86,31 +86,20 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serves service workers directly from the domain root with Service-Worker-Allowed: /
 // and application/javascript MIME type to satisfy PWABuilder, Lighthouse, and browser engines.
 app.get(['/sw.js', '/firebase-messaging-sw.js', '/sw-background-sync.js'], (req, res, next) => {
-  const swKillSwitchEnabled = getCachedAppSetting('SW_KILL_SWITCH', 'false') === 'true';
-  if (swKillSwitchEnabled && req.path === '/sw.js') {
-    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.send(`
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      .then(() => self.registration.unregister())
-      .then(() => self.clients.claim())
-  );
-});
-`);
-  }
-
   const filename = req.path.replace(/^\//, '');
-  const candidatePath = path.join(rootDir, 'public', filename);
-  if (fs.existsSync(candidatePath)) {
+  const publicCandidate = path.join(rootDir, 'public', filename);
+  const distCandidate = path.join(rootDir, 'dist', filename);
+  const targetPath = fs.existsSync(publicCandidate)
+    ? publicCandidate
+    : fs.existsSync(distCandidate)
+    ? distCandidate
+    : null;
+
+  if (targetPath) {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Service-Worker-Allowed', '/');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(candidatePath);
+    return res.sendFile(targetPath);
   }
   next();
 });
@@ -560,6 +549,7 @@ async function startServer() {
     await pgClient.waitReady;
     await dropLegacyDocumentPrefixColumns();
     await migrateLegacyWholesaleProductPrices();
+    await loadAppSettingsCache();
     const installStatus = await checkInstallationStatus();
     if (installStatus.hasSuperAdmin || (installStatus.hasUsers && installStatus.hasAdmin)) {
       await ensureSaasControlPlane();

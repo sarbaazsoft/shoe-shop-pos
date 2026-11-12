@@ -690,7 +690,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     FCM_APP_ID: '',
     FCM_MEASUREMENT_ID: '',
     FCM_VAPID_KEY: '',
-    SW_KILL_SWITCH: 'false',
     DISABLE_HMR: 'false',
   });
   const [servicesIntegrationsTab, setServicesIntegrationsTab] = useState<'email' | 'fcm'>('email');
@@ -3786,7 +3785,7 @@ setFormErrors(errors);
             </div>
           </div>
 
-          {/* CATEGORY 5: SYSTEM & PWA CONTROLS */}
+          {/* CATEGORY 5: SYSTEM RUNTIME CONTROLS */}
           <div className="bg-white dark:bg-[#131B2E] p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-purple-800/60 shadow-sm space-y-4">
             <div className="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-purple-900/40">
               <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center shrink-0">
@@ -3794,47 +3793,15 @@ setFormErrors(errors);
               </div>
               <div>
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                  System &amp; PWA Runtime Controls (Category: <span className="font-mono text-emerald-600 dark:text-emerald-400">system</span>)
+                  System Runtime Controls (Category: <span className="font-mono text-emerald-600 dark:text-emerald-400">system</span>)
                 </h4>
                 <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                  Runtime toggles for emergency PWA Service Worker bypass and Hot Module Reloading suppression.
+                  Runtime toggle for Hot Module Reloading notice suppression in sandbox environments.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <label htmlFor="sw-kill-switch-checkbox" className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer flex-1 select-none">
-                    Service Worker Kill Switch (SW_KILL_SWITCH)
-                  </label>
-                  <label className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
-                    <input
-                      id="sw-kill-switch-checkbox"
-                      type="checkbox"
-                      checked={String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true'}
-                      onChange={(e) =>
-                        setAppSettingsForm((prev) => ({
-                          ...prev,
-                          SW_KILL_SWITCH: e.target.checked ? 'true' : 'false',
-                        }))
-                      }
-                      className="w-4.5 h-4.5 rounded text-purple-600 dark:text-purple-500 accent-purple-600 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-purple-500/20 cursor-pointer transition"
-                    />
-                    <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-md ${
-                      String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true'
-                        ? 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-300/60 dark:border-rose-800/60'
-                        : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/60 dark:border-slate-700/60'
-                    }`}>
-                      {String(appSettingsForm.SW_KILL_SWITCH || 'false').toLowerCase() === 'true' ? 'Enabled (true)' : 'Disabled (false)'}
-                    </span>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  When enabled (<code className="font-mono font-bold text-rose-500">true</code>), forces all browser client service workers to unregister and purge browser storage.
-                </p>
-              </div>
-
+            <div className="grid grid-cols-1 gap-5 pt-1">
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 space-y-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="disable-hmr-checkbox" className="text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer flex-1 select-none">

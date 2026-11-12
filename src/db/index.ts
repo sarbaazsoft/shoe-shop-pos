@@ -377,7 +377,6 @@ const mockStore: Record<string, any[]> = {
     { key: 'VAPID_PUBLIC_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Public Key for browser and PWA push notifications', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'VAPID_PRIVATE_KEY', value: '', category: 'notifications', description: 'Web Push VAPID Private Key for server notification signing', is_secret: true, updated_at: new Date().toISOString() },
     { key: 'VAPID_SUBJECT', value: 'mailto:support@sarbaazsoft.com', category: 'notifications', description: 'Web Push contact subject URI or mailto link', is_secret: false, updated_at: new Date().toISOString() },
-    { key: 'SW_KILL_SWITCH', value: 'false', category: 'system', description: 'Emergency Service Worker bypass toggle for PWA debugging', is_secret: false, updated_at: new Date().toISOString() },
     { key: 'DISABLE_HMR', value: 'false', category: 'system', description: 'Disable Vite Hot Module Reloading in sandbox environments', is_secret: false, updated_at: new Date().toISOString() },
   ],
   platform_notifications: [],

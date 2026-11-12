@@ -48,7 +48,11 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_ASSETS).catch(() => {}))
+      .then((cache) =>
+        Promise.allSettled(
+          PRECACHE_ASSETS.map((assetUrl) => cache.add(assetUrl).catch(() => null))
+        )
+      )
       .catch(() => {})
   );
 });
@@ -95,12 +99,17 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
+        .then(async (response) => {
+          if (response && response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+            return response;
           }
-          return response;
+          const cached =
+            (await caches.match(request)) ||
+            (await caches.match('/index.html')) ||
+            (await caches.match('/'));
+          return cached || response;
         })
         .catch(async () => {
           const cached = await caches.match(request);
@@ -127,7 +136,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(() => cachedResponse || Response.error());
 
       return cachedResponse || fetchPromise;
     })
@@ -195,7 +204,7 @@ async function initFirebaseInWorker() {
   }
 }
 
-initFirebaseInWorker();
+initFirebaseInWorker().catch(() => {});
 
 // -------------------------------------------------------------------------
 // 4. Standard Web Push & Notification Interaction
@@ -527,7 +536,7 @@ self.addEventListener('sync', (event) => {
 });
 
 self.addEventListener('periodicsync', (event) => {
-  if (event.tag === SW_PERIODIC_SYNC_TAG) {
+  if (event.tag === SW_PERIODIC_SYNC_TAG || event.tag === SW_SYNC_TAG) {
     event.waitUntil(processOfflineQueueFromSW('periodicsync-event'));
   }
 });

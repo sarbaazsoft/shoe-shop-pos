@@ -210,13 +210,6 @@ export const APP_SETTINGS_DEFAULTS: AppSettingDefinition[] = [
 
   // 4. System Group
   {
-    key: 'SW_KILL_SWITCH',
-    defaultValue: 'false',
-    category: 'system',
-    description: 'Emergency Service Worker bypass toggle for PWA debugging',
-    isSecret: false,
-  },
-  {
     key: 'DISABLE_HMR',
     defaultValue: 'false',
     category: 'system',
@@ -286,10 +279,10 @@ export async function ensureAppSettingsSchema(): Promise<void> {
           AND value NOT ILIKE 'https://%'
       `).catch(() => {});
 
-      // Remove legacy Telegram and VAPID keys from app_settings
+      // Remove legacy Telegram, VAPID, and SW_KILL_SWITCH keys from app_settings
       await pgClient.query(`
         DELETE FROM public.app_settings 
-        WHERE key IN ('TELEGRAM_BOT_TOKEN', 'TELEGRAM_SUPERADMIN_CHAT_ID', 'TELEGRAM_ALERTS_ENABLED', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT')
+        WHERE key IN ('TELEGRAM_BOT_TOKEN', 'TELEGRAM_SUPERADMIN_CHAT_ID', 'TELEGRAM_ALERTS_ENABLED', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT', 'SW_KILL_SWITCH')
       `).catch(() => {});
 
       // Seed all default settings if not already present
@@ -327,6 +320,7 @@ export async function ensureAppSettingsSchema(): Promise<void> {
         UPDATE public.app_settings SET value = '1:900875095665:web:2050a569fe0b7eded995d0' WHERE key = 'FCM_APP_ID' AND (value IS NULL OR value = '');
         UPDATE public.app_settings SET value = 'G-YNR6ETB365' WHERE key = 'FCM_MEASUREMENT_ID' AND (value IS NULL OR value = '');
       `).catch(() => {});
+
 
       // Seed default SuperAdmin push event toggles if not already present
       await pgClient.query(`
