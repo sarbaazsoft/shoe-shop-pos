@@ -8,11 +8,11 @@
 // 4. Background Sync & Periodic Sync for Offline POS Transactions (IndexedDB)
 // =========================================================================
 
-const CACHE_NAME = 'sarbaazsoft-pos-cache-v3';
+const CACHE_NAME = 'sarbaazsoft-pos-cache-v4';
 const SW_SYNC_TAG = 'pos-offline-transactions-sync';
 const SW_PERIODIC_SYNC_TAG = 'pos-offline-periodic-sync';
 const DB_NAME = 'ShoePosOfflineDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_SALES = 'offline_sales_queue';
 const BROADCAST_CHANNEL_NAME = 'pos_background_sync_channel';
 
@@ -28,6 +28,16 @@ const PRECACHE_ASSETS = [
   '/pwa-maskable-192x192.png',
   '/pwa-maskable-512x512.png',
   '/apple-touch-icon.png',
+  '/admin/manifest.webmanifest',
+  '/admin/manifest.json',
+  '/admin/favicon.png',
+  '/admin/icon.svg',
+  '/admin/pwa-192x192.png',
+  '/admin/pwa-512x512.png',
+  '/admin/pwa-maskable-192x192.png',
+  '/admin/pwa-maskable-512x512.png',
+  '/admin/apple-touch-icon.png',
+  '/admin/shortcut-icon.png',
 ];
 
 // -------------------------------------------------------------------------

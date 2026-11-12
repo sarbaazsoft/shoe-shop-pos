@@ -31,6 +31,7 @@ import { VerifyEmailNoticeView } from './components/auth/VerifyEmailNoticeView.t
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
 import { getStandardDocumentTitle } from './utils/documentTitle.ts';
+import { APP_VERSION } from './version.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
 type SaasRouteMode =
@@ -422,6 +423,8 @@ export default function App() {
         link.setAttribute('href', `${iconPrefix}/pwa-512x512.png`);
       } else if (sizes === '32x32') {
         link.setAttribute('href', `${iconPrefix}/favicon-32x32.png`);
+      } else if (sizes === '48x48') {
+        link.setAttribute('href', `${iconPrefix}/favicon.png`);
       } else if (type === 'image/svg+xml') {
         link.setAttribute('href', `${iconPrefix}/icon.svg`);
       } else {
@@ -1844,17 +1847,20 @@ export default function App() {
                   </AnimatePresence>
                 </main>
 
-                <footer className="px-4 py-2.5 border border-indigo-500/20 bg-white/95 dark:bg-white/10 backdrop-blur-lg shadow-lg transition-colors duration-500 text-center text-xs font-medium text-slate-800 dark:text-slate-100 tracking-wide shrink-0 no-print select-none">
-                  <span className="font-bold text-slate-900 dark:text-white">{effectiveStoreName}</span>
-                  <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
-                  <span>
-                    Powered by{' '}
-                    <strong className="font-bold text-slate-900 dark:text-white">
-                      SarbaazSoft Shoe POS
-                    </strong>
-                  </span>
-                  <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
-                  <span>&copy; 2026 All rights reserved.</span>
+                <footer className="px-4 py-2.5 border border-indigo-500/20 bg-white/95 dark:bg-white/10 backdrop-blur-lg shadow-lg transition-colors duration-500 text-xs font-medium text-slate-800 dark:text-slate-100 tracking-wide shrink-0 no-print select-none">
+                  <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-4 text-center sm:text-left">
+                    <div className="flex items-center gap-2 justify-center sm:justify-start">
+                      <strong className="font-bold text-slate-900 dark:text-white">
+                        SarbaazSoft Shoe POS
+                      </strong>
+                      <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
+                        {APP_VERSION}
+                      </span>
+                    </div>
+                    <span className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs">
+                      &copy; {new Date().getFullYear()} SarbaazSoft Shoe POS. All rights reserved.
+                    </span>
+                  </div>
                 </footer>
               </div>
             </div>

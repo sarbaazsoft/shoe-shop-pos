@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import type { TenantInfo } from '../../types';
 import { FreeTrialOnboardingModal } from './FreeTrialOnboardingModal';
 import { useTheme } from '../../context/ThemeContext';
+import { APP_VERSION } from '../../version.ts';
 import { Navbar } from './Navbar';
 import { LuxuryBadge } from '../common/Badge';
 import type { LuxuryBadgeTone } from '../../utils/badgeStyles';
@@ -1156,37 +1157,31 @@ export const SaasLandingPage: React.FC<SaasLandingPageProps> = ({
       </section>
 
       {/* Global Application Footer */}
-      <footer id="global-public-footer" className="border-t border-white/10 lt:border-slate-200 bg-[#080A2A] lt:bg-[#F1F3FF] px-4 sm:px-8 py-5 text-xs text-slate-300 lt:text-slate-600">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex flex-wrap items-center justify-center gap-2">
+      <footer id="global-public-footer" className="border-t border-white/10 lt:border-slate-200 bg-[#080A2A] lt:bg-[#F1F3FF] px-4 sm:px-8 py-3.5 text-xs text-slate-300 lt:text-slate-600">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-4 text-center sm:text-left">
+          <div className="flex items-center gap-2 justify-center sm:justify-start">
             <strong
               id="sarbaazsoft-credit-text"
-              className="font-bold text-white lt:text-slate-900"
+              className="font-bold text-white lt:text-slate-900 tracking-wide"
             >
               SarbaazSoft Shoe POS
             </strong>
-            <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
-            <span className="text-slate-400 lt:text-slate-500">Multi-Tenant Shoe Shop POS &amp; Inventory Management SaaS</span>
+            <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-white/10 lt:bg-slate-200 text-indigo-300 lt:text-indigo-700 border border-white/10 lt:border-slate-300">
+              {APP_VERSION}
+            </span>
           </div>
-            <div className="flex items-center gap-3 font-medium">
-              <span
-                className="font-courgette inline-flex items-center gap-1.5 font-bold text-emerald-400 lt:text-emerald-600"
-                style={{ fontFamily: "'Courgette', cursive, sans-serif" }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 lt:bg-emerald-500" aria-hidden="true" />
-                System Online
-              </span>
-              <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
-              <button
-                type="button"
-                onClick={onOpenSuperAdmin}
-                className="text-slate-400 hover:text-white lt:text-slate-500 lt:hover:text-slate-800 transition cursor-pointer underline-offset-2 hover:underline"
-              >
-                SuperAdmin
-              </button>
-              <span className="text-slate-500 lt:text-slate-400" aria-hidden="true">&bull;</span>
-              <span className="text-slate-400 lt:text-slate-500">&copy; 2026 All rights reserved.</span>
-            </div>
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs text-slate-400 lt:text-slate-500">
+            <span>&copy; {new Date().getFullYear()} SarbaazSoft Shoe POS. All rights reserved.</span>
+            <button
+              type="button"
+              onClick={onOpenSuperAdmin}
+              className="text-slate-500 hover:text-white lt:text-slate-400 lt:hover:text-slate-800 transition cursor-pointer text-[10px] opacity-30 hover:opacity-100"
+              title="SuperAdmin"
+              aria-label="SuperAdmin"
+            >
+              &bull;
+            </button>
+          </div>
         </div>
       </footer>
       {/* STEP-BY-STEP FREE TRIAL ONBOARDING WIZARD */}

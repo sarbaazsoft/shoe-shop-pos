@@ -5,6 +5,7 @@ import { api, setAuthSession } from '../../services/api';
 import { ShowroomBackground } from '../common/ShowroomBackground';
 import { PublicHeader } from '../common/PublicHeader';
 import { PublicFooter } from '../common/PublicFooter';
+import { APP_VERSION } from '../../version.ts';
 import { UserAvatar } from '../common/UserAvatar';
 import { ThemeDropdown } from '../common/ThemeDropdown';
 import { UserProfileModal } from '../auth/UserProfileModal';
@@ -5313,18 +5314,20 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
         </main>
 
         {/* FOOTER (Aligned with Store Page Footer) */}
-        <footer className="px-4 py-2.5 border-t border-indigo-500/20 bg-white/95 dark:bg-white/5 backdrop-blur-lg shadow-lg transition-colors duration-500 text-center text-xs font-medium text-slate-800 dark:text-slate-100 tracking-wide shrink-0 no-print select-none">
-          <span className="font-bold text-slate-900 dark:text-white">SarbaazSoft Shoe POS</span>
-          <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
-          <span>Platform SuperAdmin Control Plane</span>
-          <span className="mx-1.5 text-slate-400 dark:text-slate-500">&bull;</span>
-          <span>
-            &copy; 2026{' '}
-            <strong className="font-bold text-slate-900 dark:text-white">
-              SarbaazSoft
-            </strong>
-            . All rights reserved.
-          </span>
+        <footer className="px-4 py-2.5 border-t border-indigo-500/20 bg-white/95 dark:bg-white/5 backdrop-blur-lg shadow-lg transition-colors duration-500 text-xs font-medium text-slate-800 dark:text-slate-100 tracking-wide shrink-0 no-print select-none">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-4 text-center sm:text-left">
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <strong className="font-bold text-slate-900 dark:text-white">
+                SarbaazSoft Shoe POS
+              </strong>
+              <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
+                {APP_VERSION}
+              </span>
+            </div>
+            <span className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs">
+              &copy; {new Date().getFullYear()} SarbaazSoft Shoe POS. All rights reserved.
+            </span>
+          </div>
         </footer>
       </div>
 
