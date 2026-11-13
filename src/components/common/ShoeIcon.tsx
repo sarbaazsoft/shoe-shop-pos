@@ -37,7 +37,7 @@ export const ShoeIcon: React.FC<ShoeIconProps> = ({
       return src.trim();
     }
     if (fallbackAttempt === 1) return '/pwa-512x512.png';
-    if (fallbackAttempt >= 2) return '/favicon.png';
+    if (fallbackAttempt >= 2) return '/apple-touch-icon.png';
     return '/pwa-192x192.png';
   })();
 

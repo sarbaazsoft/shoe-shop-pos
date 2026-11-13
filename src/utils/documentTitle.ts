@@ -131,37 +131,65 @@ export function getStandardDocumentTitle(options: StandardTitleOptions = {}): st
 }
 
 /**
- * Ensures browser tab favicon points to /admin/favicon.ico across all routes and roles.
- * Does NOT touch PWA APK icons (192x192, 512x512, apple-touch-icon).
+ * Ensures browser tab favicon and shortcut icon point to the SuperAdmin S-logo assets
+ * across all routes and roles (Store Owner, Cashier, SuperAdmin, SaaS Landing & Public pages).
+ * Does NOT alter PWA manifest icons.
  */
 export function applyBrowserFavicon(faviconPath: string = BROWSER_FAVICON_PATH): void {
   if (typeof document === 'undefined') return;
 
-  // Primary browser tab favicon
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]:not([sizes="192x192"]):not([sizes="512x512"])');
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/x-icon';
-    document.head.appendChild(link);
-  }
-  if (link.getAttribute('href') !== faviconPath) {
-    link.setAttribute('href', faviconPath);
-    link.setAttribute('type', 'image/x-icon');
-  }
+  // Remove any legacy 192x192 / 512x512 rel="icon" tags that could override the S-logo tab icon
+  document
+    .querySelectorAll<HTMLLinkElement>('link[rel="icon"][sizes="192x192"], link[rel="icon"][sizes="512x512"]')
+    .forEach((el) => el.remove());
 
-  // Shortcut icon for legacy browsers
-  let shortcutLink = document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]');
-  if (!shortcutLink) {
-    shortcutLink = document.createElement('link');
-    shortcutLink.rel = 'shortcut icon';
-    shortcutLink.type = 'image/x-icon';
-    document.head.appendChild(shortcutLink);
-  }
-  if (shortcutLink.getAttribute('href') !== faviconPath) {
-    shortcutLink.setAttribute('href', faviconPath);
-    shortcutLink.setAttribute('type', 'image/x-icon');
-  }
+  const ensureLink = (
+    selector: string,
+    attrs: { rel: string; type: string; href: string; sizes?: string }
+  ) => {
+    let el = document.querySelector<HTMLLinkElement>(selector);
+    if (!el) {
+      el = document.createElement('link');
+      el.rel = attrs.rel;
+      if (attrs.sizes) el.setAttribute('sizes', attrs.sizes);
+      document.head.appendChild(el);
+    }
+    if (el.getAttribute('href') !== attrs.href) {
+      el.setAttribute('href', attrs.href);
+    }
+    if (el.getAttribute('type') !== attrs.type) {
+      el.setAttribute('type', attrs.type);
+    }
+  };
+
+  ensureLink('link[rel="icon"][type="image/x-icon"], link[rel="icon"]:not([sizes])', {
+    rel: 'icon',
+    type: 'image/x-icon',
+    href: faviconPath,
+  });
+  ensureLink('link[rel="shortcut icon"]', {
+    rel: 'shortcut icon',
+    type: 'image/x-icon',
+    href: faviconPath,
+  });
+  ensureLink('link[rel="icon"][sizes="32x32"]', {
+    rel: 'icon',
+    type: 'image/png',
+    sizes: '32x32',
+    href: '/admin/favicon-32x32.png',
+  });
+  ensureLink('link[rel="icon"][sizes="16x16"]', {
+    rel: 'icon',
+    type: 'image/png',
+    sizes: '16x16',
+    href: '/admin/favicon-16x16.png',
+  });
+  ensureLink('link[rel="icon"][sizes="48x48"]', {
+    rel: 'icon',
+    type: 'image/png',
+    sizes: '48x48',
+    href: '/admin/favicon.png',
+  });
 }
 
 /**

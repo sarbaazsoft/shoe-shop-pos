@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import * as productSchema from '../src/schemas/productSchema.ts';
 import { generateSampleProductsCsv, parseAndValidateProductsCsv } from '../src/utils/csvImport.ts';
@@ -272,5 +274,21 @@ test('API & DB integration: settings low_stock_threshold, product CRUD without l
     }
   } finally {
     await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  }
+});
+
+test('browser favicons: index.html and public root favicons align with SuperAdmin S-logo assets', () => {
+  const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('href="/admin/favicon.ico"'));
+  assert.ok(indexHtml.includes('href="/admin/favicon-32x32.png"'));
+  assert.ok(indexHtml.includes('href="/admin/favicon-16x16.png"'));
+  assert.ok(indexHtml.includes('href="/admin/favicon.png"'));
+  assert.equal(indexHtml.includes('rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png"'), false);
+  assert.equal(indexHtml.includes('rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png"'), false);
+
+  for (const filename of ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png']) {
+    const rootBuf = fs.readFileSync(path.join(process.cwd(), 'public', filename));
+    const adminBuf = fs.readFileSync(path.join(process.cwd(), 'public', 'admin', filename));
+    assert.equal(Buffer.compare(rootBuf, adminBuf), 0, `public/${filename} should match public/admin/${filename}`);
   }
 });

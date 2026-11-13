@@ -8,7 +8,7 @@
 // 4. Background Sync & Periodic Sync for Offline POS Transactions (IndexedDB)
 // =========================================================================
 
-const CACHE_NAME = 'sarbaazsoft-pos-cache-v5';
+const CACHE_NAME = 'sarbaazsoft-pos-cache-v6';
 const SW_SYNC_TAG = 'pos-offline-transactions-sync';
 const SW_PERIODIC_SYNC_TAG = 'pos-offline-periodic-sync';
 const DB_NAME = 'ShoePosOfflineDB';
@@ -23,7 +23,10 @@ const PRECACHE_ASSETS = [
   '/manifest.webmanifest',
   '/manifest.json',
   '/.well-known/assetlinks.json',
+  '/favicon.ico',
   '/favicon.png',
+  '/favicon-16x16.png',
+  '/favicon-32x32.png',
   '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',

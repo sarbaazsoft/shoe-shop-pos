@@ -416,15 +416,7 @@ export default function App() {
       }
     });
 
-    // PWA Home Screen Icons (sizes 192x192 and 512x512)
-    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"][sizes="192x192"]').forEach((link) => {
-      link.setAttribute('href', `${iconPrefix}/pwa-192x192.png`);
-    });
-    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"][sizes="512x512"]').forEach((link) => {
-      link.setAttribute('href', `${iconPrefix}/pwa-512x512.png`);
-    });
-
-    // Browser Tab Favicon: standardize /admin/favicon.ico across all routes and roles (not PWA APK icon)
+    // Browser Tab Favicon: standardize S-logo across all routes and roles (Store Owner, Cashier, SuperAdmin, Landing & Public pages)
     applyBrowserFavicon('/admin/favicon.ico');
 
     if (isSuperAdminMode) {
