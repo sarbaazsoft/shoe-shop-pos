@@ -25,7 +25,8 @@ import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import { initNativeNotificationPrompt, isDeviceSubscribedToPush, getNotificationPermissionState, subscribeDeviceToWebPush, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient';
 import { NotificationStatusModal, type NotificationModalData } from '../notifications/NotificationStatusModal';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
-import { SUPERADMIN_PWA_APP_NAME, SUPERADMIN_PWA_SHORT_NAME } from '../../utils/pwaBranding';
+import { getStandardDocumentTitle } from '../../utils/documentTitle';
+import { SUPERADMIN_PWA_SHORT_NAME } from '../../utils/pwaBranding';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -150,8 +151,16 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   };
 
   useDocumentTitle(
-    SUPERADMIN_PWA_APP_NAME,
-    [isSuperAdmin, activeTab]
+    () =>
+      getStandardDocumentTitle({
+        isSuperAdmin: true,
+        saasMode: 'SUPERADMIN',
+        isAuthModalOpen: !isSuperAdmin,
+        authSubTab: !isSuperAdmin ? authTab : undefined,
+        currentTab: activeTab,
+        routeName: superAdminTabLabels[activeTab],
+      }),
+    [isSuperAdmin, activeTab, authTab]
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

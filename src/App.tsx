@@ -33,7 +33,8 @@ const VerifyEmailNoticeView = lazy(() => import('./components/auth/VerifyEmailNo
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
 import { usePwaManifest } from './hooks/usePwaManifest.ts';
-import { SUPERADMIN_PWA_APP_NAME, STANDARD_PWA_APP_NAME } from './utils/pwaBranding.ts';
+import { useDocumentTitle } from './hooks/useDocumentTitle.ts';
+import { getStandardDocumentTitle, PLATFORM_DOCUMENT_NAME } from './utils/documentTitle.ts';
 import { APP_VERSION } from './version.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
@@ -325,8 +326,8 @@ export default function App() {
   );
 
   const effectiveStoreName = (() => {
-    if (saasMode === 'SUPERADMIN') return SUPERADMIN_PWA_APP_NAME;
-    if ((saasMode === 'LANDING' || saasMode === 'AUTH') && !tenantIdParam) return STANDARD_PWA_APP_NAME;
+    if (saasMode === 'SUPERADMIN') return 'POS Admin';
+    if ((saasMode === 'LANDING' || saasMode === 'AUTH') && !tenantIdParam) return 'SarbaazSoft Shoe POS';
 
     if (
       saasMode === 'TENANT_ACTIVE' ||
@@ -334,6 +335,15 @@ export default function App() {
       saasMode === 'TENANT_SUSPENDED' ||
       saasMode === 'TENANT_EXPIRED'
     ) {
+      if (
+        companySettings &&
+        (!currentTargetTenantId ||
+          !Number(companySettings.tenantId || companySettings.tenant_id) ||
+          Number(companySettings.tenantId || companySettings.tenant_id) === currentTargetTenantId)
+      ) {
+        const csName = companySettings.name || companySettings.company_name || companySettings.companyName;
+        if (csName) return csName;
+      }
       if (activeTenant?.name && (!currentTargetTenantId || Number(activeTenant.id) === currentTargetTenantId)) {
         return activeTenant.name;
       }
@@ -345,14 +355,6 @@ export default function App() {
       if (currentTargetTenantId) {
         const found = availableTenants.find((t) => Number(t.id) === currentTargetTenantId);
         if (found?.name) return found.name;
-      }
-      if (
-        companySettings &&
-        currentTargetTenantId &&
-        Number(companySettings.tenantId || companySettings.tenant_id) === currentTargetTenantId
-      ) {
-        const csName = companySettings.name || companySettings.company_name || companySettings.companyName;
-        if (csName) return csName;
       }
       if (cachedStoreName && currentTargetTenantId && Number(getActiveTenantId()) === currentTargetTenantId) {
         return cachedStoreName;
@@ -372,7 +374,22 @@ export default function App() {
     return '';
   })();
 
-  // Synchronize document.title, PWA meta tags, favicon, and <link rel="manifest"> strictly by active role & view state
+  // Keep browser document.title route- and store-aware independently of PWA installation shortcut branding
+  useDocumentTitle(
+    () =>
+      getStandardDocumentTitle({
+        saasMode,
+        role: currentUser?.role,
+        isSuperAdmin: saasMode === 'SUPERADMIN',
+        platformName: PLATFORM_DOCUMENT_NAME,
+        storeName: effectiveStoreName,
+        currentTab,
+        isAuthModalOpen: isLoginModalOpen,
+      }),
+    [saasMode, currentUser?.role, effectiveStoreName, currentTab, isLoginModalOpen]
+  );
+
+  // Synchronize PWA manifest link and installation shortcut meta tags strictly by active role & view state
   usePwaManifest({
     role: currentUser?.role,
     saasMode,

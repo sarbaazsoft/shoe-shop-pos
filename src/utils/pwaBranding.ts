@@ -21,7 +21,6 @@ export interface PwaBrandingConfig {
   isSuperAdmin: boolean;
   appName: string;
   shortName: string;
-  documentTitle: string;
   applicationName: string;
   appleMobileWebAppTitle: string;
   description: string;
@@ -127,7 +126,6 @@ export function resolvePwaBranding(input?: PwaBrandingInput | string | null): Pw
       isSuperAdmin: true,
       appName: SUPERADMIN_PWA_APP_NAME,
       shortName: SUPERADMIN_PWA_SHORT_NAME,
-      documentTitle: SUPERADMIN_PWA_APP_NAME,
       applicationName: SUPERADMIN_PWA_APP_NAME,
       appleMobileWebAppTitle: SUPERADMIN_PWA_APP_NAME,
       description:
@@ -150,7 +148,6 @@ export function resolvePwaBranding(input?: PwaBrandingInput | string | null): Pw
     isSuperAdmin: false,
     appName: STANDARD_PWA_APP_NAME,
     shortName: STANDARD_PWA_SHORT_NAME,
-    documentTitle: STANDARD_PWA_APP_NAME,
     applicationName: STANDARD_PWA_APP_NAME,
     appleMobileWebAppTitle: STANDARD_PWA_APP_NAME,
     description:

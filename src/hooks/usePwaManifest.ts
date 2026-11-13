@@ -39,15 +39,12 @@ function upsertManifestLink(href: string): void {
 }
 
 /**
- * Synchronizes browser document title, PWA meta tags, apple-touch-icons,
- * favicon, and <link rel="manifest"> href with the active role branding config.
+ * Synchronizes PWA manifest link, installation shortcut meta tags (application-name,
+ * apple-mobile-web-app-title), theme-color, apple-touch-icons, and browser favicon
+ * with the active role branding config without altering document.title.
  */
 export function syncPwaMetadataToDocument(branding: PwaBrandingConfig): void {
   if (typeof document === 'undefined') return;
-
-  if (document.title !== branding.documentTitle) {
-    document.title = branding.documentTitle;
-  }
 
   upsertMetaTag(
     'meta[name="apple-mobile-web-app-title"]',
@@ -63,11 +60,6 @@ export function syncPwaMetadataToDocument(branding: PwaBrandingConfig): void {
     'meta[name="theme-color"]',
     { name: 'theme-color' },
     branding.themeColor
-  );
-  upsertMetaTag(
-    'meta[property="og:title"]',
-    { property: 'og:title' },
-    branding.documentTitle
   );
 
   upsertManifestLink(branding.manifestUrl);

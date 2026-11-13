@@ -10,7 +10,7 @@ import { getRememberedEmail, saveRememberedEmail, forgetRememberedEmail } from '
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
-import { STANDARD_PWA_APP_NAME } from '../../utils/pwaBranding.ts';
+import { getStandardDocumentTitle } from '../../utils/documentTitle.ts';
 
 interface AuthModalProps {
   onSuccess: (user: any) => void;
@@ -26,8 +26,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [tab, setTab] = useState<'login' | 'forgot' | 'reset'>('login');
-
-  useDocumentTitle(STANDARD_PWA_APP_NAME, [tab]);
 
   // Form states with email retrieval from localStorage
   const [email, setEmail] = useState(() => getRememberedEmail('store') ?? '');
@@ -126,6 +124,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const isStoreSpecific = Boolean(activeTenantId || storeTitle);
   const storeName = effectiveStoreName;
+
+  useDocumentTitle(
+    () =>
+      getStandardDocumentTitle({
+        saasMode: 'AUTH',
+        isAuthModalOpen: true,
+        authSubTab: tab,
+        storeName,
+      }),
+    [tab, storeName]
+  );
 
   // Hidden by default for a few ms, then fades in smoothly
   const [isVisible, setIsVisible] = useState(false);

@@ -39,7 +39,6 @@ test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to Sa
     assert.equal(config.isSuperAdmin, false);
     assert.equal(config.appName, STANDARD_PWA_APP_NAME);
     assert.equal(config.shortName, STANDARD_PWA_SHORT_NAME);
-    assert.equal(config.documentTitle, STANDARD_PWA_APP_NAME);
     assert.equal(config.applicationName, STANDARD_PWA_APP_NAME);
     assert.equal(config.appleMobileWebAppTitle, STANDARD_PWA_APP_NAME);
     assert.equal(config.themeColor, '#9333EA');
@@ -54,17 +53,38 @@ test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to Sa
     assert.ok(manifest.icons.some((i) => i.src === '/pwa-maskable-512x512.png' && i.purpose === 'maskable'));
   }
 
-  assert.equal(
-    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'ADMIN', storeName: 'Acme Shoes', currentTab: 'pos' }),
-    'SarbaazSoft Shoe Shop POS'
-  );
-  assert.equal(
-    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'CASHIER', storeName: 'Acme Shoes', currentTab: 'pos' }),
-    'SarbaazSoft Shoe Shop POS'
-  );
+  // Document titles follow clean "{StoreName} | [Page Name]", "{platformName} | Login", and Landing convention
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'LANDING' }),
     'SarbaazSoft Shoe Shop POS'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'login' }),
+    'SarbaazSoft Shoe Shop POS | Login'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'register' }),
+    'SarbaazSoft Shoe Shop POS | Register'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'forgot' }),
+    'SarbaazSoft Shoe Shop POS | Reset Password'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'ADMIN', storeName: 'Acme Shoes', currentTab: 'dashboard' }),
+    'Acme Shoes | Dashboard'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'CASHIER', storeName: 'Acme Shoes', currentTab: 'pos' }),
+    'Acme Shoes | POS Terminal'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'ADMIN', storeName: 'Acme Shoes', currentTab: 'settings' }),
+    'Acme Shoes | Settings'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'ADMIN', storeName: 'Acme Shoes', currentTab: 'reports' }),
+    'Acme Shoes | Reports & Analytics'
   );
 });
 
@@ -83,7 +103,6 @@ test('pwaBranding: SuperAdmin Control Panel strictly resolves to SuperAdmin Sarb
     assert.equal(config.isSuperAdmin, true);
     assert.equal(config.appName, SUPERADMIN_PWA_APP_NAME);
     assert.equal(config.shortName, SUPERADMIN_PWA_SHORT_NAME);
-    assert.equal(config.documentTitle, SUPERADMIN_PWA_APP_NAME);
     assert.equal(config.applicationName, SUPERADMIN_PWA_APP_NAME);
     assert.equal(config.appleMobileWebAppTitle, SUPERADMIN_PWA_APP_NAME);
     assert.equal(config.manifestUrl, '/api/pwa/manifest.webmanifest?role=SUPERADMIN');
@@ -99,8 +118,12 @@ test('pwaBranding: SuperAdmin Control Panel strictly resolves to SuperAdmin Sarb
   }
 
   assert.equal(
-    getStandardDocumentTitle({ saasMode: 'SUPERADMIN', storeName: 'Some Store' }),
-    'SuperAdmin SarbaazSoft Shoe POS'
+    getStandardDocumentTitle({ saasMode: 'SUPERADMIN', currentTab: 'dashboard' }),
+    'SuperAdmin Control Panel | Dashboard'
+  );
+  assert.equal(
+    getStandardDocumentTitle({ saasMode: 'SUPERADMIN', isAuthModalOpen: true, authSubTab: 'login' }),
+    'SarbaazSoft Shoe Shop POS | Login'
   );
 });
 
@@ -157,7 +180,7 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
 
   const prevDocument = (globalThis as any).document;
   const mockDoc = {
-    title: '',
+    title: 'POS Terminal — Acme Shoes',
     head: {
       appendChild(el: MockElement) {
         elements.push(el);
@@ -176,17 +199,17 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
   (globalThis as any).document = mockDoc;
 
   try {
-    // 1. Store Owner (ADMIN)
+    // 1. Store Owner (ADMIN) - updates PWA shortcut meta/manifest without altering document.title
     syncPwaMetadataToDocument(resolvePwaBranding({ role: 'ADMIN', saasMode: 'TENANT_ACTIVE' }));
-    assert.equal(mockDoc.title, 'SarbaazSoft Shoe Shop POS');
+    assert.equal(mockDoc.title, 'POS Terminal — Acme Shoes');
     assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SarbaazSoft Shoe Shop POS');
     assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SarbaazSoft Shoe Shop POS');
     assert.equal(mockDoc.querySelector('link[rel="manifest"]')?.getAttribute('href'), '/api/pwa/manifest.webmanifest?role=ADMIN');
     assert.equal(mockDoc.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), '/apple-touch-icon.png');
 
-    // 2. SuperAdmin Control Panel
+    // 2. SuperAdmin Control Panel - updates PWA shortcut meta/manifest without altering document.title
     syncPwaMetadataToDocument(resolvePwaBranding({ role: 'SUPERADMIN', saasMode: 'SUPERADMIN' }));
-    assert.equal(mockDoc.title, 'SuperAdmin SarbaazSoft Shoe POS');
+    assert.equal(mockDoc.title, 'POS Terminal — Acme Shoes');
     assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SuperAdmin SarbaazSoft Shoe POS');
     assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SuperAdmin SarbaazSoft Shoe POS');
     assert.equal(mockDoc.querySelector('link[rel="manifest"]')?.getAttribute('href'), '/api/pwa/manifest.webmanifest?role=SUPERADMIN');
@@ -194,7 +217,7 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
 
     // 3. Cashier switch
     syncPwaMetadataToDocument(resolvePwaBranding({ role: 'CASHIER', saasMode: 'TENANT_ACTIVE' }));
-    assert.equal(mockDoc.title, 'SarbaazSoft Shoe Shop POS');
+    assert.equal(mockDoc.title, 'POS Terminal — Acme Shoes');
     assert.equal(mockDoc.querySelector('link[rel="manifest"]')?.getAttribute('href'), '/api/pwa/manifest.webmanifest?role=CASHIER');
   } finally {
     if (prevDocument === undefined) {
@@ -205,7 +228,7 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
   }
 });
 
-test('static manifests and index.html match strict role-based branding', () => {
+test('static manifests and index.html use Landing Page document title while keeping PWA shortcut branding intact', () => {
   const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
   assert.ok(indexHtml.includes('<title>SarbaazSoft Shoe Shop POS</title>'));
   assert.ok(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="SarbaazSoft Shoe Shop POS" />'));

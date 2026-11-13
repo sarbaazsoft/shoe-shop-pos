@@ -1,21 +1,20 @@
-import {
-  resolvePwaBranding,
-  STANDARD_PWA_APP_NAME,
-  PWA_BROWSER_FAVICON_PATH,
-} from './pwaBranding.ts';
-
 /**
  * Standardized document/browser title & favicon helper.
  *
- * Role-based rules (no dynamic tenant names):
- * 1. Store Owner, Cashier, and Unlogged / Public Users: "SarbaazSoft Shoe Shop POS"
- * 2. SuperAdmin Control Panel: "SuperAdmin SarbaazSoft Shoe POS"
- * 3. Browser Tab Favicon: Multi-resolution /admin/favicon.ico across all routes and roles.
+ * Title convention (HTML <title> / document.title only — does NOT affect PWA manifests or shortcuts):
+ * - Landing Page: "SarbaazSoft Shoe Shop POS"
+ * - Auth Pages (Login/Register/Reset): "{platformName} | Login" (or respective auth action)
+ * - Dashboard: "{StoreName} | Dashboard"
+ * - POS Terminal: "{StoreName} | POS Terminal"
+ * - Settings: "{StoreName} | Settings"
+ * - Other operational pages: "{StoreName} | [Page Name]"
+ * - Browser Tab Favicon: Multi-resolution /admin/favicon.ico across all routes and roles.
  */
 
-export const SAAS_LANDING_TITLE = STANDARD_PWA_APP_NAME;
-export const AUTH_PAGE_TITLE = STANDARD_PWA_APP_NAME;
-export const BROWSER_FAVICON_PATH = PWA_BROWSER_FAVICON_PATH;
+export const PLATFORM_DOCUMENT_NAME = 'SarbaazSoft Shoe Shop POS';
+export const SAAS_LANDING_TITLE = PLATFORM_DOCUMENT_NAME;
+export const AUTH_PAGE_TITLE = PLATFORM_DOCUMENT_NAME;
+export const BROWSER_FAVICON_PATH = '/admin/favicon.ico';
 
 export const APP_ROUTE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -43,6 +42,7 @@ export interface StandardTitleOptions {
   saasMode?: string;
   role?: string;
   isSuperAdmin?: boolean;
+  platformName?: string;
   storeName?: string;
   currentTab?: string;
   routeName?: string;
@@ -52,11 +52,84 @@ export interface StandardTitleOptions {
 }
 
 /**
- * Returns the standardized document/browser title based strictly on role / SuperAdmin state.
+ * Returns the standardized HTML document title for the active route, modal, or tenant workspace.
  */
 export function getStandardDocumentTitle(options: StandardTitleOptions = {}): string {
-  const { saasMode, role, isSuperAdmin } = options;
-  return resolvePwaBranding({ saasMode, role, isSuperAdmin }).documentTitle;
+  const {
+    saasMode,
+    role,
+    isSuperAdmin,
+    platformName,
+    storeName,
+    currentTab,
+    routeName,
+    isAuthModalOpen,
+    authSubTab,
+    modalTitle,
+  } = options;
+
+  const cleanPlatformName =
+    (typeof platformName === 'string' && platformName.trim()) || PLATFORM_DOCUMENT_NAME;
+  const cleanStoreName = typeof storeName === 'string' ? storeName.trim() : '';
+  const modeUpper = String(saasMode || '').trim().toUpperCase();
+  const roleUpper = String(role || '').trim().toUpperCase();
+  const normalizedTab = typeof currentTab === 'string' ? currentTab.trim().toLowerCase() : '';
+  const tabLabel = (typeof routeName === 'string' && routeName.trim()) || APP_ROUTE_TITLES[normalizedTab] || '';
+  const cleanModal = typeof modalTitle === 'string' ? modalTitle.trim() : '';
+
+  const resolveAuthLabel = (subRaw?: string): string => {
+    const sub = String(subRaw || 'login').trim().toLowerCase();
+    if (sub === 'forgot' || sub === 'forgot-password') return 'Reset Password';
+    if (sub === 'reset' || sub === 'reset-password') return 'Create New Password';
+    if (sub === 'register' || sub === 'signup') return 'Register';
+    return 'Login';
+  };
+
+  if (isSuperAdmin || modeUpper === 'SUPERADMIN' || roleUpper === 'SUPERADMIN') {
+    if (isAuthModalOpen) {
+      return `${cleanPlatformName} | ${resolveAuthLabel(authSubTab)}`;
+    }
+    const adminBase = 'SuperAdmin Control Panel';
+    if (cleanModal) return `${adminBase} | ${cleanModal}`;
+    if (tabLabel) return `${adminBase} | ${tabLabel}`;
+    return `${adminBase} | Dashboard`;
+  }
+
+  if (modeUpper === 'INSTALLER') {
+    return `${cleanPlatformName} | System Installation`;
+  }
+
+  if (modeUpper === 'VERIFY_EMAIL') {
+    return `${cleanPlatformName} | Verify Email`;
+  }
+
+  if (modeUpper === 'AUTH' || isAuthModalOpen) {
+    return `${cleanPlatformName} | ${resolveAuthLabel(authSubTab)}`;
+  }
+
+  if (modeUpper === 'TENANT_ONBOARDING') {
+    return `${cleanStoreName || cleanPlatformName} | Store Onboarding`;
+  }
+  if (modeUpper === 'TENANT_SUSPENDED') {
+    return `${cleanStoreName || cleanPlatformName} | Store Suspended`;
+  }
+  if (modeUpper === 'TENANT_EXPIRED') {
+    return `${cleanStoreName || cleanPlatformName} | Subscription Expired`;
+  }
+  if (modeUpper === 'TENANT_NOT_FOUND') {
+    return `${cleanPlatformName} | Store Not Found`;
+  }
+
+  if (cleanModal) {
+    return `${cleanStoreName || cleanPlatformName} | ${cleanModal}`;
+  }
+
+  if (modeUpper === 'LANDING') {
+    return cleanPlatformName;
+  }
+
+  const effectiveStore = cleanStoreName || cleanPlatformName;
+  return tabLabel ? `${effectiveStore} | ${tabLabel}` : effectiveStore;
 }
 
 /**

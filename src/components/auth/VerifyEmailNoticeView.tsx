@@ -3,7 +3,7 @@ import { Mail, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, ArrowLeft, Sh
 import { api } from '../../services/api.ts';
 import { PublicLayout } from '../common/PublicLayout.tsx';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
-import { STANDARD_PWA_APP_NAME } from '../../utils/pwaBranding.ts';
+import { getStandardDocumentTitle } from '../../utils/documentTitle.ts';
 
 interface VerifyEmailNoticeViewProps {
   initialEmail?: string;
@@ -22,7 +22,10 @@ export const VerifyEmailNoticeView: React.FC<VerifyEmailNoticeViewProps> = ({
   onNavigateLogin,
   onNavigateHome,
 }) => {
-  useDocumentTitle(STANDARD_PWA_APP_NAME);
+  useDocumentTitle(
+    () => getStandardDocumentTitle({ saasMode: 'VERIFY_EMAIL', storeName }),
+    [storeName]
+  );
 
   const [email] = useState(() => {
     if (initialEmail) return initialEmail;
