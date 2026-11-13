@@ -16,12 +16,14 @@ interface AuthModalProps {
   onSuccess: (user: any) => void;
   companySettings: any;
   onBack?: () => void;
+  onClearTenantScope?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
   companySettings,
   onBack,
+  onClearTenantScope,
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -98,6 +100,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (provided && provided !== 'SarbaazSoft Shoe POS' && provided !== 'Shoe Shop POS & Inventory') {
       setStoreTitle(provided);
       return;
+    }
+    if (!activeTenantId) {
+      setStoreTitle('');
     }
 
     if (activeTenantId) {
@@ -325,6 +330,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         actionIcon={<Store className="w-3.5 h-3.5" />}
         onActionClick={onBack}
       />
+
+      {/* Unauthenticated Store Scope Notification Banner (matching landing page header bar) */}
+      {activeTenantId && (
+        <div
+          id="auth-tenant-scope-banner"
+          className="relative z-20 bg-purple-100 dark:bg-purple-950/90 border-b border-purple-300 dark:border-purple-800/60 py-2 px-4 text-xs select-none"
+        >
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-purple-900 dark:text-purple-200 font-medium">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+              <span>
+                Active Store Scope: <strong>{effectiveStoreName}</strong> (Tenant #{activeTenantId})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] transition cursor-pointer shadow-xs"
+                >
+                  Change Store
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    sessionStorage.removeItem('pos_unauth_scoped_tenant_id');
+                    localStorage.removeItem('pos_unauth_scoped_tenant_id');
+                  } catch {}
+                  onClearTenantScope?.();
+                }}
+                className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-purple-900 dark:text-purple-200 font-semibold text-[11px] transition cursor-pointer border border-purple-400/30"
+                title="Clear tenant scope and sign in without a store lock"
+              >
+                Clear Store Scope
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area - Centered Login Form Card */}
       <main className="relative z-10 w-full flex-1 flex items-center justify-center px-4 py-8 sm:py-12">

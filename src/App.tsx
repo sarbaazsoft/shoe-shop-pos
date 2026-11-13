@@ -9,6 +9,7 @@ import { PushNotificationSoftPrompt } from './components/notifications/PushNotif
 import { PublicLayout } from './components/common/PublicLayout.tsx';
 import { TenantWorkspaceSkeleton } from './components/common/TenantWorkspaceSkeleton.tsx';
 import { LoadingWindow } from './components/common/LoadingWindow.tsx';
+import { SaasLandingPage } from './components/saas/SaasLandingPage.tsx';
 
 const PosTerminal = lazy(() => import('./components/pos/PosTerminal.tsx').then((m) => ({ default: m.PosTerminal })));
 const ProductManagement = lazy(() => import('./components/inventory/ProductManagement.tsx').then((m) => ({ default: m.ProductManagement })));
@@ -27,7 +28,6 @@ const SuspendedStoreView = lazy(() => import('./components/saas/SuspendedStoreVi
 const SuperAdminControlPanel = lazy(() => import('./components/saas/SuperAdminControlPanel.tsx').then((m) => ({ default: m.SuperAdminControlPanel })));
 const TenantOnboardingWizard = lazy(() => import('./components/saas/TenantOnboardingWizard.tsx').then((m) => ({ default: m.TenantOnboardingWizard })));
 const InstallationWizard = lazy(() => import('./components/saas/InstallationWizard.tsx').then((m) => ({ default: m.InstallationWizard })));
-const SaasLandingPage = lazy(() => import('./components/saas/SaasLandingPage.tsx').then((m) => ({ default: m.SaasLandingPage })));
 const NotificationsView = lazy(() => import('./components/notifications/NotificationsView.tsx').then((m) => ({ default: m.NotificationsView })));
 const VerifyEmailNoticeView = lazy(() => import('./components/auth/VerifyEmailNoticeView.tsx').then((m) => ({ default: m.VerifyEmailNoticeView })));
 import { ShieldAlert } from 'lucide-react';
@@ -164,12 +164,19 @@ function detectInitialRouteFromLocation(): {
     hasAuthToken = Boolean(token && token !== 'null' && token !== 'undefined');
   } catch {}
 
-  // 3. Unauthenticated tenant scope retention
-  let tenantIdParam = queryTenantId || pathTenantId;
+  // 3. Unauthenticated tenant scope retention (only auto-applied on /auth or explicit URL tenant params)
+  const explicitTenantId = queryTenantId || pathTenantId;
+  const isExplicitAuthRoute =
+    pathname === '/auth' ||
+    pathname.startsWith('/auth/') ||
+    pathname === '/login' ||
+    pathname.startsWith('/login/') ||
+    searchParams.get('mode') === 'login';
+  let tenantIdParam = explicitTenantId;
   if (!hasAuthToken) {
-    if (tenantIdParam) {
-      setStoredUnauthTenantId(tenantIdParam);
-    } else {
+    if (explicitTenantId) {
+      setStoredUnauthTenantId(explicitTenantId);
+    } else if (isExplicitAuthRoute) {
       tenantIdParam = getStoredUnauthTenantId();
     }
   }
@@ -310,12 +317,13 @@ export default function App() {
   // A tenantId/storeId URL is an explicit store switch. Until its ID has been
   // resolved against the current tenant directory, cached settings belong to an
   // unknown (possibly previous) store and must not be used by the login UI.
+  const hasStoredAuthToken = Boolean(getAuthToken());
   const isRequestedTenantVerified = !tenantIdParam || Boolean(
     storeLoginTarget && Number(storeLoginTarget.id) === Number(tenantIdParam)
   );
-  const shouldShowTenantLoading = isInitializing || (
-    Boolean(tenantIdParam) && !isRequestedTenantVerified && !tenantIdNotice
-  );
+  const shouldShowTenantLoading =
+    (isInitializing && (hasStoredAuthToken || Boolean(tenantIdParam))) ||
+    (Boolean(tenantIdParam) && !isRequestedTenantVerified && !tenantIdNotice);
 
   const currentTargetTenantId = Number(
     activeTenant?.id ||
@@ -481,25 +489,40 @@ export default function App() {
       }
 
       // Clean section URLs no longer carry tenantId, so recover the last tenant
-      // from the cached identity while bootstrapping a refresh. The session is
-      // still verified with /auth/me below before protected content is shown.
+      // from the cached identity while bootstrapping an authenticated session.
+      const existingToken = getAuthToken();
+      const hasExistingToken = Boolean(existingToken && existingToken !== 'null' && existingToken !== 'undefined');
       let cachedTenantId: number | null = null;
       let cachedRole = '';
-      try {
-        const cachedUser = JSON.parse(localStorage.getItem('pos_current_user') || 'null');
-        cachedTenantId = Number(cachedUser?.tenantId) > 0 ? Number(cachedUser.tenantId) : null;
-        cachedRole = String(cachedUser?.originalRole || cachedUser?.role || '').toUpperCase();
-      } catch {}
+      if (hasExistingToken) {
+        try {
+          const cachedUser = JSON.parse(localStorage.getItem('pos_current_user') || 'null');
+          cachedTenantId = Number(cachedUser?.tenantId) > 0 ? Number(cachedUser.tenantId) : null;
+          cachedRole = String(cachedUser?.originalRole || cachedUser?.role || '').toUpperCase();
+        } catch {}
+      }
       const queryTenantId = Number(tenantIdParam) > 0 ? Number(tenantIdParam) : null;
       const tenantIdForInit = overrideTenantId !== undefined
         ? overrideTenantId
-        : (queryTenantId || (cachedRole === 'SUPERADMIN' ? null : cachedTenantId || getActiveTenantId() || null));
-      const modeForInit = overrideMode || (tenantIdForInit ? 'TENANT_ACTIVE' : saasMode);
-      const isLanding = modeForInit === 'LANDING' || modeForInit === 'SUPERADMIN';
+        : (hasExistingToken
+            ? (queryTenantId || (cachedRole === 'SUPERADMIN' ? null : cachedTenantId || getActiveTenantId() || null))
+            : queryTenantId);
+      const modeForInit =
+        overrideMode ||
+        (hasExistingToken && tenantIdForInit && saasMode !== 'SUPERADMIN' && saasMode !== 'TENANT_ONBOARDING'
+          ? 'TENANT_ACTIVE'
+          : saasMode);
+      const isPublicOrAdminPortal =
+        modeForInit === 'LANDING' || modeForInit === 'AUTH' || modeForInit === 'SUPERADMIN';
       await refreshTenantDirectory(modeForInit);
 
-      // The shared portal only needs the public tenant directory until a tenant is selected.
-      if (modeForInit === 'SUPERADMIN' || (isLanding && !tenantIdForInit)) return;
+      // The shared portal and auth screen only need the public tenant directory until a session is authenticated.
+      if (modeForInit === 'SUPERADMIN' || (isPublicOrAdminPortal && (!hasExistingToken || !tenantIdForInit))) {
+        if (!hasExistingToken) {
+          setCurrentUser(null);
+        }
+        return;
+      }
 
       const [statusRes, settingsRes] = await Promise.all([
         api.install.status().catch(() => null),
@@ -712,13 +735,12 @@ export default function App() {
       const sp = new URLSearchParams(window.location.search);
       const pathname = window.location.pathname;
       const pathMatch = pathname.match(/^\/(?:store|stores|tenant|t|directory)\/([a-zA-Z0-9_-]+)/i);
-      const tid =
+      const explicitTid =
         sp.get('tenantId') ||
         sp.get('storeId') ||
         sp.get('tenant_id') ||
         sp.get('store_id') ||
         (pathMatch ? pathMatch[1] : '') ||
-        (!currentUser ? getStoredUnauthTenantId() : '') ||
         '';
       const mode = sp.get('mode');
       const reset = sp.get('resetToken');
@@ -727,20 +749,21 @@ export default function App() {
         pathname.startsWith('/auth/') ||
         pathname === '/login' ||
         pathname.startsWith('/login/');
+      const tid = explicitTid || (isAuthPath && !currentUser ? getStoredUnauthTenantId() : '');
 
-      if (tid && !currentUser) {
-        setStoredUnauthTenantId(tid);
+      if (explicitTid && !currentUser) {
+        setStoredUnauthTenantId(explicitTid);
       }
 
       if (isAuthPath) {
         setSaasMode('AUTH');
         setIsLoginModalOpen(true);
-      } else if (pathname === '/' && !tid && mode !== 'login') {
+      } else if (pathname === '/' && !explicitTid && mode !== 'login') {
         setSaasMode('LANDING');
         setIsLoginModalOpen(false);
       }
       setTenantIdParam(tid);
-      setIsLoginModalOpen(Boolean(tid || mode === 'login' || reset || isAuthPath));
+      setIsLoginModalOpen(Boolean(explicitTid || mode === 'login' || reset || isAuthPath));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -757,6 +780,19 @@ export default function App() {
     setSaasMode('LANDING');
     setIsLoginModalOpen(false);
     window.history.pushState({}, '', '/');
+  }, []);
+
+  // Clear tenant scope while remaining on the /auth sign-in route
+  const handleClearAuthTenantScope = useCallback(() => {
+    clearStoredUnauthTenantId();
+    setTenantIdParam('');
+    setActiveTenant(null);
+    setActiveTenantId(null);
+    setStoreLoginTarget(null);
+    setTenantIdNotice('');
+    setSaasMode('AUTH');
+    setIsLoginModalOpen(true);
+    window.history.pushState({}, '', '/auth');
   }, []);
 
   // When clicking Store Directory, unauthenticated users retain their tenantId scope
@@ -1317,6 +1353,7 @@ export default function App() {
                         ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '', logo: '/pwa-192x192.png' }
                         : { name: 'SarbaazSoft Shoe POS', logo: '/pwa-192x192.png' }))}
               onBack={handleBackToStoreDirectory}
+              onClearTenantScope={handleClearAuthTenantScope}
               onSuccess={handleAuthSuccess}
             />
           </>
@@ -1369,6 +1406,7 @@ export default function App() {
                         ? { tenant_id: Number(tenantIdParam), name: effectiveStoreName || '', logo: '/pwa-192x192.png' }
                         : { name: 'SarbaazSoft Shoe POS', logo: '/pwa-192x192.png' }))}
               onBack={handleBackToStoreDirectory}
+              onClearTenantScope={handleClearAuthTenantScope}
               onSuccess={handleAuthSuccess}
             />
           </>
