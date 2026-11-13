@@ -10,6 +10,7 @@ import { getRememberedEmail, saveRememberedEmail, forgetRememberedEmail } from '
 import { useTheme } from '../../context/ThemeContext.tsx';
 import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.tsx';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
+import { STANDARD_PWA_APP_NAME } from '../../utils/pwaBranding.ts';
 
 interface AuthModalProps {
   onSuccess: (user: any) => void;
@@ -26,11 +27,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const isDark = theme === 'dark';
   const [tab, setTab] = useState<'login' | 'forgot' | 'reset'>('login');
 
-  useDocumentTitle(() => {
-    if (tab === 'forgot') return 'SarbaazSoft Shoe POS | Forgot Password';
-    if (tab === 'reset') return 'SarbaazSoft Shoe POS | Reset Password';
-    return 'SarbaazSoft Shoe POS | Login';
-  }, [tab]);
+  useDocumentTitle(STANDARD_PWA_APP_NAME, [tab]);
 
   // Form states with email retrieval from localStorage
   const [email, setEmail] = useState(() => getRememberedEmail('store') ?? '');

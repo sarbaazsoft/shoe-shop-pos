@@ -1,17 +1,21 @@
+import {
+  resolvePwaBranding,
+  STANDARD_PWA_APP_NAME,
+  PWA_BROWSER_FAVICON_PATH,
+} from './pwaBranding.ts';
+
 /**
- * Standardized document/browser title & favicon helper for SarbaazSoft Shoe POS.
+ * Standardized document/browser title & favicon helper.
  *
- * Rules:
- * 1. SaaS Landing Page: "SarbaazSoft Shoe POS - Wholesale & Retail POS Solution"
- * 2. Login & Auth Pages: "SarbaazSoft Shoe POS | Login" (or Signup / Forgot Password / Reset Password)
- * 3. Authenticated App Views: "[Store Name] | [Current Route Name]"
- *    (e.g., "TJ Shoes Collection | Dashboard", "TJ Shoes Collection | POS Terminal", "TJ Shoes Collection | Settings")
- * 4. Browser Tab Favicon: Multi-resolution /admin/favicon.ico across all routes and roles.
+ * Role-based rules (no dynamic tenant names):
+ * 1. Store Owner, Cashier, and Unlogged / Public Users: "SarbaazSoft Shoe Shop POS"
+ * 2. SuperAdmin Control Panel: "SuperAdmin SarbaazSoft Shoe POS"
+ * 3. Browser Tab Favicon: Multi-resolution /admin/favicon.ico across all routes and roles.
  */
 
-export const SAAS_LANDING_TITLE = 'SarbaazSoft Shoe POS - Wholesale & Retail POS Solution';
-export const AUTH_PAGE_TITLE = 'SarbaazSoft Shoe POS | Login';
-export const BROWSER_FAVICON_PATH = '/admin/favicon.ico';
+export const SAAS_LANDING_TITLE = STANDARD_PWA_APP_NAME;
+export const AUTH_PAGE_TITLE = STANDARD_PWA_APP_NAME;
+export const BROWSER_FAVICON_PATH = PWA_BROWSER_FAVICON_PATH;
 
 export const APP_ROUTE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -37,6 +41,8 @@ export const APP_ROUTE_TITLES: Record<string, string> = {
 
 export interface StandardTitleOptions {
   saasMode?: string;
+  role?: string;
+  isSuperAdmin?: boolean;
   storeName?: string;
   currentTab?: string;
   routeName?: string;
@@ -46,88 +52,11 @@ export interface StandardTitleOptions {
 }
 
 /**
- * Returns a standardized document/browser title based on the current application state.
+ * Returns the standardized document/browser title based strictly on role / SuperAdmin state.
  */
 export function getStandardDocumentTitle(options: StandardTitleOptions = {}): string {
-  const {
-    saasMode,
-    storeName,
-    currentTab,
-    routeName,
-    isAuthModalOpen,
-    authSubTab,
-    modalTitle,
-  } = options;
-
-  // 1. Auth Modal is open or direct Auth Route
-  if (isAuthModalOpen || saasMode === 'AUTH') {
-    const sub = (authSubTab || '').toLowerCase();
-    if (sub === 'register' || sub === 'signup') {
-      return 'SarbaazSoft Shoe POS | Signup';
-    }
-    if (sub === 'forgot' || sub === 'forgot-password') {
-      return 'SarbaazSoft Shoe POS | Forgot Password';
-    }
-    if (sub === 'reset' || sub === 'reset-password') {
-      return 'SarbaazSoft Shoe POS | Reset Password';
-    }
-    return AUTH_PAGE_TITLE;
-  }
-
-  // 2. Email Verification Route
-  if (saasMode === 'VERIFY_EMAIL') {
-    return 'SarbaazSoft Shoe POS | Verify Email';
-  }
-
-  // 3. SaaS Landing Page
-  if (saasMode === 'LANDING' || (!storeName && saasMode !== 'SUPERADMIN' && saasMode !== 'TENANT_ACTIVE')) {
-    return SAAS_LANDING_TITLE;
-  }
-
-  // 4. SuperAdmin Control Panel
-  if (saasMode === 'SUPERADMIN') {
-    return routeName ? `POS Admin | ${routeName}` : 'POS Admin | Control Panel';
-  }
-
-  // 5. System Installer
-  if (saasMode === 'INSTALLER') {
-    return 'SarbaazSoft Shoe POS | Installation Wizard';
-  }
-
-  // 6. Tenant Error / Notice States
-  if (saasMode === 'TENANT_NOT_FOUND') {
-    return 'SarbaazSoft Shoe POS | Store Not Found';
-  }
-  if (saasMode === 'TENANT_SUSPENDED') {
-    return `${storeName || 'Store'} | Account Suspended`;
-  }
-  if (saasMode === 'TENANT_EXPIRED') {
-    return `${storeName || 'Store'} | Subscription Expired`;
-  }
-  if (saasMode === 'TENANT_ONBOARDING') {
-    return `${storeName || 'Store'} | Store Setup`;
-  }
-
-  // 7. Authenticated Active Store View: "[Store Name] | [Current Route Name]"
-  const resolvedStore = (storeName || '').trim() || 'SarbaazSoft Shoe POS';
-
-  // If a specific modal view title is active inside the authenticated workspace
-  if (modalTitle) {
-    return `${resolvedStore} | ${modalTitle}`;
-  }
-
-  // Determine route name
-  let resolvedRoute = routeName;
-  if (!resolvedRoute && currentTab) {
-    const cleanTab = currentTab.toLowerCase().trim();
-    resolvedRoute = APP_ROUTE_TITLES[cleanTab] || cleanTab.charAt(0).toUpperCase() + cleanTab.slice(1);
-  }
-
-  if (resolvedRoute) {
-    return `${resolvedStore} | ${resolvedRoute}`;
-  }
-
-  return `${resolvedStore} | Dashboard`;
+  const { saasMode, role, isSuperAdmin } = options;
+  return resolvePwaBranding({ saasMode, role, isSuperAdmin }).documentTitle;
 }
 
 /**

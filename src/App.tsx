@@ -32,7 +32,8 @@ const NotificationsView = lazy(() => import('./components/notifications/Notifica
 const VerifyEmailNoticeView = lazy(() => import('./components/auth/VerifyEmailNoticeView.tsx').then((m) => ({ default: m.VerifyEmailNoticeView })));
 import { ShieldAlert } from 'lucide-react';
 import { initNativeNotificationPrompt } from './services/pushNotificationClient.ts';
-import { getStandardDocumentTitle, applyBrowserFavicon } from './utils/documentTitle.ts';
+import { usePwaManifest } from './hooks/usePwaManifest.ts';
+import { SUPERADMIN_PWA_APP_NAME, STANDARD_PWA_APP_NAME } from './utils/pwaBranding.ts';
 import { APP_VERSION } from './version.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
@@ -324,8 +325,8 @@ export default function App() {
   );
 
   const effectiveStoreName = (() => {
-    if (saasMode === 'SUPERADMIN') return 'POS Admin';
-    if ((saasMode === 'LANDING' || saasMode === 'AUTH') && !tenantIdParam) return 'Shoe POS';
+    if (saasMode === 'SUPERADMIN') return SUPERADMIN_PWA_APP_NAME;
+    if ((saasMode === 'LANDING' || saasMode === 'AUTH') && !tenantIdParam) return STANDARD_PWA_APP_NAME;
 
     if (
       saasMode === 'TENANT_ACTIVE' ||
@@ -371,73 +372,12 @@ export default function App() {
     return '';
   })();
 
-  // Mobile home screen title and iOS bundle display name (ShoePOS) to prevent truncation
-  const pwaShortName =
-    saasMode === 'SUPERADMIN'
-      ? 'POSAdmin'
-      : 'ShoePOS';
-
-  // Standardized document/browser title across SaaS landing, login, and authenticated store routes
-  const pageTitle = getStandardDocumentTitle({
+  // Synchronize document.title, PWA meta tags, favicon, and <link rel="manifest"> strictly by active role & view state
+  usePwaManifest({
+    role: currentUser?.role,
     saasMode,
-    storeName: effectiveStoreName,
-    currentTab,
-    isAuthModalOpen: isLoginModalOpen,
-    modalTitle: isProfileModalOpen ? 'User Profile' : undefined,
+    pathname: typeof window !== 'undefined' ? window.location.pathname : '/',
   });
-
-  // Dynamically update <link rel="manifest">, Apple meta tags, and <meta name="theme-color">
-  useEffect(() => {
-    document.title = pageTitle;
-
-    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-    if (appleTitle) {
-      appleTitle.setAttribute('content', pwaShortName);
-    }
-    const appNameMeta = document.querySelector('meta[name="application-name"]');
-    if (appNameMeta) {
-      appNameMeta.setAttribute('content', pwaShortName);
-    }
-
-    const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-    const themeMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
-    const isSuperAdminMode = saasMode === 'SUPERADMIN';
-    const iconPrefix = isSuperAdminMode ? '/admin' : '';
-
-    // Dynamically update apple-touch-icon and standard icon links so store icons apply only to stores, not SuperAdmin PWA
-    document.querySelectorAll<HTMLLinkElement>('link[rel="apple-touch-icon"]').forEach((link) => {
-      const sizes = link.getAttribute('sizes');
-      if (sizes === '192x192') {
-        link.setAttribute('href', `${iconPrefix}/pwa-192x192.png`);
-      } else if (sizes === '512x512') {
-        link.setAttribute('href', `${iconPrefix}/pwa-512x512.png`);
-      } else {
-        link.setAttribute('href', `${iconPrefix}/apple-touch-icon.png`);
-      }
-    });
-
-    // Browser Tab Favicon: standardize S-logo across all routes and roles (Store Owner, Cashier, SuperAdmin, Landing & Public pages)
-    applyBrowserFavicon('/admin/favicon.ico');
-
-    if (isSuperAdminMode) {
-      if (manifestLink) manifestLink.setAttribute('href', '/admin/manifest.webmanifest');
-      if (themeMeta) themeMeta.setAttribute('content', '#9333EA');
-    } else if (activeTenant && activeTenant.id) {
-      if (manifestLink) {
-        manifestLink.setAttribute('href', `/api/tenants/manifest?tenantId=${encodeURIComponent(String(activeTenant.id))}`);
-      }
-      if (themeMeta) {
-        themeMeta.setAttribute('content', '#9333EA');
-      }
-    } else {
-      if (manifestLink) {
-        manifestLink.setAttribute('href', `/manifest.webmanifest?store=${encodeURIComponent(effectiveStoreName)}`);
-      }
-      if (themeMeta) {
-        themeMeta.setAttribute('content', '#9333EA');
-      }
-    }
-  }, [pwaShortName, pageTitle, effectiveStoreName, saasMode, activeTenant]);
 
   // Resolve the shared tenant directory and selected store status.
   const refreshTenantDirectory = useCallback(async (targetMode?: SaasRouteMode) => {

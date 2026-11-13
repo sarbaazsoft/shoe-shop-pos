@@ -5,33 +5,38 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { useScrollActiveTab } from '../../hooks/useScrollActiveTab.ts';
 import { ShoeIcon } from './ShoeIcon.tsx';
 import { APP_VERSION } from '../../version.ts';
+import { resolvePwaBranding } from '../../utils/pwaBranding.ts';
 
 interface InstallAppModalProps {
   isOpen: boolean;
   onClose: () => void;
   storeName?: string;
   isAdmin?: boolean;
+  role?: string;
 }
 
 type PlatformTab = 'android' | 'apple' | 'desktop';
 
 // Only show the native-APK download when a REAL, signed APK is configured (e.g. built with PWABuilder/Bubblewrap).
 // Set VITE_ANDROID_APK_URL=/assets/SarbaazSoft-POS.apk in your env once you drop a real APK at that path.
-export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, storeName, isAdmin = false }) => {
+export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClose, isAdmin = false, role }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [activeTab, setActiveTab] = useState<PlatformTab>('android');
-  const effectiveStoreName = storeName || (isAdmin ? 'POS Admin' : localStorage.getItem('cached_store_name') || 'Shoe POS');
-  const pwaAppName = effectiveStoreName;
+  const branding = resolvePwaBranding({
+    role: role || (isAdmin ? 'SUPERADMIN' : 'ADMIN'),
+    isSuperAdmin: isAdmin,
+  });
+  const pwaAppName = branding.appName;
+  const pwaShortName = branding.shortName;
 
-  const cleanStoreFileName = effectiveStoreName.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'Shoe_POS';
-  const baseStoreFileName = cleanStoreFileName.toLowerCase().endsWith('pos') ? cleanStoreFileName : `${cleanStoreFileName}-POS`;
-  const apkDownloadFileName = `${baseStoreFileName}.apk`;
-  const exeDownloadFileName = `${baseStoreFileName}-Desktop-Setup.exe`;
+  const cleanAppFileName = pwaShortName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SarbaazSoft-POS';
+  const apkDownloadFileName = `${cleanAppFileName}.apk`;
+  const exeDownloadFileName = `${cleanAppFileName}-Desktop-Setup.exe`;
   const configuredApkUrl: string = (import.meta as any).env?.VITE_ANDROID_APK_URL || '/api/download/apk';
   const apkDownloadUrl = configuredApkUrl.startsWith('/api')
-    ? `${configuredApkUrl}?store=${encodeURIComponent(effectiveStoreName)}`
+    ? `${configuredApkUrl}?role=${encodeURIComponent(branding.mode)}`
     : configuredApkUrl;
-  const exeDownloadUrl = `/api/download/desktop-setup?store=${encodeURIComponent(effectiveStoreName)}`;
+  const exeDownloadUrl = `/api/download/desktop-setup?role=${encodeURIComponent(branding.mode)}`;
 
   const { containerRef: installTabContainerRef } = useScrollActiveTab<HTMLDivElement>(activeTab, {
     padding: 16,
@@ -91,8 +96,8 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
         {/* Header */}
         <div className="flex items-center gap-3.5 pr-8">
           <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-md shadow-indigo-500/20 border border-indigo-400/30 shrink-0 overflow-hidden p-0.5">
-            {isAdmin ? (
-              <img src="/admin/pwa-192x192.png" alt="POS Admin Icon" className="w-full h-full object-contain rounded-xl" />
+            {branding.isSuperAdmin ? (
+              <img src="/admin/pwa-192x192.png" alt={`${pwaAppName} Icon`} className="w-full h-full object-contain rounded-xl" />
             ) : (
               <ShoeIcon className="w-full h-full object-cover rounded-2xl" />
             )}
@@ -103,11 +108,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
                 Install {pwaAppName}
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
-                PWA &amp; App Support • {APP_VERSION}
+                {pwaShortName} • {APP_VERSION}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Universal support for Android phones/tablets, Apple iPhone/iPad, and Windows PC
+              Shortcut name: {pwaShortName} • Universal Android, Apple iOS, and Windows PC support
             </p>
           </div>
         </div>

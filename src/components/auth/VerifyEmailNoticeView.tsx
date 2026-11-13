@@ -3,6 +3,7 @@ import { Mail, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, ArrowLeft, Sh
 import { api } from '../../services/api.ts';
 import { PublicLayout } from '../common/PublicLayout.tsx';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
+import { STANDARD_PWA_APP_NAME } from '../../utils/pwaBranding.ts';
 
 interface VerifyEmailNoticeViewProps {
   initialEmail?: string;
@@ -21,7 +22,7 @@ export const VerifyEmailNoticeView: React.FC<VerifyEmailNoticeViewProps> = ({
   onNavigateLogin,
   onNavigateHome,
 }) => {
-  useDocumentTitle('SarbaazSoft Shoe POS | Verify Email');
+  useDocumentTitle(STANDARD_PWA_APP_NAME);
 
   const [email] = useState(() => {
     if (initialEmail) return initialEmail;

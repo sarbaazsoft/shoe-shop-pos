@@ -24,6 +24,7 @@ import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.t
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
+import { STANDARD_PWA_APP_NAME } from '../../utils/pwaBranding.ts';
 import { ShoeIcon } from '../common/ShoeIcon.tsx';
 
 interface FreeTrialOnboardingModalProps {
@@ -51,7 +52,7 @@ export const FreeTrialOnboardingModal: React.FC<FreeTrialOnboardingModalProps> =
 }) => {
   const globalTheme = useTheme();
 
-  useDocumentTitle(isOpen ? 'SarbaazSoft Shoe POS | Signup' : '', [isOpen]);
+  useDocumentTitle(isOpen ? STANDARD_PWA_APP_NAME : '', [isOpen]);
 
   // Dark mode resolution: supports propTheme, global ThemeContext, localStorage, and DOM
   const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>(() => {

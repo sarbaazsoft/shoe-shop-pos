@@ -10,6 +10,7 @@ import { PasswordStrengthIndicator } from '../common/PasswordStrengthIndicator.t
 import { PasswordRequirementsTooltip } from '../common/PasswordRequirementsTooltip.tsx';
 import { evaluatePasswordStrength } from '../../utils/passwordStrength.ts';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.ts';
+import { resolvePwaBranding } from '../../utils/pwaBranding.ts';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -79,9 +80,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const isSuperAdmin = roleUpper === 'SUPERADMIN';
   const isAdmin = roleUpper === 'ADMIN';
 
+  const branding = resolvePwaBranding({
+    role: currentUser?.role,
+    isSuperAdmin,
+  });
+
   useDocumentTitle(
-    isOpen ? `${(storeName || '').trim() || 'Store'} | User Profile` : '',
-    [isOpen, storeName]
+    isOpen ? branding.documentTitle : '',
+    [isOpen, branding.documentTitle]
   );
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
@@ -831,7 +837,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
-        storeName={storeName}
+        isAdmin={isSuperAdmin}
+        role={currentUser?.role}
       />
     </div>
   );

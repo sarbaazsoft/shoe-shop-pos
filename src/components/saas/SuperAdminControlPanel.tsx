@@ -25,6 +25,7 @@ import { evaluatePasswordStrength } from '../../utils/passwordStrength';
 import { initNativeNotificationPrompt, isDeviceSubscribedToPush, getNotificationPermissionState, subscribeDeviceToWebPush, unsubscribeDeviceFromWebPush, connectRealtimeNotificationStream } from '../../services/pushNotificationClient';
 import { NotificationStatusModal, type NotificationModalData } from '../notifications/NotificationStatusModal';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { SUPERADMIN_PWA_APP_NAME, SUPERADMIN_PWA_SHORT_NAME } from '../../utils/pwaBranding';
 import type { SuperAdminStoreRow, TrialActivation, SuperAdminReportProduct, SuperAdminReportBreakdown, SuperAdminSevenDayPoint, SuperAdminRecentTransaction, User, PlatformNotification, PlatformNotificationType, TenantPlanBreakdown, ExpiringTenantAlert } from '../../types';
 
 interface SuperAdminControlPanelProps {
@@ -149,9 +150,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
   };
 
   useDocumentTitle(
-    isSuperAdmin
-      ? `POS Admin | ${superAdminTabLabels[activeTab] || 'Control Panel'}`
-      : 'SarbaazSoft Shoe POS | SuperAdmin Login',
+    SUPERADMIN_PWA_APP_NAME,
     [isSuperAdmin, activeTab]
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1985,7 +1984,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           >
             <div className="flex items-center gap-2">
               <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              {!collapsed && <span className="text-[11px] font-bold">Install POS Admin</span>}
+              {!collapsed && <span className="text-[11px] font-bold">Install {SUPERADMIN_PWA_SHORT_NAME}</span>}
             </div>
             {!collapsed && (
               <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white dark:bg-[#070B14] text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
@@ -6799,8 +6798,8 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
-        storeName="POS Admin"
         isAdmin={true}
+        role="SUPERADMIN"
       />
     </div>
   );

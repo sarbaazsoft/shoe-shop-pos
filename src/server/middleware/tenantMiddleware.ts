@@ -374,6 +374,7 @@ export async function tenantRoutingMiddleware(
       !req.path.startsWith('/api/superadmin') &&
       !req.path.startsWith('/api/saas') &&
       !req.path.startsWith('/api/tenants/') &&
+      !req.path.startsWith('/api/pwa/') &&
       !req.path.startsWith('/api/auth')
     ) {
       if (resolution.mode === 'TENANT_EXPIRED' || resolution.tenant?.subscriptionStatus === 'EXPIRED') {

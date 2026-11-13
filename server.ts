@@ -40,6 +40,7 @@ import tenantSaasRoutes from './src/server/routes/tenantSaasRoutes.ts';
 import { transformKeysToCamelCase } from './src/utils/caseTransformer.ts';
 import { loadAppSettingsCache } from './src/server/services/appSettingsService.ts';
 import { recordApplicationBaseUrl } from './src/server/services/welcomeService.ts';
+import { buildPwaManifest, resolvePwaBranding, type PwaBrandingInput } from './src/utils/pwaBranding.ts';
 
 const rootDir = path.resolve('.');
 
@@ -68,7 +69,15 @@ function resolvePort(): number {
 const PORT = resolvePort();
 
 // Universal API Response Transformer to map database rows (snake_case) to strict camelCase
-app.use('/api', (_req, res, next) => {
+// Skip PWA manifest endpoints so W3C Web App Manifest keys and `application/manifest+json` Content-Type remain intact.
+app.use('/api', (req, res, next) => {
+  if (
+    req.path === '/pwa/manifest.webmanifest' ||
+    req.path === '/pwa/manifest.json' ||
+    req.path.startsWith('/tenants/manifest')
+  ) {
+    return next();
+  }
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const originalJson = res.json.bind(res);
   res.json = (body: any) => {
@@ -157,81 +166,57 @@ app.use((req, _res, next) => {
   next();
 });
 
+function extractRequestPwaBrandingInput(req: express.Request): PwaBrandingInput {
+  const role = typeof req.query.role === 'string' ? req.query.role.trim() : '';
+  const mode = typeof req.query.mode === 'string' ? req.query.mode.trim() : '';
+  const adminFlag =
+    req.query.admin === '1' ||
+    req.query.admin === 'true' ||
+    req.query.isAdmin === 'true';
+
+  return {
+    role: role || undefined,
+    saasMode: mode || undefined,
+    isSuperAdmin: adminFlag || undefined,
+    pathname: req.path,
+  };
+}
+
+// Dynamic Role-Based PWA Manifest Route (`/api/pwa/manifest.webmanifest`, `/api/pwa/manifest.json`)
+app.get(['/api/pwa/manifest.webmanifest', '/api/pwa/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  return res.status(200).send(JSON.stringify(buildPwaManifest(extractRequestPwaBrandingInput(req))));
+});
+
 // Dedicated Store & SuperAdmin PWA Manifests (`/manifest.webmanifest`, `/manifest.json`, `/admin/manifest.*`)
 app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
-
-  const manifestPath = path.join(rootDir, 'public', 'manifest.json');
-  let manifestData: any = null;
-  if (fs.existsSync(manifestPath)) {
-    try {
-      manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    } catch {}
-  }
-  if (!manifestData) {
-    manifestData = {
-      id: '/',
-      name: 'Shoe POS',
-      short_name: 'ShoePOS',
-      description: 'Multi-tenant dual-engine wholesale shoe shop POS and inventory management system',
-      theme_color: '#9333EA',
-      background_color: '#FFFFFF',
-      display: 'standalone',
-      display_override: ['standalone', 'minimal-ui'],
-      orientation: 'any',
-      start_url: '/',
-      scope: '/',
-      categories: ['business', 'productivity', 'shopping'],
-      icons: [
-        { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        { src: '/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
-      ],
-    };
-  }
-
-  // Align dynamically with active store/app title
-  if (storeQuery) {
-    const short = storeQuery.length > 12 ? storeQuery.slice(0, 12).trim() : storeQuery;
-    manifestData.name = storeQuery;
-    manifestData.short_name = short;
-    manifestData.description = `Dedicated Point of Sale & Retail Inventory Management for ${storeQuery}`;
-  }
-  if (manifestData.prefer_related_applications === undefined) {
-    manifestData.prefer_related_applications = false;
-  }
-
-  return res.json(manifestData);
+  return res.status(200).send(JSON.stringify(buildPwaManifest(extractRequestPwaBrandingInput(req))));
 });
 
 // Dynamic Desktop Setup Installer (.EXE) Download Endpoint
 app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.exe'], (req, res) => {
-  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
   const exePath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS-Desktop-Setup.exe');
   if (!fs.existsSync(exePath)) {
     return res.status(404).send('Desktop installer binary not found');
   }
 
-  const cleanStore = storeQuery ? storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Shoe-POS';
-  const downloadFileName = `${cleanStore}-Desktop-Setup.exe`;
+  const branding = resolvePwaBranding(extractRequestPwaBrandingInput(req));
+  const cleanFileBase = branding.shortName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SarbaazSoft-POS';
+  const downloadFileName = `${cleanFileBase}-Desktop-Setup.exe`;
   const originalBuf = fs.readFileSync(exePath);
   const buf = Buffer.from(originalBuf);
 
-  // If a store name was provided, dynamically align desktop shortcut name in the binary buffer
-  if (storeQuery) {
-    // Binary offset 31997 is the start of the shortcut file name (22 bytes available before next string)
-    const targetOffset = 31997;
-    const maxLen = 22;
-    const shortcutName = `${storeQuery.slice(0, 15).trim()}.url\0`;
-    const shortcutBuf = Buffer.from(shortcutName, 'utf8');
-    if (shortcutBuf.length <= maxLen) {
-      buf.fill(0, targetOffset, targetOffset + maxLen);
-      shortcutBuf.copy(buf, targetOffset);
-    }
+  // Align desktop shortcut name in the binary buffer strictly with role-based branding
+  const targetOffset = 31997;
+  const maxLen = 22;
+  const shortcutName = `${cleanFileBase.slice(0, 17)}.url\0`;
+  const shortcutBuf = Buffer.from(shortcutName, 'utf8');
+  if (shortcutBuf.length <= maxLen && targetOffset + maxLen <= buf.length) {
+    buf.fill(0, targetOffset, targetOffset + maxLen);
+    shortcutBuf.copy(buf, targetOffset);
   }
 
   res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
@@ -242,7 +227,6 @@ app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.e
 
 // Signed Android APK (.APK) Download Endpoint
 app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
-  const storeQuery = typeof req.query.store === 'string' ? req.query.store.trim() : '';
   const requestedBase = 'SarbaazSoft-POS.apk';
   const candidates = [
     path.join(rootDir, 'public', 'assets', requestedBase),
@@ -253,13 +237,9 @@ app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
     return res.status(404).send('Android package APK not found');
   }
 
-  let downloadFileName = requestedBase;
-  if (storeQuery) {
-    const cleanStore = storeQuery.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    if (cleanStore) {
-      downloadFileName = cleanStore.toLowerCase().endsWith('pos') ? `${cleanStore}.apk` : `${cleanStore}-POS.apk`;
-    }
-  }
+  const branding = resolvePwaBranding(extractRequestPwaBrandingInput(req));
+  const cleanFileBase = branding.shortName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SarbaazSoft-POS';
+  const downloadFileName = `${cleanFileBase}.apk`;
 
   const stat = fs.statSync(apkPath);
   res.setHeader('Content-Type', 'application/vnd.android.package-archive');
@@ -340,94 +320,7 @@ app.get('/.well-known/assetlinks.json', (_req, res) => {
 app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const adminManifestPath = path.join(rootDir, 'public', 'admin', 'manifest.json');
-  if (fs.existsSync(adminManifestPath)) {
-    return res.sendFile(adminManifestPath);
-  }
-  res.json({
-    id: '/admin/',
-    name: 'POS Admin',
-    short_name: 'POSAdmin',
-    description: 'Dedicated SuperAdmin Control Plane for Multi-Tenant Dual-Engine Wholesale POS Provisioning, Store Suspension & SaaS Analytics',
-    start_url: '/admin',
-    scope: '/',
-    display: 'standalone',
-    display_override: ['standalone', 'minimal-ui'],
-    orientation: 'any',
-    background_color: '#FFFFFF',
-    theme_color: '#9333EA',
-    categories: ['business', 'finance', 'productivity'],
-    icons: [
-      {
-        src: '/admin/favicon.png',
-        sizes: '48x48',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/admin/pwa-192x192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/admin/pwa-512x512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/admin/pwa-maskable-192x192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-      {
-        src: '/admin/pwa-maskable-512x512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-      {
-        src: '/admin/apple-touch-icon.png',
-        sizes: '180x180',
-        type: 'image/png',
-        purpose: 'any',
-      },
-    ],
-    shortcuts: [
-      {
-        name: 'SuperAdmin Dashboard',
-        short_name: 'Dashboard',
-        description: 'Open SuperAdmin Overview & Metrics',
-        url: '/admin',
-        icons: [
-          { src: '/admin/shortcut-dashboard.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
-      {
-        name: 'Store Tenants',
-        short_name: 'Tenants',
-        description: 'Provision & manage tenant stores',
-        url: '/admin?tab=tenants',
-        icons: [
-          { src: '/admin/shortcut-tenants.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
-      {
-        name: 'Platform Reports',
-        short_name: 'Reports',
-        description: 'Platform ledger & analytics',
-        url: '/admin?tab=reports',
-        icons: [
-          { src: '/admin/shortcut-reports.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
-    ],
-  });
+  return res.status(200).send(JSON.stringify(buildPwaManifest('SUPERADMIN')));
 });
 
 // Initialize PostgreSQL schema + SaaS Multi-Tenant Control Plane on cold start

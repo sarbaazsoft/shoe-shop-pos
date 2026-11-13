@@ -10,12 +10,9 @@ import { sendWelcomeMsg } from '../services/welcomeService.ts';
 import { sendTrialActivationEmail } from '../utils/email.ts';
 import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
+import { buildPwaManifest } from '../../utils/pwaBranding.ts';
 
 const router = Router();
-
-// Standard PWA colors (match public/manifest.webmanifest and index.html)
-const DEFAULT_PWA_THEME_COLOR = '#9333EA';
-const DEFAULT_PWA_BACKGROUND_COLOR = '#FFFFFF';
 
 export function extractRequestOrigin(req: Request): string {
   const origin = req.get('origin');
@@ -36,11 +33,9 @@ export function extractRequestOrigin(req: Request): string {
 }
 
 /**
- * 1. DYNAMIC STORE PWA MANIFEST (`/api/tenants/manifest?tenantId=...`)
- * Generates a separate PWA manifest for each store.
- * Dynamic Fields: `name`, `short_name`, `start_url`. Colors are the app-wide defaults.
- * Each installed store app starts at `/?tenantId=[tenant_id]` and resolves its own
- * sign-in from the shared origin.
+ * 1. STORE PWA MANIFEST (`/api/tenants/manifest?tenantId=...`)
+ * Serves a store-scoped start_url while strictly enforcing role-based
+ * SarbaazSoft Shoe Shop POS branding without dynamic tenant names.
  */
 router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.webmanifest'], async (req: Request, res: Response) => {
   try {
@@ -48,18 +43,8 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
     const tenantId = Number(req.query.tenantId ?? req.headers['x-tenant-id']);
     if (!Number.isSafeInteger(tenantId) || tenantId <= 0) return res.status(400).json({ error: 'A valid tenantId is required.' });
 
-    const tenantRes = await pgClient.query<{
-      id: number;
-      name: string;
-      status: string;
-      logo_url: string;
-    }>(
-      `SELECT t.id, t.name, t.status,
-              COALESCE(NULLIF(cs.logo, ''), '/pwa-512x512.png') AS logo_url
-       FROM tenants t
-       LEFT JOIN company_settings cs ON cs.tenant_id = t.id
-       WHERE t.id = $1
-       LIMIT 1`,
+    const tenantRes = await pgClient.query<{ id: number }>(
+      `SELECT id FROM tenants WHERE id = $1 LIMIT 1`,
       [tenantId]
     );
 
@@ -70,83 +55,16 @@ router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.we
     }
 
     const tenant = tenantRes.rows[0];
-    const shortName = (tenant.name && tenant.name.length > 12 ? tenant.name.slice(0, 12).trim() : tenant.name) || 'ShoePOS';
-
-    const manifest = {
+    const manifest = buildPwaManifest('PUBLIC', {
       id: `/?tenantId=${tenant.id}`,
-      name: tenant.name || 'Shoe POS',
-      short_name: shortName,
-      description: `Dedicated Dual-Engine Wholesale & Retail POS Terminal for ${tenant.name}`,
-      start_url: `/?tenantId=${tenant.id}`,
-      scope: '/',
-      display: 'standalone',
-      display_override: ['standalone', 'minimal-ui'],
-      orientation: 'any',
-      theme_color: DEFAULT_PWA_THEME_COLOR,
-      background_color: DEFAULT_PWA_BACKGROUND_COLOR,
-      prefer_related_applications: false,
-      categories: ['business', 'shopping', 'finance'],
-      icons: [
-        {
-          src: '/pwa-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any',
-        },
-        {
-          src: '/pwa-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any',
-        },
-        {
-          src: '/pwa-maskable-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'maskable',
-        },
-        {
-          src: '/pwa-maskable-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'maskable',
-        },
-        {
-          src: '/apple-touch-icon.png',
-          sizes: '180x180',
-          type: 'image/png',
-          purpose: 'any',
-        },
-      ],
-      shortcuts: [
-        {
-          name: 'POS Terminal',
-          short_name: 'POS',
-          description: `Open ${tenant.name} Point of Sale checkout counter`,
-          url: `/pos?tenantId=${tenant.id}`,
-          icons: [
-            { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-            { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          ],
-        },
-        {
-          name: 'Shoe Catalog',
-          short_name: 'Catalog',
-          description: `Manage ${tenant.name} shoe inventory`,
-          url: `/inventory?tenantId=${tenant.id}`,
-          icons: [
-            { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-            { src: '/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          ],
-        },
-      ],
-    };
+      startUrl: `/?tenantId=${tenant.id}`,
+    });
 
-    res.setHeader('Content-Type', 'application/manifest+json');
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.json(manifest);
+    return res.status(200).send(JSON.stringify(manifest));
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to generate dynamic tenant manifest: ' + err.message });
+    return res.status(500).json({ error: 'Failed to generate tenant manifest: ' + err.message });
   }
 });
 

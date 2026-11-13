@@ -582,7 +582,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
-        storeName={companySettings?.name || companySettings?.company_name || companySettings?.companyName}
+        isAdmin={isPlatformOwner}
+        role={currentUser?.role}
       />
     </>
   );
