@@ -27,7 +27,6 @@ const PRECACHE_ASSETS = [
   '/favicon.png',
   '/favicon-16x16.png',
   '/favicon-32x32.png',
-  '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/pwa-maskable-192x192.png',
@@ -39,17 +38,11 @@ const PRECACHE_ASSETS = [
   '/admin/favicon.png',
   '/admin/favicon-16x16.png',
   '/admin/favicon-32x32.png',
-  '/admin/icon.svg',
   '/admin/pwa-192x192.png',
   '/admin/pwa-512x512.png',
   '/admin/pwa-maskable-192x192.png',
   '/admin/pwa-maskable-512x512.png',
-  '/admin/maskable-icon.png',
   '/admin/apple-touch-icon.png',
-  '/admin/apple-touch-icon-180x180.png',
-  '/admin/shortcut-dashboard.png',
-  '/admin/shortcut-tenants.png',
-  '/admin/shortcut-reports.png',
 ];
 
 function isCacheableStaticOrigin(url) {

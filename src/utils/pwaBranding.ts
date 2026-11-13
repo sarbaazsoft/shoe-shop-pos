@@ -204,7 +204,7 @@ export function buildPwaManifest(
           description: 'Open SuperAdmin Overview & Metrics',
           url: '/admin',
           icons: [
-            { src: '/admin/shortcut-dashboard.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/admin/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           ],
         },
@@ -214,7 +214,7 @@ export function buildPwaManifest(
           description: 'Provision & manage tenant stores',
           url: '/admin?tab=tenants',
           icons: [
-            { src: '/admin/shortcut-tenants.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/admin/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           ],
         },
@@ -224,7 +224,7 @@ export function buildPwaManifest(
           description: 'Platform ledger & analytics',
           url: '/admin?tab=reports',
           icons: [
-            { src: '/admin/shortcut-reports.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/admin/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: '/admin/pwa-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           ],
         },
