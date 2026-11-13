@@ -8,7 +8,7 @@ import { requireAuth, requireAdmin, requireSuperAdmin } from '../auth.ts';
 import type { AuthenticatedRequest } from '../auth.ts';
 import { extractStrictTenantId } from '../../db/tenantDb.ts';
 import { getAllAppSettings, updateAppSettings } from '../services/appSettingsService.ts';
-import { notifyPlatformAnnouncement, testFcmPush } from '../pushNotificationService.ts';
+import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendStaffWelcomeNotification } from '../services/welcomeService.ts';
 import { testEmailConfiguration } from '../utils/email.ts';
 
@@ -792,21 +792,6 @@ const handleUpdateSettings = async (req: AuthenticatedRequest, res: Response) =>
 router.post('/', requireAuth, requireAdmin, handleUpdateSettings);
 router.put('/', requireAuth, requireAdmin, handleUpdateSettings);
 router.patch('/', requireAuth, requireAdmin, handleUpdateSettings);
-
-// POST /api/settings/test-fcm - SuperAdmin verification endpoint to test Firebase Cloud Messaging
-router.post('/test-fcm', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const result = await testFcmPush(0, req.body?.title, req.body?.message);
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to dispatch test FCM alert: ' + (err?.message || 'Unknown error'),
-      error: err?.message,
-    });
-  }
-});
-
 
 // --- USER MANAGEMENT (Store Admin Only, Strictly scoped to store tenant) ---
 

@@ -1,0 +1,10 @@
+Please fix the double title issue across the entire application (web, PWA, and APK wrappers) by doing the following:
+
+1. Clean Web Manifests (manifest.json & manifest.webmanifest):
+   - Ensure "name" and "short_name" are kept concise and clean (e.g., "Shoe POS" and "ShoePOS") so mobile OS app title bars don't append extra platform or brand suffixes.
+
+2. Sanitize index.html:
+   - Remove any static or hardcoded title separators (like "|", "-", or brand text) from the <title> tag in index.html so the application has sole control over clean page titles.
+
+3. Audit & Update Dynamic Document Titles:
+   - Check where document.title is updated dynamically (e.g., in layout wrappers, views, or print modal handlers like InvoicePrintModal.tsx). Ensure they assign just the clean, direct page title (or invoice ID) without prepending or appending duplicate store names, slogans, or platform credits.

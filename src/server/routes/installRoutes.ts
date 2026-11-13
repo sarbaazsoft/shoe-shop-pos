@@ -241,7 +241,7 @@ router.get('/status', async (_req: Request, res: Response) => {
 // First-run bootstrap: create schema and the operator-provided superadmin only.
 // It intentionally does not insert stores, demo rows, or default credentials.
 // =========================================================================
-router.post(['/bootstrap', '/install-platform'], async (req: Request, res: Response) => {
+router.post('/install-platform', async (req: Request, res: Response) => {
   try {
     await pgClient.waitReady;
 

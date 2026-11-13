@@ -349,7 +349,6 @@ export const api = {
       }
       return apiFetch(`/saas/resolve${q}`);
     },
-    getManifest: (tenantId: number) => apiFetch(`/tenants/manifest?tenantId=${encodeURIComponent(String(tenantId))}`),
     getOnboarding: (tenantId?: number) => {
       const query = tenantId ? `?tenantId=${encodeURIComponent(String(tenantId))}` : '';
       return apiFetch(`/tenants/onboarding${query}`, {
@@ -394,7 +393,6 @@ export const api = {
   // SuperAdmin Control Panel Endpoints
   superAdmin: {
     getOverview: () => apiFetch('/superadmin/overview'),
-    getSaaSMetrics: () => apiFetch('/superadmin/saas-metrics'),
     getTrialActivations: (params?: { search?: string; status?: string }) => {
       const q = new URLSearchParams();
       if (params?.search) q.set('search', params.search);
@@ -515,8 +513,6 @@ export const api = {
 
   install: {
     status: () => apiFetch<any>('/install/status'),
-    bootstrap: (data: { name: string; email: string; password: string; phone?: string; whatsapp?: string }) =>
-      apiFetch('/install/bootstrap', { method: 'POST', body: data }),
     installPlatform: (data: { name: string; email: string; password: string; phone?: string; whatsapp?: string }) =>
       apiFetch('/install/install-platform', { method: 'POST', body: data }),
     reset: (password: string, email?: string, dropTables?: boolean) =>
@@ -539,11 +535,6 @@ export const api = {
         ...(cleanTenantId ? { headers: { 'X-Tenant-Id': String(cleanTenantId) } } : {}),
       });
     },
-    getStoreCredentials: (tenantId?: number) => {
-      const query = tenantId && tenantId > 0 ? `?tenantId=${tenantId}` : '';
-      return apiFetch<any>(`/auth/store-credentials${query}`);
-    },
-    signup: (data: any) => apiFetch('/auth/signup', { method: 'POST', body: data }),
     forgotPassword: (data: { email: string; tenantId?: number | null; origin?: string }) => {
       const rawTid = Number(data?.tenantId ?? getActiveTenantId() ?? 0);
       const cleanTenantId = Number.isInteger(rawTid) && rawTid > 0 ? rawTid : undefined;
@@ -615,12 +606,6 @@ export const api = {
       apiFetch('/auth/change-password', { method: 'PUT', body: data }),
     me: () => apiFetch('/auth/me'),
     updateProfile: (data: any) => apiFetch('/auth/profile', { method: 'PUT', body: data }),
-    listUsers: () => apiFetch('/auth/users'),
-    createUser: (data: any) => apiFetch('/auth/users', { method: 'POST', body: data }),
-    updateUser: (id: number, data: any) => apiFetch(`/auth/users/${id}`, { method: 'PUT', body: data }),
-    approveUser: (id: number, status: 'APPROVED' | 'PENDING') =>
-      apiFetch(`/auth/users/${id}/status`, { method: 'PATCH', body: { status } }),
-    deleteUser: (id: number) => apiFetch(`/auth/users/${id}`, { method: 'DELETE' }),
     verifyEmail: (token: string) =>
       apiFetch<{
         success: boolean;
@@ -641,9 +626,6 @@ export const api = {
         method: 'POST',
         body: { email, tenantId },
       }),
-    listApiTokens: () => apiFetch('/auth/api-tokens'),
-    createApiToken: (name: string) => apiFetch('/auth/api-tokens', { method: 'POST', body: { name } }),
-    deleteApiToken: (id: number) => apiFetch(`/auth/api-tokens/${id}`, { method: 'DELETE' }),
   },
   products: {
     list: async (params?: { search?: string; category?: string; brand?: string; lowStock?: boolean; lowStockOnly?: boolean; limit?: number }) => {
@@ -847,12 +829,6 @@ export const api = {
       }
       return res;
     },
-    nextCode: (brand?: string, category?: string) => {
-      const qs = new URLSearchParams();
-      if (brand) qs.set('brand', brand);
-      if (category) qs.set('category', category);
-      return apiFetch(`/products/next-code?${qs.toString()}`);
-    },
     update: async (id: number, data: ProductFormValues) => {
       const normalizedData = { ...data, brand: String(data.brand ?? '').trim() || 'Unbranded' };
       const res = await apiFetch<any>(`/products/${id}`, { method: 'PUT', body: normalizedData });
@@ -869,15 +845,9 @@ export const api = {
   },
   categories: {
     getCategories: () => apiFetch('/categories'),
-    createCategory: (name: string) => apiFetch('/categories', { method: 'POST', body: { name } }),
-    deleteCategory: (id: number) => apiFetch(`/categories/${id}`, { method: 'DELETE' }),
   },
   pos: {
-    verifyOverride: (credentials: { email?: string; password?: string; pin?: string }) =>
-      apiFetch('/pos/verify-override', { method: 'POST', body: credentials }),
-    createSale: (saleData: any) => apiFetch('/pos/sales', { method: 'POST', body: saleData }),
     checkout: (saleData: any) => apiFetch('/pos/checkout', { method: 'POST', body: saleData }),
-    exchange: (exchangeData: any) => apiFetch('/pos/exchange', { method: 'POST', body: exchangeData }),
     listSales: (params?: { startDate?: string; endDate?: string; search?: string; limit?: number }) => {
       const qs = new URLSearchParams();
       if (params?.startDate) qs.set('startDate', params.startDate);
@@ -888,18 +858,11 @@ export const api = {
       return apiFetch(`/pos/sales${query}`);
     },
     getSale: (id: number) => apiFetch(`/pos/sales/${id}`),
-    getSaleByInvoice: (invoiceNumber: string) =>
-      apiFetch(`/pos/invoice/${encodeURIComponent(invoiceNumber)}`),
   },
   returns: {
     verifyInvoice: (invoiceNumber: string) =>
       apiFetch(`/returns/verify-invoice/${encodeURIComponent(invoiceNumber)}`),
     create: (data: any) => apiFetch('/returns', { method: 'POST', body: data }),
-    list: (search?: string) => {
-      const query = search ? `?search=${encodeURIComponent(search)}` : '';
-      return apiFetch(`/returns${query}`);
-    },
-    get: (id: number) => apiFetch(`/returns/${id}`),
   },
   suppliers: {
     list: (search?: string | { search?: string }) => {
@@ -947,7 +910,6 @@ export const api = {
       return apiFetch(`/customers${query}`);
     },
     get: (id: number) => apiFetch(`/customers/${id}`),
-    getLedger: (id: number) => apiFetch(`/customers/${id}/ledger`),
     recordPayment: (id: number, data: { amount: number; paymentMethod?: string; notes?: string; paymentDate?: string }) =>
       apiFetch(`/customers/${id}/payments`, { method: 'POST', body: data }),
     create: (data: any) => apiFetch('/customers', { method: 'POST', body: data }),
@@ -955,15 +917,6 @@ export const api = {
     delete: (id: number) => apiFetch(`/customers/${id}`, { method: 'DELETE' }),
   },
   inventory: {
-    listMovements: (params?: { productId?: number; type?: string; movementType?: string; search?: string; limit?: number }) => {
-      const qs = new URLSearchParams();
-      if (params?.productId) qs.set('productId', String(params.productId));
-      if (params?.type || params?.movementType) qs.set('movementType', String(params.type || params.movementType));
-      if (params?.search) qs.set('search', params.search);
-      if (params?.limit) qs.set('limit', String(params.limit));
-      const query = qs.toString() ? `?${qs.toString()}` : '';
-      return apiFetch(`/inventory/ledger${query}`);
-    },
     ledger: (params?: { productId?: number; movementType?: string; limit?: number }) => {
       const qs = new URLSearchParams();
       if (params?.productId) qs.set('productId', String(params.productId));
@@ -972,23 +925,13 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : '';
       return apiFetch(`/inventory/ledger${query}`);
     },
-    adjustStock: (data: { productId: number; newStock: number; reason?: string }) =>
-      apiFetch('/inventory/adjust', { method: 'POST', body: data }),
     adjust: (data: { productId: number; newStock: number; reason?: string }) =>
       apiFetch('/inventory/adjust', { method: 'POST', body: data }),
     updateInlineStock: (data: { productId: number; newStock: number; reason?: string }) =>
       apiFetch('/inventory/inline-stock', { method: 'PATCH', body: data }),
   },
   reports: {
-    dashboard: () => apiFetch('/reports/dashboard'),
     getDashboard: () => apiFetch('/reports/dashboard'),
-    profitLoss: (params?: { startDate?: string; endDate?: string }) => {
-      const qs = new URLSearchParams();
-      if (params?.startDate) qs.set('startDate', params.startDate);
-      if (params?.endDate) qs.set('endDate', params.endDate);
-      const query = qs.toString() ? `?${qs.toString()}` : '';
-      return apiFetch(`/reports/profit-loss${query}`);
-    },
     getProfitLoss: (params?: { startDate?: string; endDate?: string }) => {
       const qs = new URLSearchParams();
       if (params?.startDate) qs.set('startDate', params.startDate);
@@ -996,7 +939,6 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : '';
       return apiFetch(`/reports/profit-loss${query}`);
     },
-    topSelling: () => apiFetch('/reports/top-selling'),
     getTopSelling: () => apiFetch('/reports/top-selling'),
   },
   settings: {
@@ -1013,9 +955,6 @@ export const api = {
         message: string;
         details?: any;
       }>('/settings/test-email', { method: 'POST', body: { recipientEmail } }),
-    testFcm: (data?: { title?: string; message?: string }) =>
-      apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number; error?: string }>('/settings/test-fcm', { method: 'POST', body: data || {} }),
-    post: (data: any) => apiFetch('/settings', { method: 'POST', body: data }),
     getSubscription: () => apiFetch('/settings/subscription'),
     requestSubscriptionRenewal: (data: { plan: '6_MONTHS' | 'YEARLY' | string; notes?: string }) =>
       apiFetch('/settings/renew-subscription', { method: 'POST', body: data }),
@@ -1048,7 +987,6 @@ export const api = {
       apiFetch('/backup/import-sql', { method: 'POST', body: { sql: sqlContent, sqlContent } }),
   },
   notifications: {
-    list: () => apiFetch('/notifications'),
     grouped: (limit: number = 5) =>
       apiFetch<GroupedNotificationsResponse>(`/notifications/grouped?limit=${limit}`),
     all: (params?: {
@@ -1082,11 +1020,6 @@ export const api = {
       apiFetch<{ success: boolean; message: string }>('/notifications/dismiss-all', {
         method: 'POST',
         body: category ? { category } : {},
-      }),
-    markRead: (id: string | number, itemType?: string) =>
-      apiFetch<{ success: boolean; message: string }>(`/notifications/${encodeURIComponent(String(id))}/read`, {
-        method: 'POST',
-        body: itemType ? { itemType } : {},
       }),
     markAllRead: () =>
       apiFetch<{ success: boolean; message: string }>('/notifications/mark-all-read', {
@@ -1139,8 +1072,6 @@ export const api = {
       }),
     testPush: (data?: { title?: string; message?: string }) =>
       apiFetch<{ success: boolean; message: string; sentCount?: number; failureCount?: number }>('/notifications/test-push', { method: 'POST', body: data || {} }),
-    getPlatformAnnouncements: () =>
-      apiFetch<{ announcements: PlatformNotification[]; unreadCount: number }>('/notifications/platform'),
     dismissAnnouncement: (id: number) =>
       apiFetch<{ success: boolean; message: string }>(`/notifications/platform/${id}/dismiss`, {
         method: 'POST',
@@ -1155,17 +1086,10 @@ export const api = {
       }),
   },
   chat: {
-    message: (data: { message: string; history?: { role: 'user' | 'assistant'; content: string }[] }) =>
-      apiFetch('/chat', { method: 'POST', body: data }),
     send: (payload: any, history?: any) =>
       apiFetch('/chat', {
         method: 'POST',
         body: typeof payload === 'string' ? { message: payload, history } : payload,
-      }),
-    transcribe: (audioBase64: string, mimeType: string = 'audio/webm', language: string = 'auto') =>
-      apiFetch<{ text: string; success: boolean }>('/chat/transcribe', {
-        method: 'POST',
-        body: { audioBase64, mimeType, language },
       }),
   },
 };

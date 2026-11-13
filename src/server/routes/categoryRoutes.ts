@@ -96,45 +96,4 @@ router.get('/categories', requireAuth, async (_req: AuthRequest, res: Response) 
   }
 });
 
-// POST /api/categories - Create a new global category
-router.post('/categories', requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    await ensureGlobalCategoriesTable();
-    const name = (req.body.name || '').trim();
-    if (!name) {
-      return res.status(400).json({ error: 'Category name is required' });
-    }
-
-    const existing = await pgClient.query<any>(
-      `SELECT id, name, created_at FROM categories WHERE LOWER(TRIM(name)) = LOWER($1) LIMIT 1`,
-      [name]
-    );
-
-    if (existing.rows.length > 0) {
-      return res.status(200).json({ category: existing.rows[0], message: 'Category already exists' });
-    }
-
-    const result = await pgClient.query<any>(
-      `INSERT INTO categories (name) VALUES ($1) RETURNING id, name, created_at`,
-      [name]
-    );
-
-    res.status(201).json({ category: result.rows[0], message: 'Category created successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to create category: ' + err.message });
-  }
-});
-
-// DELETE /api/categories/:id - Delete a global category
-router.delete('/categories/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    await ensureGlobalCategoriesTable();
-    const { id } = req.params;
-    await pgClient.query(`DELETE FROM categories WHERE id = $1`, [id]);
-    res.json({ message: 'Category deleted successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to delete category: ' + err.message });
-  }
-});
-
 export default router;

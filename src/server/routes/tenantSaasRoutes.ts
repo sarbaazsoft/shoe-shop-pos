@@ -8,7 +8,7 @@ import { requireAuth, requireAdmin, requireSuperAdmin, generateToken, type Authe
 import { notifyPlatformAnnouncement } from '../pushNotificationService.ts';
 import { sendWelcomeMsg } from '../services/welcomeService.ts';
 import { sendTrialActivationEmail } from '../utils/email.ts';
-import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence, getTenantPresenceStats } from '../middleware/tenantMiddleware.ts';
+import { resolveTenantContext, isTenantOnlineInMiddleware, getTenantMiddlewareLastSeen, removeTenantMiddlewarePresence } from '../middleware/tenantMiddleware.ts';
 import { getCachedAppSetting } from '../services/appSettingsService.ts';
 import { buildPwaManifest } from '../../utils/pwaBranding.ts';
 
@@ -969,103 +969,6 @@ router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: 
 });
 
 /**
- * 4B. SUPERADMIN DEDICATED SAAS & SUBSCRIPTION TELEMETRY ENDPOINT (`GET /api/superadmin/saas-metrics`)
- * Provides tenant-centric subscription distribution, churn risk, and live presence telemetry.
- */
-router.get('/superadmin/saas-metrics', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
-  try {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    await ensureSaasControlPlane();
-    await syncExpiredTenantSubscriptions();
-    const presence = getTenantPresenceStats();
-
-    const storesRes = await pgClient.query<{
-      id: number;
-      name: string;
-      status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED';
-      subscription_plan: string;
-      subscription_type?: string;
-      subscription_start_date: string;
-      subscription_end_date: string;
-      subscription_status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
-      onboarding_completed: boolean;
-      created_at: string;
-      business_type: 'RETAIL' | 'WHOLESALE';
-      owner_email: string;
-      owner_phone: string;
-      sales_count: string;
-      total_sales_revenue: string;
-      staff_count: string;
-      product_count: string;
-    }>(`
-      SELECT 
-        t.id, t.name, t.status, t.subscription_plan, t.subscription_type,
-        t.subscription_start_date, t.subscription_end_date, t.subscription_status,
-        t.onboarding_completed, t.created_at,
-        COALESCE(cs.business_type::text, 'RETAIL') AS business_type,
-        COALESCE(u.email, cs.email, '') AS owner_email,
-        COALESCE(u.phone, cs.phone, '') AS owner_phone,
-        (SELECT COUNT(*) FROM sales s WHERE s.tenant_id = t.id)::text as sales_count,
-        (SELECT COALESCE(SUM(s.total_amount), 0) FROM sales s WHERE s.tenant_id = t.id)::text as total_sales_revenue,
-        (SELECT COUNT(*) FROM users u2 WHERE u2.tenant_id = t.id AND u2.role != 'SUPERADMIN')::text as staff_count,
-        (SELECT COUNT(*) FROM products p WHERE p.tenant_id = t.id AND p.active = true)::text as product_count
-      FROM tenants t
-      LEFT JOIN company_settings cs ON cs.tenant_id = t.id
-      LEFT JOIN LATERAL (
-        SELECT email, phone FROM users WHERE tenant_id = t.id AND role = 'ADMIN' ORDER BY id ASC LIMIT 1
-      ) u ON true
-      ORDER BY t.id ASC
-    `);
-
-    const stores = storesRes.rows.map((s) => {
-      const endDateIso = s.subscription_end_date ? new Date(s.subscription_end_date).toISOString() : '';
-      const isDateExpired = endDateIso && new Date(endDateIso).getTime() < Date.now();
-      let subStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' = (String(s.subscription_status || 'ACTIVE').toUpperCase() as any);
-      if (s.status === 'SUSPENDED') subStatus = 'SUSPENDED';
-      else if (isDateExpired) subStatus = 'EXPIRED';
-
-      const isOnline = s.status === 'ACTIVE' && subStatus === 'ACTIVE' && isTenantOnlineInMiddleware(s.id, s.status, subStatus);
-      return {
-        id: s.id,
-        name: s.name,
-        status: s.status,
-        businessType: s.business_type,
-        subscriptionPlan: normalizeSubscriptionPlan(s.subscription_plan),
-        subscriptionEndDate: endDateIso,
-        subscriptionStatus: subStatus,
-        daysLeft: calculateDaysLeft(endDateIso, new Date(), s.subscription_plan),
-        isOnline,
-        ownerEmail: s.owner_email,
-        ownerPhone: s.owner_phone,
-        salesCount: parseInt(s.sales_count || '0', 10),
-        totalSales: parseFloat(s.total_sales_revenue || '0'),
-        staffCount: parseInt(s.staff_count || '0', 10),
-        productCount: parseInt(s.product_count || '0', 10),
-      };
-    });
-
-    const activeStores = stores.filter((s) => s.status === 'ACTIVE' && s.subscriptionStatus === 'ACTIVE');
-    const suspendedStores = stores.filter((s) => s.status === 'SUSPENDED' || s.subscriptionStatus === 'SUSPENDED');
-    const expiredStores = stores.filter((s) => s.subscriptionStatus === 'EXPIRED');
-    const expiringSoon = stores.filter((s) => s.daysLeft !== null && s.daysLeft !== undefined && s.daysLeft <= 30 && s.daysLeft >= 0 && s.subscriptionStatus !== 'SUSPENDED');
-
-    return res.json({
-      totalTenants: stores.length,
-      activeTenants: activeStores.length,
-      expiringSoonTenants: expiringSoon.length,
-      expiredTenants: expiredStores.length,
-      suspendedTenants: suspendedStores.length,
-      onlineTenantsCount: stores.filter((s) => s.isOnline).length,
-      presenceTelemetry: presence,
-      tenants: stores,
-      expiringTenants: expiringSoon,
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to load SaaS metrics: ' + err.message });
-  }
-});
-
-/**
  * 5. SUPERADMIN REAL-TIME TENANT ACTIVE / DISABLE TOGGLE (`PATCH /api/superadmin/tenants/:id/status`)
  * Immediately revokes or restores tenant access at the API and tenant-routing middleware levels.
  */
@@ -1364,15 +1267,6 @@ export async function getNextTenantId(): Promise<number> {
     return parseInt(fallbackRes.rows[0]?.next_id || '1', 10);
   }
 }
-
-router.get('/superadmin/tenants/next-id', requireAuth, requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response) => {
-  try {
-    const nextTenantId = await getNextTenantId();
-    return res.json({ nextTenantId });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to retrieve next store ID: ' + err.message });
-  }
-});
 
 /**
  * Helper to provision a new tenant store + initial admin credentials + store_settings
@@ -2992,38 +2886,6 @@ router.post(['/superadmin/notifications/:id/revoke', '/superadmin/notifications/
     return res.json({ success: true, message: 'Notification revoked successfully.' });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to revoke notification: ' + err.message });
-  }
-});
-
-// POST /api/welcome and /api/saas/welcome - Relaxed endpoint to trigger or re-send the single canonical welcome message service
-router.post(['/welcome', '/saas/welcome'], async (req: Request, res: Response) => {
-  try {
-    const rawTenantId =
-      req.body?.tenantId ||
-      req.body?.tenant_id ||
-      req.query?.tenantId ||
-      req.headers['x-tenant-id'] ||
-      1;
-    const tenantId = Number(rawTenantId) || 1;
-    const msg = req.body?.msg || req.body?.message || req.body?.welcomeMsg || '';
-    const email = req.body?.email || req.body?.ownerEmail || req.body?.targetEmail || undefined;
-    const requestOrigin = extractRequestOrigin(req);
-    const resendEmail = Boolean(req.body?.resendEmail || req.body?.sendEmail || email);
-
-    const result = await sendWelcomeMsg(tenantId, msg, email, {
-      origin: requestOrigin,
-      resendEmail,
-    });
-    return res.json({
-      success: true,
-      result,
-      message: 'Welcome message processed via single canonical welcome service.',
-    });
-  } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to process welcome message: ' + (err?.message || err),
-    });
   }
 });
 

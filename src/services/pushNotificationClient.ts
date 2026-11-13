@@ -123,33 +123,6 @@ export function resetSoftPushPromptDismissal(): void {
 }
 
 /**
- * Triggers the two-step permission and token registration flow.
- * Usually invoked when the user clicks 'Allow' on the soft prompt or enables the toggle in settings.
- */
-export async function triggerNativeNotificationPrompt(overrideRole?: string): Promise<NotificationPermission> {
-  if (typeof window === 'undefined' || !('Notification' in window)) {
-    return 'denied';
-  }
-
-  if (Notification.permission === 'granted') {
-    await syncFcmTokenSilently(overrideRole).catch(() => {});
-    return 'granted';
-  }
-
-  if (Notification.permission === 'denied') {
-    return 'denied';
-  }
-
-  try {
-    const res = await requestFcmPermissionAndToken(overrideRole);
-    return res.permission || Notification.permission;
-  } catch (err) {
-    console.warn('[pushNotificationClient] Error requesting notification permission:', err);
-    return Notification.permission;
-  }
-}
-
-/**
  * Background FCM initialization on session load:
  * 1. Warm up the Firebase client and foreground listener.
  * 2. If permission is already granted, silently synchronize the FCM device token with the backend.

@@ -94,26 +94,6 @@ export function parseSenderAddress(rawCandidate?: string | null): ParsedSenderAd
   };
 }
 
-export function resolveSenderAddress(
-  customFrom?: string,
-  settings?: Record<string, string>
-): string {
-  // CRITICAL REQUIREMENT: Database root app_settings table is the single source of truth
-  const candidate = (
-    customFrom ||
-    settings?.RESEND_FROM ||
-    settings?.RESEND_FROM_EMAIL ||
-    getCachedAppSetting('RESEND_FROM') ||
-    getCachedAppSetting('RESEND_FROM_EMAIL') ||
-    process.env.RESEND_FROM ||
-    process.env.RESEND_FROM_EMAIL ||
-    DEFAULT_FROM_ADDRESS
-  ).trim();
-
-  const parsed = parseSenderAddress(candidate);
-  return parsed.resendFrom;
-}
-
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
@@ -1118,6 +1098,3 @@ export async function testEmailConfiguration(testRecipient?: string): Promise<Te
     };
   }
 }
-
-// Backward-compatible export alias for testResendConfiguration
-export const testResendConfiguration = testEmailConfiguration;

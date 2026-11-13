@@ -12,8 +12,6 @@
  */
 
 export const PLATFORM_DOCUMENT_NAME = 'SarbaazSoft Shoe Shop POS';
-export const SAAS_LANDING_TITLE = PLATFORM_DOCUMENT_NAME;
-export const AUTH_PAGE_TITLE = PLATFORM_DOCUMENT_NAME;
 export const BROWSER_FAVICON_PATH = '/admin/favicon.ico';
 
 export const APP_ROUTE_TITLES: Record<string, string> = {

@@ -90,50 +90,6 @@ export function getTenantMiddlewareLastSeen(tenantId: number): string | null {
   return new Date(entry.lastSeenAt).toISOString();
 }
 
-export function getOnlineTenantIds(): number[] {
-  const now = Date.now();
-  const onlineIds: number[] = [];
-  for (const [tid, entry] of onlineTenantPresence.entries()) {
-    if (now - entry.lastSeenAt <= MIDDLEWARE_ONLINE_WINDOW_MS) {
-      onlineIds.push(tid);
-    } else {
-      onlineTenantPresence.delete(tid);
-    }
-  }
-  return onlineIds;
-}
-
-export function getOnlineTenantCount(): number {
-  return getOnlineTenantIds().length;
-}
-
-export function getTenantPresenceStats(): {
-  onlineCount: number;
-  onlineTenantIds: number[];
-  activeTenants: { tenantId: number; lastSeenAt: string; lastRoute: string }[];
-} {
-  const now = Date.now();
-  const activeTenants: { tenantId: number; lastSeenAt: string; lastRoute: string }[] = [];
-  const onlineTenantIds: number[] = [];
-  for (const [tid, entry] of onlineTenantPresence.entries()) {
-    if (now - entry.lastSeenAt <= MIDDLEWARE_ONLINE_WINDOW_MS) {
-      onlineTenantIds.push(tid);
-      activeTenants.push({
-        tenantId: tid,
-        lastSeenAt: new Date(entry.lastSeenAt).toISOString(),
-        lastRoute: entry.lastRoute,
-      });
-    } else {
-      onlineTenantPresence.delete(tid);
-    }
-  }
-  return {
-    onlineCount: onlineTenantIds.length,
-    onlineTenantIds,
-    activeTenants,
-  };
-}
-
 /** Resolve tenant identity from the shared tenantId selector. */
 export function parseTenantSelectionFromRequest(req: Request): {
   host: string;

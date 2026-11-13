@@ -30,25 +30,6 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
   }
 });
 
-// Get Customer Khata Ledger History (Strictly scoped to req.user.tenantId)
-router.get('/:id/ledger', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const tenantDb = getTenantDb(req);
-    const id = parseInt(req.params.id, 10);
-    const data = await tenantDb.customers.findById(id);
-    if (!data) {
-      return res.status(404).json({ error: 'Customer not found in this store.' });
-    }
-    res.json({
-      customer: data.customer,
-      ledger: data.ledger || [],
-      sales: data.sales || [],
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to fetch customer ledger: ' + err.message });
-  }
-});
-
 // Record direct payment towards Customer Khata balance
 router.post('/:id/payments', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {

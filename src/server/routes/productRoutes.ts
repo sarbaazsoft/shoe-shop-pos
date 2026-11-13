@@ -677,7 +677,7 @@ function mapProductRow(row: any, settings: {
 }
 
 // Fast POS Scanner Lookup by Barcode / Article (strictly scoped by req.user.tenantId)
-router.get(['/lookup/:barcode', '/barcode/:barcode', '/scan/:barcode'], requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get(['/lookup/:barcode', '/barcode/:barcode'], requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     await ensureProductAndSettingsColumns();
     const tenantId = extractStrictTenantId(req);

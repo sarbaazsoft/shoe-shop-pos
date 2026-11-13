@@ -141,7 +141,6 @@ export function resetSaasControlPlaneState(): void {
   databaseEnumsSchemaPromise = null;
   customerLedgerSchemaPromise = null;
   salesTransactionIdSchemaPromise = null;
-  pushSubscriptionsSchemaPromise = null;
   fcmTokensSchemaPromise = null;
   platformNotificationsSchemaPromise = null;
   productPriceMigrationPromise = null;
@@ -242,7 +241,6 @@ export const REQUIRED_DATABASE_TABLES = [
   'stock_movements',
   'customer_ledger',
   'supplier_ledger',
-  'push_subscriptions',
   'app_settings',
   'platform_notifications',
   'platform_notification_reads',
@@ -613,18 +611,6 @@ const DATABASE_TABLE_DDL: string[] = [
     notes TEXT DEFAULT '',
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
   )`,
-  `CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id SERIAL PRIMARY KEY,
-    tenant_id INTEGER NOT NULL DEFAULT 1,
-    user_id INTEGER NOT NULL DEFAULT 0,
-    user_role TEXT NOT NULL DEFAULT 'CASHIER',
-    endpoint TEXT NOT NULL UNIQUE,
-    p256dh TEXT NOT NULL,
-    auth TEXT NOT NULL,
-    user_agent TEXT DEFAULT '',
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-  )`,
   `CREATE TABLE IF NOT EXISTS trial_activations (
     id SERIAL PRIMARY KEY,
     user_id INTEGER,
@@ -757,39 +743,6 @@ export function ensureSalesTransactionIdSchema(): Promise<void> {
     });
   }
   return salesTransactionIdSchemaPromise;
-}
-
-let pushSubscriptionsSchemaPromise: Promise<void> | null = null;
-
-/** Ensures the Web Push subscriptions table exists in the database. */
-export function ensurePushSubscriptionsSchema(): Promise<void> {
-  if (!pushSubscriptionsSchemaPromise) {
-    pushSubscriptionsSchemaPromise = (async () => {
-      await pgClient.waitReady;
-      await pgClient.exec(`
-        CREATE TABLE IF NOT EXISTS public.push_subscriptions (
-          id SERIAL PRIMARY KEY,
-          tenant_id INTEGER NOT NULL DEFAULT 1,
-          user_id INTEGER NOT NULL DEFAULT 0,
-          user_role TEXT NOT NULL DEFAULT 'ADMIN',
-          endpoint TEXT NOT NULL UNIQUE,
-          p256dh TEXT NOT NULL,
-          auth TEXT NOT NULL,
-          user_agent TEXT DEFAULT '',
-          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-        );
-        ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS user_role TEXT NOT NULL DEFAULT 'ADMIN';
-        CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_uidx ON public.push_subscriptions(endpoint);
-        CREATE INDEX IF NOT EXISTS push_subscriptions_tenant_idx ON public.push_subscriptions(tenant_id);
-        CREATE INDEX IF NOT EXISTS push_subscriptions_user_role_idx ON public.push_subscriptions(user_role);
-      `);
-    })().catch((error) => {
-      pushSubscriptionsSchemaPromise = null;
-      throw error;
-    });
-  }
-  return pushSubscriptionsSchemaPromise;
 }
 
 /** Ensures the platform custom notifications and reads tracking tables exist. */
@@ -2024,33 +1977,5 @@ export async function ensureFcmTokensSchema(): Promise<void> {
     }
   })();
   return fcmTokensSchemaPromise;
-}
-
-let legacyCleanupPromise: Promise<void> | null = null;
-export async function ensureTelegramSettingsSchema(): Promise<void> {
-  if (legacyCleanupPromise) return legacyCleanupPromise;
-  legacyCleanupPromise = (async () => {
-    try {
-      await ensureFcmTokensSchema();
-      await pgClient.exec(`
-        DO $$ BEGIN
-          IF to_regclass('public.company_settings') IS NOT NULL THEN
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_bot_token;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_chat_id;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS telegram_alerts_enabled;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_user;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_app_password;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS gmail_from_name;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS active_alert_provider;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS pricing_policy_locked;
-            ALTER TABLE public.company_settings DROP COLUMN IF EXISTS min_selling_quantity;
-          END IF;
-        END $$;
-      `);
-    } catch (err) {
-      console.warn('Notice cleaning up legacy notification columns:', err);
-    }
-  })();
-  return legacyCleanupPromise;
 }
 

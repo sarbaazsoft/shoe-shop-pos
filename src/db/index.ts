@@ -351,7 +351,6 @@ const mockStore: Record<string, any[]> = {
   purchase_return_items: [],
   supplier_payments: [],
   stock_movements: [],
-  push_subscriptions: [],
   trial_activations: [],
   app_settings: [
     { key: 'INVOICE_PREFIX', value: 'INV-', category: 'billing', description: 'Default prefix for customer sales receipts and invoices', is_secret: false, updated_at: new Date().toISOString() },
@@ -393,7 +392,6 @@ let mockIdCounters: Record<string, number> = {
   purchase_return_items: 1,
   supplier_payments: 1,
   stock_movements: 1,
-  push_subscriptions: 1,
   trial_activations: 1,
   platform_notifications: 1,
   platform_notification_reads: 1,
@@ -585,65 +583,6 @@ async function executeMockQuery<T = any>(text: string, params: any[] = []): Prom
       });
     }
     return { rows: rows as unknown as T[], rowCount: rows.length };
-  }
-
-  // Push Subscriptions tracking for Web Push API
-  if (upper.includes('PUSH_SUBSCRIPTIONS')) {
-    if (upper.startsWith('INSERT INTO') || upper.includes('INSERT INTO PUBLIC.PUSH_SUBSCRIPTIONS')) {
-      const tenantId = Number(params[0] || 1);
-      const userId = Number(params[1] || 0);
-      const userRole = String(params[2] || 'ADMIN').toUpperCase();
-      const endpoint = String(params[3] || '');
-      const p256dh = String(params[4] || '');
-      const auth = String(params[5] || '');
-      const userAgent = String(params[6] || '');
-      const existingIdx = mockStore.push_subscriptions.findIndex((s) => s.endpoint === endpoint);
-      const entry = {
-        id: existingIdx >= 0 ? mockStore.push_subscriptions[existingIdx].id : nextMockId('push_subscriptions'),
-        tenant_id: tenantId,
-        user_id: userId,
-        user_role: userRole,
-        endpoint,
-        p256dh,
-        auth,
-        user_agent: userAgent,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      if (existingIdx >= 0) {
-        mockStore.push_subscriptions[existingIdx] = entry;
-      } else {
-        mockStore.push_subscriptions.push(entry);
-      }
-      return { rows: [entry as unknown as T], rowCount: 1 };
-    }
-    if (upper.startsWith('SELECT')) {
-      const tenantId = params.length > 0 && params[0] !== null && params[0] !== undefined ? Number(params[0]) : null;
-      let subs = [...(mockStore.push_subscriptions || [])];
-      if (tenantId !== null && tenantId !== 0) {
-        subs = subs.filter((s) => Number(s.tenant_id) === tenantId);
-      }
-      if (upper.includes('UPPER(USER_ROLE) IN') || upper.includes('UPPER(USER_ROLE) = ANY') || upper.includes('USER_ROLE = ANY')) {
-        const roles: string[] = Array.isArray(params[1]) ? params[1].map((r: string) => String(r).toUpperCase()) : [];
-        subs = subs.filter((s) => {
-          const sRole = String(s.user_role || '').toUpperCase();
-          return sRole === 'ADMIN' || sRole === 'OWNER' || (roles.length > 0 && roles.includes(sRole));
-        });
-      } else if (upper.includes("UPPER(USER_ROLE) = 'ADMIN'")) {
-        subs = subs.filter((s) => ['ADMIN', 'OWNER'].includes(String(s.user_role || '').toUpperCase()));
-      } else if (upper.includes("UPPER(USER_ROLE) = 'SUPERADMIN'")) {
-        subs = subs.filter((s) => String(s.user_role || '').toUpperCase() === 'SUPERADMIN');
-      } else if (upper.includes("UPPER(USER_ROLE) = 'CASHIER'")) {
-        subs = subs.filter((s) => String(s.user_role || '').toUpperCase() === 'CASHIER');
-      }
-      return { rows: subs as unknown as T[], rowCount: subs.length };
-    }
-    if (upper.startsWith('DELETE FROM')) {
-      const endpoint = String(params[0] || '');
-      mockStore.push_subscriptions = mockStore.push_subscriptions.filter((s) => s.endpoint !== endpoint);
-      return { rows: [], rowCount: 1 };
-    }
-    return { rows: [], rowCount: 0 };
   }
 
   // Trial Activations tracking for Free Trial management

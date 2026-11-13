@@ -53,56 +53,6 @@ async function generateReturnNumber(tenantId: number): Promise<string> {
   return `RET-${padded}`;
 }
 
-// POST /api/pos/verify-override - Verify Store Admin credentials strictly scoped by tenant_id
-router.post('/verify-override', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const tenantId = extractStrictTenantId(req);
-    const { email, password, pin } = req.body || {};
-    const secret = String(password || pin || '').trim();
-    if (!secret) {
-      return res.status(400).json({ error: 'Admin password or PIN is required.' });
-    }
-
-    const adminQuery = email
-      ? await pgClient.query<any>(
-          `SELECT id, tenant_id, name, email, password_hash, role, status
-           FROM users
-           WHERE COALESCE(tenant_id, 1) = $2
-             AND LOWER(email) = LOWER($1)
-             AND role = 'ADMIN'
-             AND status = 'APPROVED'`,
-          [String(email).trim(), tenantId]
-        )
-      : await pgClient.query<any>(
-          `SELECT id, tenant_id, name, email, password_hash, role, status
-           FROM users
-           WHERE COALESCE(tenant_id, 1) = $1
-             AND role = 'ADMIN'
-             AND status = 'APPROVED'`,
-          [tenantId]
-        );
-
-    for (const adminRow of adminQuery.rows) {
-      if (Number(adminRow.tenant_id || 1) !== tenantId) continue;
-      if (await bcrypt.compare(secret, adminRow.password_hash)) {
-        return res.json({
-          verified: true,
-          adminId: adminRow.id,
-          tenantId,
-          adminName: adminRow.name,
-        });
-      }
-    }
-
-    return res.status(403).json({
-      verified: false,
-      error: 'Invalid Store Admin credentials for this store.',
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to verify override credentials: ' + err.message });
-  }
-});
-
 // POST /api/pos/checkout - Atomic Sale & Direct Shoe Exchange Processing (Strictly Scoped to req.user.tenantId)
 router.post('/checkout', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const tenantId = extractStrictTenantId(req);
@@ -919,50 +869,6 @@ router.get('/sales/:id', requireAuth, async (req: AuthenticatedRequest, res: Res
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to fetch sale details: ' + err.message });
-  }
-});
-
-// GET /api/pos/invoice/:invoiceNumber - Single Sale Details by Invoice Number scoped to tenant
-router.get('/invoice/:invoiceNumber', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const tenantId = extractStrictTenantId(req);
-    const invoiceNumber = req.params.invoiceNumber.trim();
-    const saleRes = await pgClient.query(
-      `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
-              c.customer_type, c.shop_name as customer_shop_name, c.market_name as customer_market_name, c.city as customer_city,
-              c.ntn_number as customer_ntn
-       FROM sales s
-       LEFT JOIN users u ON s.created_by = u.id
-       LEFT JOIN customers c ON s.customer_id = c.id AND COALESCE(c.tenant_id, 1) = $2
-       WHERE UPPER(s.invoice_number) = UPPER($1) AND COALESCE(s.tenant_id, 1) = $2`,
-      [invoiceNumber, tenantId]
-    );
-
-    if (saleRes.rows.length === 0) {
-      return res.status(404).json({ error: `Invoice "${invoiceNumber}" not found in your store.` });
-    }
-
-    const sale = saleRes.rows[0];
-    const itemsRes = await pgClient.query(
-      `SELECT si.*, COALESCE(p.article, si.product_name) as article, COALESCE(p.article, si.product_name) as product_name,
-              COALESCE(p.pairs_per_carton, 12) as pairs_per_carton, p.allow_half_carton 
-       FROM sale_items si
-       LEFT JOIN products p ON si.product_id = p.id
-       WHERE si.sale_id = $1 ORDER BY si.id ASC`,
-      [sale.id]
-    );
-
-    const settingsRes = await pgClient.query('SELECT * FROM company_settings WHERE COALESCE(tenant_id, 1) = $1 LIMIT 1', [tenantId]);
-
-    res.json({
-      sale: {
-        ...(sale as any),
-        items: itemsRes.rows,
-      },
-      companySettings: settingsRes.rows[0] || null,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to fetch invoice details: ' + err.message });
   }
 });
 
