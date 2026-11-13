@@ -246,7 +246,7 @@ app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
   res.setHeader('Content-Length', stat.size);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-  res.setHeader('X-APK-Package', process.env.TWA_PACKAGE_NAME || 'studio.ai.sarbaazsoft.twa');
+  res.setHeader('X-APK-Package', process.env.TWA_PACKAGE_NAME || 'com.sarbaazsoft.shoe.pos');
   return res.sendFile(apkPath);
 });
 
