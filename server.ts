@@ -176,7 +176,7 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
       name: 'Shoe POS',
       short_name: 'ShoePOS',
       description: 'Multi-tenant dual-engine wholesale shoe shop POS and inventory management system',
-      theme_color: '#FFFFFF',
+      theme_color: '#9333EA',
       background_color: '#FFFFFF',
       display: 'standalone',
       display_override: ['standalone', 'minimal-ui'],
@@ -355,7 +355,7 @@ app.get(['/admin/manifest.webmanifest', '/admin/manifest.json'], (_req, res) => 
     display_override: ['standalone', 'minimal-ui'],
     orientation: 'any',
     background_color: '#FFFFFF',
-    theme_color: '#FFFFFF',
+    theme_color: '#9333EA',
     categories: ['business', 'finance', 'productivity'],
     icons: [
       {

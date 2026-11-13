@@ -3,7 +3,7 @@
   "name": "Shoe POS",
   "short_name": "ShoePOS",
   "description": "Multi-tenant dual-engine wholesale shoe shop POS and inventory management system",
-  "theme_color": "#FFFFFF",
+  "theme_color": "#9333EA",
   "background_color": "#FFFFFF",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

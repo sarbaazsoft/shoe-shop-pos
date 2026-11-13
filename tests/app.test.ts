@@ -277,14 +277,25 @@ test('API & DB integration: settings low_stock_threshold, product CRUD without l
   }
 });
 
-test('browser favicons: index.html and public root favicons align with SuperAdmin S-logo assets', () => {
+test('browser favicons & PWA theme_color: index.html, root favicons, and manifests align', () => {
   const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('<meta name="theme-color" content="#9333EA" />'));
   assert.ok(indexHtml.includes('href="/admin/favicon.ico"'));
   assert.ok(indexHtml.includes('href="/admin/favicon-32x32.png"'));
   assert.ok(indexHtml.includes('href="/admin/favicon-16x16.png"'));
   assert.ok(indexHtml.includes('href="/admin/favicon.png"'));
   assert.equal(indexHtml.includes('rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png"'), false);
   assert.equal(indexHtml.includes('rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png"'), false);
+
+  for (const manifestFile of [
+    'public/manifest.json',
+    'public/manifest.webmanifest',
+    'public/admin/manifest.json',
+    'public/admin/manifest.webmanifest',
+  ]) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), manifestFile), 'utf8'));
+    assert.equal(manifest.theme_color, '#9333EA', `${manifestFile} theme_color should be #9333EA`);
+  }
 
   for (const filename of ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png']) {
     const rootBuf = fs.readFileSync(path.join(process.cwd(), 'public', filename));

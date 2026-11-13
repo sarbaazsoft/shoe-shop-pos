@@ -421,20 +421,20 @@ export default function App() {
 
     if (isSuperAdminMode) {
       if (manifestLink) manifestLink.setAttribute('href', '/admin/manifest.webmanifest');
-      if (themeMeta) themeMeta.setAttribute('content', '#FFFFFF');
+      if (themeMeta) themeMeta.setAttribute('content', '#9333EA');
     } else if (activeTenant && activeTenant.id) {
       if (manifestLink) {
         manifestLink.setAttribute('href', `/api/tenants/manifest?tenantId=${encodeURIComponent(String(activeTenant.id))}`);
       }
       if (themeMeta) {
-        themeMeta.setAttribute('content', '#FFFFFF');
+        themeMeta.setAttribute('content', '#9333EA');
       }
     } else {
       if (manifestLink) {
         manifestLink.setAttribute('href', `/manifest.webmanifest?store=${encodeURIComponent(effectiveStoreName)}`);
       }
       if (themeMeta) {
-        themeMeta.setAttribute('content', '#FFFFFF');
+        themeMeta.setAttribute('content', '#9333EA');
       }
     }
   }, [pwaShortName, pageTitle, effectiveStoreName, saasMode, activeTenant]);

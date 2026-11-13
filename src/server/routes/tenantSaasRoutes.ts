@@ -14,7 +14,7 @@ import { getCachedAppSetting } from '../services/appSettingsService.ts';
 const router = Router();
 
 // Standard PWA colors (match public/manifest.webmanifest and index.html)
-const DEFAULT_PWA_THEME_COLOR = '#FFFFFF';
+const DEFAULT_PWA_THEME_COLOR = '#9333EA';
 const DEFAULT_PWA_BACKGROUND_COLOR = '#FFFFFF';
 
 export function extractRequestOrigin(req: Request): string {
