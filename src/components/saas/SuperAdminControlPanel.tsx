@@ -2187,65 +2187,69 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
               <AnimatePresence>
                 {showToolsDropdown && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                    initial={{ opacity: 0, scale: 0.96, y: -6 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -6 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-[#120726] border border-slate-200 dark:border-purple-400/40 rounded-xl shadow-2xl p-1.5 z-50 backdrop-blur-md space-y-1"
+                    exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="fixed left-2 right-2 top-[3.8rem] sm:left-auto sm:right-6 lg:absolute lg:right-0 lg:top-full lg:mt-2 sm:w-80 md:w-96 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] bg-white dark:bg-[#120726] border border-slate-200 dark:border-purple-400/40 rounded-xl shadow-2xl dark:shadow-[0_0_25px_rgba(147,51,234,0.25)] p-2 z-50 backdrop-blur-md origin-top sm:origin-top-right max-h-[calc(100dvh-4.6rem)] overflow-y-auto flex flex-col"
                   >
-                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 dark:text-purple-300/70 uppercase tracking-wider">
-                      Platform Tools
+                    <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-purple-800/40 mb-1.5 flex items-center justify-between shrink-0">
+                      <span className="text-xs font-bold text-slate-900 dark:text-purple-100 truncate">
+                        Platform Tools
+                      </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotifError(null);
-                        setNotificationModalOpen(true);
-                        setShowToolsDropdown(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:text-purple-700 dark:hover:text-white transition cursor-pointer text-left"
-                    >
-                      <Megaphone className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-900 dark:text-white">Send Notification</div>
-                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Broadcast announcement to stores</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImportSqlError(null);
-                        setImportSqlModalOpen(true);
-                        setShowToolsDropdown(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-white transition cursor-pointer text-left"
-                    >
-                      <Upload className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-900 dark:text-white">Import Data</div>
-                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Import multi-store .SQL backup</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleExportPlatformSql();
-                        setShowToolsDropdown(false);
-                      }}
-                      disabled={exportingPlatform}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-white transition cursor-pointer text-left disabled:opacity-50"
-                    >
-                      <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {exportingPlatform ? 'Exporting...' : 'Export All Backup'}
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotifError(null);
+                          setNotificationModalOpen(true);
+                          setShowToolsDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:text-purple-700 dark:hover:text-white transition cursor-pointer text-left"
+                      >
+                        <Megaphone className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">Send Notification</div>
+                          <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Broadcast announcement to stores</div>
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Download platform SQL dump</div>
-                      </div>
-                    </button>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImportSqlError(null);
+                          setImportSqlModalOpen(true);
+                          setShowToolsDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-white transition cursor-pointer text-left"
+                      >
+                        <Upload className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">Import Data</div>
+                          <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Import multi-store .SQL backup</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleExportPlatformSql();
+                          setShowToolsDropdown(false);
+                        }}
+                        disabled={exportingPlatform}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-purple-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-white transition cursor-pointer text-left disabled:opacity-50"
+                      >
+                        <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">
+                            {exportingPlatform ? 'Exporting...' : 'Export All Backup'}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate">Download platform SQL dump</div>
+                        </div>
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
