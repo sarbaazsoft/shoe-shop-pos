@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight, Volume2, VolumeX } from 'lucide-react';
+import { Barcode, Search, Plus, Minus, Trash2, AlertTriangle, Banknote, ShieldAlert, Printer, ScanLine, Zap, Keyboard, Repeat, RotateCcw, X, CheckCircle2, Lock, ImageIcon, Truck, BookOpen, Package, Eye, EyeOff, AlertCircle, Coins, ArrowLeftRight, Landmark, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../../services/api.ts';
 import { playAudioFeedback, isAudioMuted, toggleAudioMuted } from '../../utils/audio.ts';
 import { InvoicePrintModal } from './InvoicePrintModal.tsx';
@@ -2715,10 +2715,10 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
             </div>
 
             {/* Payment Method Selector */}
-            <div className={`grid ${isWholesaleStore ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-1.5 text-xs`}>
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
               {(isWholesaleStore
-                ? (['KHATA', 'CASH', 'ONLINE', 'SPLIT'] as const)
-                : (['CASH', 'ONLINE', 'SPLIT'] as const)
+                ? (['KHATA', 'CASH', 'ONLINE', 'BANK_TRANSFER', 'SPLIT'] as const)
+                : (['CASH', 'ONLINE', 'BANK_TRANSFER', 'SPLIT'] as const)
               ).map((method) => (
                 <button
                   key={method}
@@ -2739,6 +2739,8 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     selectPaymentMethod(method);
                   }}
                   className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition text-[11px] cursor-pointer ${
+                    isWholesaleStore && method === 'SPLIT' ? 'col-span-2' : ''
+                  } ${
                     paymentMethod === method
                       ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 text-white border border-purple-400/40 dark:border-purple-400/50 shadow-md shadow-purple-600/25 dark:shadow-[0_0_14px_rgba(147,51,234,0.35)]'
                       : 'bg-slate-100 dark:bg-[#131B2E] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 font-semibold'
@@ -2747,10 +2749,13 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                   {method === 'KHATA' && <BookOpen className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'CASH' && <Banknote className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'ONLINE' && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />}
+                  {method === 'BANK_TRANSFER' && <Landmark className="w-3.5 h-3.5 shrink-0" />}
                   {method === 'SPLIT' && <Coins className="w-3.5 h-3.5 shrink-0" />}
                   <span className="truncate">
                     {method === 'KHATA'
                       ? 'Khata (Udhaar)'
+                      : method === 'BANK_TRANSFER'
+                      ? 'Bank Transfer'
                       : method === 'SPLIT'
                       ? 'Split (Cash+Digital)'
                       : method}
