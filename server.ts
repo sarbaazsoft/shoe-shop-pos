@@ -246,7 +246,7 @@ app.get(['/api/download/apk', '/assets/SarbaazSoft-POS.apk'], (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
   res.setHeader('Content-Length', stat.size);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-  res.setHeader('X-APK-Package', process.env.TWA_PACKAGE_NAME || 'com.sarbaazsoft.shoe.pos');
+  res.setHeader('X-APK-Package', process.env.TWA_PACKAGE_NAME || 'com.sarbaazsoft.shoepos');
   return res.sendFile(apkPath);
 });
 
@@ -278,9 +278,9 @@ app.get('/.well-known/assetlinks.json', (_req, res) => {
         relation: ['delegate_permission/common.handle_all_urls'],
         target: {
           namespace: 'android_app',
-          package_name: 'studio.ai.sarbaazsoft.twa',
+          package_name: 'com.sarbaazsoft.shoepos',
           sha256_cert_fingerprints: [
-            '58:54:C6:78:45:D3:CD:EA:AC:3B:42:57:23:DD:C9:EA:1B:7C:22:23:16:DF:93:6B:E3:06:DF:FF:00:FA:5F:50',
+            '5D:FA:D4:B5:EC:75:AE:33:41:3D:47:AA:F0:20:0C:FE:EC:81:29:FE:AC:CC:2C:75:6E:B3:38:E9:9D:14:36:47',
           ],
         },
       },

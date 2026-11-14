@@ -264,7 +264,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between gap-2 text-[10.5px] text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>TWA Verified: <code>com.sarbaazsoft.shoe.pos</code></span>
+                  <span>TWA Verified: <code>com.sarbaazsoft.shoepos</code></span>
                 </span>
                 <div className="flex items-center gap-2">
                   <a

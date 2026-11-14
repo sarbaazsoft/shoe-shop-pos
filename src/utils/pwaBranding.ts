@@ -248,7 +248,7 @@ export function buildPwaManifest(
     related_applications: [
       {
         platform: 'play',
-        id: 'studio.ai.sarbaazsoft.twa',
+        id: 'com.sarbaazsoft.shoepos',
       },
     ],
     categories: ['business', 'productivity', 'shopping'],
