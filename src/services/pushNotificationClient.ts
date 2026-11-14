@@ -277,10 +277,15 @@ export function connectRealtimeNotificationStream(
       (document.hidden || !document.hasFocus())
     ) {
       try {
+        const deepLinkUrl = payload.deepLinkUrl || payload.url || '';
+        const isAdminTarget = String(deepLinkUrl).startsWith('/admin') || payload.targetRole === 'SUPERADMIN';
+        const icon = payload.icon || (isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png');
+        const rawBadge = payload.badge;
+        const badge = rawBadge && !String(rawBadge).includes('pwa-192x192') ? rawBadge : '/icons/badge-favicon.png';
         const notif = new Notification(payload.title || 'POS Alert', {
           body: payload.message || 'Transaction confirmed.',
-          icon: '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
+          icon,
+          badge,
           tag: `pos-${payload.type?.toLowerCase()}-${payload.invoiceNumber || Date.now()}`,
           data: payload,
         });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Store, ArrowRight } from 'lucide-react';
+import { Lock, Mail, KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, Store, ArrowRight, Clock } from 'lucide-react';
 import { api, setAuthSession } from '../../services/api.ts';
 import { ShoeIcon } from '../common/ShoeIcon.tsx';
 import { ShowroomBackground } from '../common/ShowroomBackground.tsx';
@@ -17,6 +17,7 @@ interface AuthModalProps {
   companySettings: any;
   onBack?: () => void;
   onClearTenantScope?: () => void;
+  sessionNotice?: string | null;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -24,6 +25,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   companySettings,
   onBack,
   onClearTenantScope,
+  sessionNotice,
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -484,6 +486,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {sessionNotice && !errorMessage && !infoMessage && (
+                <div role="status" className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed font-medium">{sessionNotice}</span>
                 </div>
               )}
 

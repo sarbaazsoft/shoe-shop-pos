@@ -8,7 +8,8 @@
 // 4. Background Sync & Periodic Sync for Offline POS Transactions (IndexedDB)
 // =========================================================================
 
-const CACHE_NAME = 'sarbaazsoft-pos-cache-v8';
+const CACHE_NAME = 'sarbaazsoft-pos-cache-v10';
+const NOTIFICATION_BADGE_ICON = '/icons/badge-favicon.png';
 const SW_SYNC_TAG = 'pos-offline-transactions-sync';
 const SW_PERIODIC_SYNC_TAG = 'pos-offline-periodic-sync';
 const DB_NAME = 'ShoePosOfflineDB';
@@ -27,6 +28,7 @@ const PRECACHE_ASSETS = [
   '/favicon.png',
   '/favicon-16x16.png',
   '/favicon-32x32.png',
+  '/icons/badge-favicon.png',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/pwa-maskable-192x192.png',
@@ -98,14 +100,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pass-through API calls, binary installers (.apk / .exe), signing assets, and Vite dev internals directly to network
+  // Pass-through API calls, service worker scripts, binary installers (.apk/.aab/.exe/.msix*), and Vite dev internals directly to network
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/@') ||
     url.pathname.startsWith('/node_modules') ||
     url.pathname.includes('hot-update') ||
+    url.pathname === '/sw.js' ||
+    url.pathname === '/firebase-messaging-sw.js' ||
+    url.pathname === '/sw-background-sync.js' ||
+    url.pathname.startsWith('/assets/windows/') ||
+    url.pathname.startsWith('/assets/android/') ||
     url.pathname.endsWith('.apk') ||
-    url.pathname.endsWith('.exe')
+    url.pathname.endsWith('.aab') ||
+    url.pathname.endsWith('.exe') ||
+    url.pathname.endsWith('.msix') ||
+    url.pathname.endsWith('.msixbundle') ||
+    url.pathname.endsWith('.appx') ||
+    url.pathname.endsWith('.appxbundle') ||
+    url.pathname.endsWith('.cer')
   ) {
     return;
   }
@@ -221,13 +234,18 @@ async function initFirebaseInWorker() {
         const url = payload.data?.url || '/?tab=reports';
         const isAdminTarget = String(url).startsWith('/admin') || payload.data?.isAdmin === 'true';
         const defaultIcon = isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png';
-        const icon = payload.notification?.icon || defaultIcon;
+        const icon = payload.notification?.icon || payload.data?.icon || defaultIcon;
+        const rawBadge = payload.data?.badge || payload.notification?.badge;
+        const badge =
+          rawBadge && !String(rawBadge).includes('pwa-192x192')
+            ? rawBadge
+            : NOTIFICATION_BADGE_ICON;
         const tag = payload.data?.tag || `pos-${Date.now()}`;
 
         const notificationOptions = {
           body,
           icon,
-          badge: defaultIcon,
+          badge,
           tag,
           vibrate: [200, 100, 200],
           data: {
@@ -268,12 +286,20 @@ self.addEventListener('push', (event) => {
   const title = notification.title || 'SarbaazSoft Shoe POS Alert';
   const tag = data.data?.tag || data.tag || `pos-alert-${Date.now()}`;
   const targetUrl = (data.data && data.data.url) || data.url || '/?tab=reports';
-  const isAdminTarget = String(targetUrl).startsWith('/admin') || Boolean(data.data?.isAdmin);
+  const isAdminTarget =
+    String(targetUrl).startsWith('/admin') ||
+    data.data?.isAdmin === true ||
+    data.data?.isAdmin === 'true';
   const defaultIcon = isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png';
+  const rawBadge = notification.badge || data.badge || data.data?.badge;
+  const badge =
+    rawBadge && !String(rawBadge).includes('pwa-192x192')
+      ? rawBadge
+      : NOTIFICATION_BADGE_ICON;
   const options = {
     body: notification.body || data.body || data.message || 'New Point of Sale transaction confirmed.',
-    icon: notification.icon || data.icon || defaultIcon,
-    badge: data.badge || defaultIcon,
+    icon: notification.icon || data.icon || data.data?.icon || defaultIcon,
+    badge,
     tag,
     data: data.data || { url: targetUrl },
     vibrate: [250, 100, 250, 100, 250],
@@ -316,7 +342,7 @@ self.addEventListener('notificationclick', (event) => {
               targetUrl,
             });
             if (client.url && client.navigate) {
-              client.navigate(targetUrl);
+              Promise.resolve(client.navigate(targetUrl)).catch(() => {});
             }
           } catch {}
           return client.focus();

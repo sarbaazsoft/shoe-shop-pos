@@ -214,6 +214,10 @@ export async function getFcmStats(): Promise<{
 // FCM MULTICAST DISPATCH ENGINE
 // ============================================================================
 
+export const DEFAULT_NOTIFICATION_ICON = '/pwa-192x192.png';
+export const ADMIN_NOTIFICATION_ICON = '/admin/pwa-192x192.png';
+export const NOTIFICATION_BADGE_ICON = '/icons/badge-favicon.png';
+
 export interface FcmDispatchResult {
   success: boolean;
   sentCount: number;
@@ -221,16 +225,67 @@ export interface FcmDispatchResult {
   error?: string;
 }
 
+export interface FcmPushPayload {
+  title: string;
+  body: string;
+  deepLinkUrl?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  data?: Record<string, string>;
+}
+
+export function buildFcmNotificationConfig(payload: FcmPushPayload) {
+  const linkUrl = payload.deepLinkUrl || '/';
+  const isAdminTarget = linkUrl.startsWith('/admin') || payload.data?.isAdmin === 'true';
+  const icon = payload.icon || (isAdminTarget ? ADMIN_NOTIFICATION_ICON : DEFAULT_NOTIFICATION_ICON);
+  const badge = payload.badge || NOTIFICATION_BADGE_ICON;
+  const tag = payload.tag || `pos-${Date.now()}`;
+
+  const stringData: Record<string, string> = {
+    url: linkUrl,
+    title: payload.title,
+    body: payload.body,
+    icon,
+    badge,
+    tag,
+  };
+  if (payload.data) {
+    for (const [k, v] of Object.entries(payload.data)) {
+      stringData[k] = String(v ?? '');
+    }
+  }
+
+  return {
+    linkUrl,
+    icon,
+    badge,
+    tag,
+    stringData,
+    androidNotification: {
+      title: payload.title,
+      body: payload.body,
+      channelId: 'pos_alerts',
+      color: '#9333EA',
+      priority: 'max' as const,
+      defaultSound: true,
+      defaultVibrateTimings: true,
+      visibility: 'public' as const,
+    },
+    webpushNotification: {
+      title: payload.title,
+      body: payload.body,
+      icon,
+      badge,
+      tag,
+      vibrate: [200, 100, 200],
+    },
+  };
+}
+
 export async function sendFcmPushToTokens(
   tokens: string[],
-  payload: {
-    title: string;
-    body: string;
-    deepLinkUrl?: string;
-    icon?: string;
-    tag?: string;
-    data?: Record<string, string>;
-  }
+  payload: FcmPushPayload
 ): Promise<FcmDispatchResult> {
   await loadAppSettingsCache();
   const app = getFirebaseAdmin();
@@ -254,19 +309,7 @@ export async function sendFcmPushToTokens(
 
   try {
     const messaging = getMessaging(app);
-    const linkUrl = payload.deepLinkUrl || '/';
-
-    const stringData: Record<string, string> = {
-      url: linkUrl,
-      title: payload.title,
-      body: payload.body,
-      tag: payload.tag || `pos-${Date.now()}`,
-    };
-    if (payload.data) {
-      for (const [k, v] of Object.entries(payload.data)) {
-        stringData[k] = String(v ?? '');
-      }
-    }
+    const config = buildFcmNotificationConfig(payload);
 
     const response = await messaging.sendEachForMulticast({
       tokens: uniqueTokens,
@@ -274,30 +317,15 @@ export async function sendFcmPushToTokens(
         title: payload.title,
         body: payload.body,
       },
-      data: stringData,
+      data: config.stringData,
       android: {
         priority: 'high',
-        notification: {
-          title: payload.title,
-          body: payload.body,
-          channelId: 'pos_alerts',
-          priority: 'max',
-          defaultSound: true,
-          defaultVibrateTimings: true,
-          visibility: 'public',
-        },
+        notification: config.androidNotification,
       },
       webpush: {
-        notification: {
-          title: payload.title,
-          body: payload.body,
-          icon: payload.icon || '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
-          tag: payload.tag || `pos-${Date.now()}`,
-          vibrate: [200, 100, 200],
-        },
+        notification: config.webpushNotification,
         fcmOptions: {
-          link: linkUrl,
+          link: config.linkUrl,
         },
       },
     });
@@ -444,7 +472,8 @@ export async function notifyPosAction(
         title: enrichedPayload.title,
         body: enrichedPayload.message,
         deepLinkUrl: enrichedPayload.deepLinkUrl || '/pos',
-        icon: '/pwa-192x192.png',
+        icon: DEFAULT_NOTIFICATION_ICON,
+        badge: NOTIFICATION_BADGE_ICON,
         tag: `pos-${enrichedPayload.type.toLowerCase()}-${enrichedPayload.invoiceNumber || Date.now()}`,
         data: {
           type: enrichedPayload.type,
@@ -576,15 +605,18 @@ export async function notifyPlatformAnnouncement(
     if (tokensRes.rows.length === 0) return;
 
     const tokens = tokensRes.rows.map((r) => r.token);
+    const isAdminAnnouncement = targetRole === 'SUPERADMIN';
     await sendFcmPushToTokens(tokens, {
       title: payload.title,
       body: payload.message,
-      deepLinkUrl: payload.actionUrl || '/',
-      icon: '/pwa-192x192.png',
+      deepLinkUrl: payload.actionUrl || (isAdminAnnouncement ? '/admin' : '/'),
+      icon: isAdminAnnouncement ? ADMIN_NOTIFICATION_ICON : DEFAULT_NOTIFICATION_ICON,
+      badge: NOTIFICATION_BADGE_ICON,
       tag: `platform-${payload.id || Date.now()}`,
       data: {
         type: payload.type || 'INFO',
         notificationId: String(payload.id || ''),
+        isAdmin: isAdminAnnouncement ? 'true' : 'false',
       },
     });
   } catch (err) {
@@ -653,10 +685,12 @@ export async function testFcmPush(
     title: alertTitle,
     body: alertBody,
     deepLinkUrl: isSuperAdminTest ? '/admin' : '/pos',
-    icon: '/pwa-192x192.png',
+    icon: isSuperAdminTest ? ADMIN_NOTIFICATION_ICON : DEFAULT_NOTIFICATION_ICON,
+    badge: NOTIFICATION_BADGE_ICON,
     tag: `fcm-test-${Date.now()}`,
     data: {
       type: 'TEST_PUSH',
+      isAdmin: isSuperAdminTest ? 'true' : 'false',
       timestamp: new Date().toISOString(),
     },
   });

@@ -434,6 +434,7 @@ export const SuperAdminControlPanel: React.FC<SuperAdminControlPanelProps> = ({
           new Notification('🔔 SuperAdmin Test Alert', {
             body: 'SuperAdmin push alert test confirmed on this device.',
             icon: '/admin/pwa-192x192.png',
+            badge: '/icons/badge-favicon.png',
             tag: `superadmin-test-${Date.now()}`,
           });
         } catch {}

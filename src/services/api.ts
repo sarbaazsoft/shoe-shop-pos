@@ -103,6 +103,7 @@ export function clearAllSessionState(): void {
       localStorage.removeItem('sammi_chat_history');
       localStorage.removeItem('pos_barcode_tag_options');
       localStorage.removeItem('pos_last_synced_at');
+      localStorage.removeItem('pos_cashier_last_activity_at');
 
       // Clear any tenant-scoped or user-scoped cache keys without removing device preferences like pos_theme, remembered accounts, or permanent welcome dismissals
       for (let i = localStorage.length - 1; i >= 0; i--) {

@@ -36,6 +36,9 @@ import { usePwaManifest } from './hooks/usePwaManifest.ts';
 import { useDocumentTitle } from './hooks/useDocumentTitle.ts';
 import { getStandardDocumentTitle, PLATFORM_DOCUMENT_NAME } from './utils/documentTitle.ts';
 import { APP_VERSION } from './version.ts';
+import { CashierIdleWarningModal } from './components/common/CashierIdleWarningModal.tsx';
+import { useCashierIdleLogout } from './hooks/useCashierIdleLogout.ts';
+import { CASHIER_IDLE_LOGOUT_NOTICE, isCashierIdleTimerEnabled } from './utils/cashierIdleTimer.ts';
 import type { ActiveExchange, TenantInfo, CompanySettings } from './types.ts';
 
 type SaasRouteMode =
@@ -312,6 +315,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<{ id?: number; name?: string } | null>(null);
+  const [authSessionNotice, setAuthSessionNotice] = useState<string | null>(null);
 
   // A tenantId/storeId URL is an explicit store switch. Until its ID has been
   // resolved against the current tenant directory, cached settings belong to an
@@ -772,6 +776,7 @@ export default function App() {
   // Explicit clearance of unauthenticated tenant scope
   const handleClearTenantScope = useCallback(() => {
     clearStoredUnauthTenantId();
+    setAuthSessionNotice(null);
     setTenantIdParam('');
     setActiveTenant(null);
     setActiveTenantId(null);
@@ -785,6 +790,7 @@ export default function App() {
   // Clear tenant scope while remaining on the /auth sign-in route
   const handleClearAuthTenantScope = useCallback(() => {
     clearStoredUnauthTenantId();
+    setAuthSessionNotice(null);
     setTenantIdParam('');
     setActiveTenant(null);
     setActiveTenantId(null);
@@ -798,6 +804,7 @@ export default function App() {
   // When clicking Store Directory, unauthenticated users retain their tenantId scope
   const handleBackToStoreDirectory = useCallback(() => {
     const activeUnauthId = !currentUser ? (tenantIdParam || getStoredUnauthTenantId()) : null;
+    setAuthSessionNotice(null);
     setIsLoginModalOpen(false);
     setTenantIdNotice('');
     setSaasMode('LANDING');
@@ -1061,6 +1068,7 @@ export default function App() {
 
   const handleAuthSuccess = useCallback((user: any) => {
     clearStoredUnauthTenantId();
+    setAuthSessionNotice(null);
     setStoreLoginTarget(null);
     setTenantIdParam('');
     setIsLoginModalOpen(false);
@@ -1131,11 +1139,17 @@ export default function App() {
     }
   }, [availableTenants, companySettings, handleNavigateDomain]);
 
-  const handleLogout = () => {
+  const handleLogout = (options?: { reason?: 'idle' | 'manual' } | unknown) => {
     // Immediate logout, no prompt. The remembered login email is stored under its own key
     // (see utils/rememberedAccount.ts) and is intentionally NOT cleared here; only the
     // "Forget this account" action on the sign-in screen removes it.
     // Capture the tenant id BEFORE the session/tenant state is cleared.
+    const isIdleLogout =
+      typeof options === 'object' &&
+      options !== null &&
+      'reason' in options &&
+      (options as { reason?: string }).reason === 'idle';
+
     const rawLogoutId =
       activeTenant?.id ||
       currentUser?.tenantId ||
@@ -1149,6 +1163,8 @@ export default function App() {
 
     revokeSessionOnServer();
     clearAllSessionState();
+    setIsProfileModalOpen(false);
+    setMobileMenuOpen(false);
     setActiveTenantId(null);
     setCurrentUser(null);
     setCompanySettings(null);
@@ -1156,6 +1172,7 @@ export default function App() {
     setActiveExchangeForPos(null);
     setSelectedSupplierForPurchase(null);
     setTenantIdNotice('');
+    setAuthSessionNotice(isIdleLogout ? CASHIER_IDLE_LOGOUT_NOTICE : null);
     setCurrentTab('dashboard');
 
     // On logging out, don't redirect user to saaslandingpage; redirect user to auth route with tenantId instead.
@@ -1177,6 +1194,18 @@ export default function App() {
     const authUrl = `/auth?tenantId=${encodeURIComponent(currentLogoutID)}`;
     window.history.replaceState({}, '', authUrl);
   };
+
+  const cashierIdleTimerEnabled = isCashierIdleTimerEnabled(currentUser, saasMode);
+  const {
+    isWarningOpen: isCashierIdleWarningOpen,
+    remainingSeconds: cashierIdleRemainingSeconds,
+    totalWarningSeconds: cashierIdleTotalWarningSeconds,
+    staySignedIn: handleCashierStaySignedIn,
+    logoutNow: handleCashierLogoutNow,
+  } = useCashierIdleLogout({
+    enabled: cashierIdleTimerEnabled,
+    onAutoLogout: () => handleLogout({ reason: 'idle' }),
+  });
 
   const handleSwitchRole = (newRole: 'ADMIN' | 'CASHIER') => {
     setCurrentUser((prev: any) => {
@@ -1355,6 +1384,7 @@ export default function App() {
               onBack={handleBackToStoreDirectory}
               onClearTenantScope={handleClearAuthTenantScope}
               onSuccess={handleAuthSuccess}
+              sessionNotice={authSessionNotice}
             />
           </>
         )
@@ -1400,6 +1430,7 @@ export default function App() {
               onBack={handleBackToStoreDirectory}
               onClearTenantScope={handleClearAuthTenantScope}
               onSuccess={handleAuthSuccess}
+              sessionNotice={authSessionNotice}
             />
           </>
           )
@@ -1853,6 +1884,16 @@ export default function App() {
       {currentUser && (
         <PushNotificationSoftPrompt currentUser={currentUser} />
       )}
+
+      <CashierIdleWarningModal
+        isOpen={cashierIdleTimerEnabled && isCashierIdleWarningOpen}
+        remainingSeconds={cashierIdleRemainingSeconds}
+        totalWarningSeconds={cashierIdleTotalWarningSeconds}
+        cashierName={currentUser?.name || currentUser?.email}
+        storeName={effectiveStoreName}
+        onStaySignedIn={handleCashierStaySignedIn}
+        onLogoutNow={handleCashierLogoutNow}
+      />
     </div>
     </Suspense>
   );

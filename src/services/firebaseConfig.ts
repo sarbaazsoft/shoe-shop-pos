@@ -66,6 +66,10 @@ export async function initFirebaseClient(): Promise<{ app: FirebaseApp | null; m
         const title = payload.notification?.title || payload.data?.title || 'POS Notification';
         const body = payload.notification?.body || payload.data?.body || 'New operational activity';
         const deepLinkUrl = payload.data?.url || '/pos';
+        const isAdminTarget = String(deepLinkUrl).startsWith('/admin') || payload.data?.isAdmin === 'true';
+        const icon = payload.notification?.icon || payload.data?.icon || (isAdminTarget ? '/admin/pwa-192x192.png' : '/pwa-192x192.png');
+        const rawBadge = payload.data?.badge || (payload.notification as Record<string, any> | undefined)?.badge;
+        const badge = rawBadge && !String(rawBadge).includes('pwa-192x192') ? rawBadge : '/icons/badge-favicon.png';
 
         // Play alert audio chime
         playAudioFeedback.success();
@@ -75,8 +79,8 @@ export async function initFirebaseClient(): Promise<{ app: FirebaseApp | null; m
           try {
             const notif = new Notification(title, {
               body,
-              icon: '/pwa-192x192.png',
-              badge: '/pwa-192x192.png',
+              icon,
+              badge,
               tag: payload.data?.tag || `fcm-fg-${Date.now()}`,
               data: { url: deepLinkUrl },
             });

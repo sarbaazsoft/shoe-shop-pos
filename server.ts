@@ -41,6 +41,7 @@ import { transformKeysToCamelCase } from './src/utils/caseTransformer.ts';
 import { loadAppSettingsCache } from './src/server/services/appSettingsService.ts';
 import { recordApplicationBaseUrl } from './src/server/services/welcomeService.ts';
 import { buildPwaManifest, resolvePwaBranding, type PwaBrandingInput } from './src/utils/pwaBranding.ts';
+import { patchDesktopSetupExe, resolveDesktopTargetUrl } from './src/server/utils/windowsExePatcher.ts';
 
 const rootDir = path.resolve('.');
 
@@ -106,6 +107,7 @@ app.get(['/sw.js', '/firebase-messaging-sw.js', '/sw-background-sync.js'], (req,
 
   if (targetPath) {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Service-Worker-Allowed', '/');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(targetPath);
@@ -198,31 +200,65 @@ app.get(['/manifest.webmanifest', '/manifest.json'], (req, res) => {
 
 // Dynamic Desktop Setup Installer (.EXE) Download Endpoint
 app.get(['/api/download/desktop-setup', '/assets/SarbaazSoft-POS-Desktop-Setup.exe'], (req, res) => {
-  const exePath = path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS-Desktop-Setup.exe');
-  if (!fs.existsSync(exePath)) {
+  const candidates = [
+    path.join(rootDir, 'public', 'assets', 'SarbaazSoft-POS-Desktop-Setup.exe'),
+    path.join(rootDir, 'dist', 'assets', 'SarbaazSoft-POS-Desktop-Setup.exe'),
+  ];
+  const exePath = candidates.find((p) => fs.existsSync(p));
+  if (!exePath) {
     return res.status(404).send('Desktop installer binary not found');
   }
 
   const branding = resolvePwaBranding(extractRequestPwaBrandingInput(req));
   const cleanFileBase = branding.shortName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'SarbaazSoft-POS';
   const downloadFileName = `${cleanFileBase}-Desktop-Setup.exe`;
+  const targetUrl = resolveDesktopTargetUrl({
+    envUrl: process.env.PUBLIC_APP_URL,
+    hostHeader: (req.get('x-forwarded-host') || req.get('host') || '').trim(),
+  });
   const originalBuf = fs.readFileSync(exePath);
-  const buf = Buffer.from(originalBuf);
-
-  // Align desktop shortcut name in the binary buffer strictly with role-based branding
-  const targetOffset = 31997;
-  const maxLen = 22;
-  const shortcutName = `${cleanFileBase.slice(0, 17)}.url\0`;
-  const shortcutBuf = Buffer.from(shortcutName, 'utf8');
-  if (shortcutBuf.length <= maxLen && targetOffset + maxLen <= buf.length) {
-    buf.fill(0, targetOffset, targetOffset + maxLen);
-    shortcutBuf.copy(buf, targetOffset);
-  }
+  const buf = patchDesktopSetupExe(originalBuf, {
+    targetUrl,
+    shortcutBaseName: cleanFileBase,
+  });
 
   res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
   res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"`);
   res.setHeader('Content-Length', buf.length);
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.end(buf);
+});
+
+// Windows MSIX / Sideload / Classic APPX Package Download Endpoints
+app.get('/assets/windows/:filename', (req, res, next) => {
+  const filename = path.basename(req.params.filename || '');
+  const candidates = [
+    path.join(rootDir, 'public', 'assets', 'windows', filename),
+    path.join(rootDir, 'dist', 'assets', 'windows', filename),
+  ];
+  const filePath = candidates.find((p) => fs.existsSync(p));
+  if (!filePath) {
+    return next();
+  }
+
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.msixbundle')) {
+    res.setHeader('Content-Type', 'application/msixbundle');
+  } else if (lower.endsWith('.msix')) {
+    res.setHeader('Content-Type', 'application/msix');
+  } else if (lower.endsWith('.appxbundle')) {
+    res.setHeader('Content-Type', 'application/appxbundle');
+  } else if (lower.endsWith('.appx')) {
+    res.setHeader('Content-Type', 'application/appx');
+  } else if (lower.endsWith('.cer')) {
+    res.setHeader('Content-Type', 'application/x-x509-ca-cert');
+  } else {
+    return next();
+  }
+
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  return res.sendFile(filePath);
 });
 
 // Signed Android APK (.APK) Download Endpoint
@@ -480,12 +516,20 @@ async function startServer() {
           } else if (filePath.endsWith('.exe')) {
             res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
             res.setHeader('Content-Disposition', 'attachment; filename="SarbaazSoft-POS-Desktop-Setup.exe"');
+          } else if (filePath.endsWith('.msixbundle')) {
+            res.setHeader('Content-Type', 'application/msixbundle');
+          } else if (filePath.endsWith('.msix')) {
+            res.setHeader('Content-Type', 'application/msix');
+          } else if (filePath.endsWith('.appxbundle')) {
+            res.setHeader('Content-Type', 'application/appxbundle');
+          } else if (filePath.endsWith('.appx')) {
+            res.setHeader('Content-Type', 'application/appx');
           }
         },
       })
     );
     // Missing static files must 404 (never fall through to index.html with a 200)
-    app.get(/\.(?:js|map|json|webmanifest|png|svg|ico|apk|exe)$/, (_req, res) => res.sendStatus(404));
+    app.get(/\.(?:js|map|json|webmanifest|png|svg|ico|apk|aab|exe|msix|msixbundle|appx|appxbundle|cer)$/, (_req, res) => res.sendStatus(404));
     app.get('*', (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
