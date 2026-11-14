@@ -1,9 +1,9 @@
 export type PwaRoleMode = 'SUPERADMIN' | 'ADMIN' | 'CASHIER' | 'PUBLIC';
 
-export const STANDARD_PWA_APP_NAME = 'SarbaazSoft Shoe Shop POS';
-export const STANDARD_PWA_SHORT_NAME = 'SarbaazSoft POS';
-export const SUPERADMIN_PWA_APP_NAME = 'SuperAdmin SarbaazSoft Shoe POS';
-export const SUPERADMIN_PWA_SHORT_NAME = 'SarbaazSoft Admin';
+export const STANDARD_PWA_APP_NAME = 'SarbaazSoft ShoePOS';
+export const STANDARD_PWA_SHORT_NAME = 'SarbaazSoft ShoePOS';
+export const SUPERADMIN_PWA_APP_NAME = 'SarbaazSoft AdminPOS';
+export const SUPERADMIN_PWA_SHORT_NAME = 'SarbaazSoft AdminPOS';
 
 export const PWA_THEME_COLOR = '#9333EA';
 export const PWA_BACKGROUND_COLOR = '#FFFFFF';
@@ -113,8 +113,8 @@ export function resolvePwaRoleMode(input?: PwaBrandingInput | string | null): Pw
 
 /**
  * Returns the strict role-based PWA branding configuration.
- * - SUPERADMIN / Control Panel: "SuperAdmin SarbaazSoft Shoe POS" (Short name: "SarbaazSoft Admin")
- * - ADMIN, CASHIER, and PUBLIC: "SarbaazSoft Shoe Shop POS" (Short name: "SarbaazSoft POS")
+ * - SUPERADMIN / Control Panel: "SarbaazSoft AdminPOS"
+ * - ADMIN, CASHIER, and PUBLIC: "SarbaazSoft ShoePOS"
  */
 export function resolvePwaBranding(input?: PwaBrandingInput | string | null): PwaBrandingConfig {
   const mode = resolvePwaRoleMode(input);

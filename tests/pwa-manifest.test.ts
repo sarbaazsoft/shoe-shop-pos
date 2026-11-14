@@ -21,7 +21,7 @@ import { ensureSaasControlPlane } from '../src/db/schemaInit.ts';
 import tenantSaasRoutes from '../src/server/routes/tenantSaasRoutes.ts';
 import { transformKeysToCamelCase } from '../src/utils/caseTransformer.ts';
 
-test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to SarbaazSoft Shoe Shop POS / SarbaazSoft POS', () => {
+test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to SarbaazSoft ShoePOS', () => {
   const standardCases = [
     undefined,
     null,
@@ -45,8 +45,8 @@ test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to Sa
     assert.match(config.manifestUrl, /^\/api\/pwa\/manifest\.webmanifest\?role=(PUBLIC|ADMIN|CASHIER)$/);
 
     const manifest = buildPwaManifest(input);
-    assert.equal(manifest.name, 'SarbaazSoft Shoe Shop POS');
-    assert.equal(manifest.short_name, 'SarbaazSoft POS');
+    assert.equal(manifest.name, 'SarbaazSoft ShoePOS');
+    assert.equal(manifest.short_name, 'SarbaazSoft ShoePOS');
     assert.equal(manifest.start_url, '/');
     assert.equal(manifest.theme_color, '#9333EA');
     assert.ok(manifest.icons.some((i) => i.src === '/pwa-192x192.png' && i.purpose === 'any'));
@@ -88,7 +88,7 @@ test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to Sa
   );
 });
 
-test('pwaBranding: SuperAdmin Control Panel strictly resolves to SuperAdmin SarbaazSoft Shoe POS / SarbaazSoft Admin', () => {
+test('pwaBranding: SuperAdmin Control Panel strictly resolves to SarbaazSoft AdminPOS', () => {
   const superAdminCases = [
     'SUPERADMIN',
     { role: 'SUPERADMIN', saasMode: 'SUPERADMIN', pathname: '/admin' },
@@ -108,8 +108,8 @@ test('pwaBranding: SuperAdmin Control Panel strictly resolves to SuperAdmin Sarb
     assert.equal(config.manifestUrl, '/api/pwa/manifest.webmanifest?role=SUPERADMIN');
 
     const manifest = buildPwaManifest(input);
-    assert.equal(manifest.name, 'SuperAdmin SarbaazSoft Shoe POS');
-    assert.equal(manifest.short_name, 'SarbaazSoft Admin');
+    assert.equal(manifest.name, 'SarbaazSoft AdminPOS');
+    assert.equal(manifest.short_name, 'SarbaazSoft AdminPOS');
     assert.equal(manifest.id, '/admin/');
     assert.equal(manifest.start_url, '/admin');
     assert.equal(manifest.theme_color, '#9333EA');
@@ -202,16 +202,16 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
     // 1. Store Owner (ADMIN) - updates PWA shortcut meta/manifest without altering document.title
     syncPwaMetadataToDocument(resolvePwaBranding({ role: 'ADMIN', saasMode: 'TENANT_ACTIVE' }));
     assert.equal(mockDoc.title, 'POS Terminal — Acme Shoes');
-    assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SarbaazSoft Shoe Shop POS');
-    assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SarbaazSoft Shoe Shop POS');
+    assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SarbaazSoft ShoePOS');
+    assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SarbaazSoft ShoePOS');
     assert.equal(mockDoc.querySelector('link[rel="manifest"]')?.getAttribute('href'), '/api/pwa/manifest.webmanifest?role=ADMIN');
     assert.equal(mockDoc.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), '/apple-touch-icon.png');
 
     // 2. SuperAdmin Control Panel - updates PWA shortcut meta/manifest without altering document.title
     syncPwaMetadataToDocument(resolvePwaBranding({ role: 'SUPERADMIN', saasMode: 'SUPERADMIN' }));
     assert.equal(mockDoc.title, 'POS Terminal — Acme Shoes');
-    assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SuperAdmin SarbaazSoft Shoe POS');
-    assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SuperAdmin SarbaazSoft Shoe POS');
+    assert.equal(mockDoc.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute('content'), 'SarbaazSoft AdminPOS');
+    assert.equal(mockDoc.querySelector('meta[name="application-name"]')?.getAttribute('content'), 'SarbaazSoft AdminPOS');
     assert.equal(mockDoc.querySelector('link[rel="manifest"]')?.getAttribute('href'), '/api/pwa/manifest.webmanifest?role=SUPERADMIN');
     assert.equal(mockDoc.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), '/admin/apple-touch-icon.png');
 
@@ -231,19 +231,19 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
 test('static manifests and index.html use Landing Page document title while keeping PWA shortcut branding intact', () => {
   const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
   assert.ok(indexHtml.includes('<title>SarbaazSoft Shoe Shop POS</title>'));
-  assert.ok(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="SarbaazSoft Shoe Shop POS" />'));
-  assert.ok(indexHtml.includes('<meta name="application-name" content="SarbaazSoft Shoe Shop POS" />'));
+  assert.ok(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="SarbaazSoft ShoePOS" />'));
+  assert.ok(indexHtml.includes('<meta name="application-name" content="SarbaazSoft ShoePOS" />'));
 
   for (const file of ['public/manifest.json', 'public/manifest.webmanifest']) {
     const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), file), 'utf8'));
-    assert.equal(manifest.name, 'SarbaazSoft Shoe Shop POS');
-    assert.equal(manifest.short_name, 'SarbaazSoft POS');
+    assert.equal(manifest.name, 'SarbaazSoft ShoePOS');
+    assert.equal(manifest.short_name, 'SarbaazSoft ShoePOS');
   }
 
   for (const file of ['public/admin/manifest.json', 'public/admin/manifest.webmanifest']) {
     const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), file), 'utf8'));
-    assert.equal(manifest.name, 'SuperAdmin SarbaazSoft Shoe POS');
-    assert.equal(manifest.short_name, 'SarbaazSoft Admin');
+    assert.equal(manifest.name, 'SarbaazSoft AdminPOS');
+    assert.equal(manifest.short_name, 'SarbaazSoft AdminPOS');
   }
 });
 
@@ -307,8 +307,8 @@ test('backend manifest routes serve strict role-based manifests and ignore dynam
       assert.equal(res.status, 200);
       assert.ok((res.headers.get('content-type') || '').includes('application/manifest+json'));
       const json = (await res.json()) as Record<string, unknown> & { name: string; short_name: string; start_url: string };
-      assert.equal(json.name, 'SarbaazSoft Shoe Shop POS');
-      assert.equal(json.short_name, 'SarbaazSoft POS');
+      assert.equal(json.name, 'SarbaazSoft ShoePOS');
+      assert.equal(json.short_name, 'SarbaazSoft ShoePOS');
       assert.equal(json.start_url, '/');
       assertCleanManifestShape(json);
     }
@@ -317,8 +317,8 @@ test('backend manifest routes serve strict role-based manifests and ignore dynam
     assert.equal(saRes.status, 200);
     assert.ok((saRes.headers.get('content-type') || '').includes('application/manifest+json'));
     const saJson = (await saRes.json()) as Record<string, unknown> & { name: string; short_name: string; start_url: string };
-    assert.equal(saJson.name, 'SuperAdmin SarbaazSoft Shoe POS');
-    assert.equal(saJson.short_name, 'SarbaazSoft Admin');
+    assert.equal(saJson.name, 'SarbaazSoft AdminPOS');
+    assert.equal(saJson.short_name, 'SarbaazSoft AdminPOS');
     assert.equal(saJson.start_url, '/admin');
     assertCleanManifestShape(saJson);
 
@@ -326,16 +326,16 @@ test('backend manifest routes serve strict role-based manifests and ignore dynam
     assert.equal(rootRes.status, 200);
     assert.ok((rootRes.headers.get('content-type') || '').includes('application/manifest+json'));
     const rootJson = (await rootRes.json()) as Record<string, unknown> & { name: string; short_name: string };
-    assert.equal(rootJson.name, 'SarbaazSoft Shoe Shop POS');
-    assert.equal(rootJson.short_name, 'SarbaazSoft POS');
+    assert.equal(rootJson.name, 'SarbaazSoft ShoePOS');
+    assert.equal(rootJson.short_name, 'SarbaazSoft ShoePOS');
     assertCleanManifestShape(rootJson);
 
     const adminRes = await fetch(`${baseUrl}/admin/manifest.webmanifest?role=CASHIER&store=ShouldBeIgnored`);
     assert.equal(adminRes.status, 200);
     assert.ok((adminRes.headers.get('content-type') || '').includes('application/manifest+json'));
     const adminJson = (await adminRes.json()) as Record<string, unknown> & { name: string; short_name: string };
-    assert.equal(adminJson.name, 'SuperAdmin SarbaazSoft Shoe POS');
-    assert.equal(adminJson.short_name, 'SarbaazSoft Admin');
+    assert.equal(adminJson.name, 'SarbaazSoft AdminPOS');
+    assert.equal(adminJson.short_name, 'SarbaazSoft AdminPOS');
     assertCleanManifestShape(adminJson);
 
     const tenantRow = await pgClient.query<{ id: number; name: string }>('SELECT id, name FROM tenants ORDER BY id ASC LIMIT 1');
@@ -345,8 +345,8 @@ test('backend manifest routes serve strict role-based manifests and ignore dynam
       assert.equal(tRes.status, 200);
       assert.ok((tRes.headers.get('content-type') || '').includes('application/manifest+json'));
       const tJson = (await tRes.json()) as Record<string, unknown> & { name: string; short_name: string; start_url: string };
-      assert.equal(tJson.name, 'SarbaazSoft Shoe Shop POS');
-      assert.equal(tJson.short_name, 'SarbaazSoft POS');
+      assert.equal(tJson.name, 'SarbaazSoft ShoePOS');
+      assert.equal(tJson.short_name, 'SarbaazSoft ShoePOS');
       assert.equal(tJson.start_url, `/?tenantId=${tid}`);
       assertCleanManifestShape(tJson);
     }

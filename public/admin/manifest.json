@@ -1,7 +1,7 @@
 {
   "id": "/admin/",
-  "name": "SuperAdmin SarbaazSoft Shoe POS",
-  "short_name": "SarbaazSoft Admin",
+  "name": "SarbaazSoft AdminPOS",
+  "short_name": "SarbaazSoft AdminPOS",
   "description": "Dedicated SuperAdmin Control Plane for Multi-Tenant Dual-Engine Wholesale POS Provisioning, Store Suspension & SaaS Analytics",
   "start_url": "/admin",
   "scope": "/",
