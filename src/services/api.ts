@@ -159,6 +159,40 @@ function getStoredUser() {
   }
 }
 
+export function isStoredTokenValid(token?: string | null): boolean {
+  const candidate = token !== undefined ? token : getAuthToken();
+  if (!candidate || candidate === 'null' || candidate === 'undefined') {
+    return false;
+  }
+  const payload = decodeTokenPayload(candidate);
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) {
+    return false;
+  }
+  return true;
+}
+
+export function getValidatedStoredSession(): { token: string; user: any } | null {
+  try {
+    const token = getAuthToken();
+    if (!isStoredTokenValid(token)) {
+      if (token) {
+        removeAuthToken();
+      }
+      return null;
+    }
+    const user = getStoredUser();
+    if (!user || typeof user !== 'object') {
+      return null;
+    }
+    return { token: token!, user };
+  } catch {
+    return null;
+  }
+}
+
 interface RequestOptions extends RequestInit {
   body?: any;
 }
@@ -320,6 +354,9 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestOption
   if (!response.ok) {
     if (response.status === 401 && !endpoint.includes('/auth/') && !endpoint.includes('/login')) {
       clearAllSessionState();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      }
     }
     if (data?.code === 'SUBSCRIPTION_EXPIRED' && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tenant:subscription-expired', { detail: data }));
