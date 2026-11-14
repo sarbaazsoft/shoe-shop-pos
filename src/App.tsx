@@ -254,13 +254,12 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<any | null>(() => {
     try {
-      const token = localStorage.getItem('pos_auth_token');
+      const token = getAuthToken();
       if (!token || token === 'null' || token === 'undefined') {
-        localStorage.removeItem('pos_current_user');
-        localStorage.removeItem('pos_auth_token');
+        removeAuthToken();
         return null;
       }
-      const stored = localStorage.getItem('pos_current_user');
+      const stored = localStorage.getItem('pos_current_user') || localStorage.getItem('shoe_pos_user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -321,9 +320,10 @@ export default function App() {
   const isRequestedTenantVerified = !tenantIdParam || Boolean(
     storeLoginTarget && Number(storeLoginTarget.id) === Number(tenantIdParam)
   );
+  // Only show the blocking loading screen when bootstrapping an authenticated session;
+  // unauthenticated visitors on the landing page or sign-in screen render immediately.
   const shouldShowTenantLoading =
-    (isInitializing && (hasStoredAuthToken || Boolean(tenantIdParam))) ||
-    (Boolean(tenantIdParam) && !isRequestedTenantVerified && !tenantIdNotice);
+    isInitializing && hasStoredAuthToken && Boolean(currentUser);
 
   const currentTargetTenantId = Number(
     activeTenant?.id ||
@@ -1362,8 +1362,8 @@ export default function App() {
 
       {/* 1. ROOT DOMAIN SAAS LANDING PAGE */}
       {saasMode === 'LANDING' && (
-        shouldShowTenantLoading ? (
-          Boolean(tenantIdParam) ? (
+        isLoginModalOpen ? (
+          shouldShowTenantLoading ? (
             <LoadingWindow
               isAdmin={false}
               storeName={
@@ -1383,14 +1383,6 @@ export default function App() {
               }
             />
           ) : (
-            <LoadingWindow
-              isAdmin={false}
-              storeName="SarbaazSoft Shoe POS"
-              statusMessage="Loading SarbaazSoft Shoe POS..."
-              subtitle="Dual-engine wholesale shoe shop POS"
-            />
-          )
-        ) : isLoginModalOpen ? (
           <>
             {tenantIdNotice && (
               <div role="alert" className="mx-auto mt-6 w-[min(92%,40rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
@@ -1410,6 +1402,7 @@ export default function App() {
               onSuccess={handleAuthSuccess}
             />
           </>
+          )
         ) : (
           <SaasLandingPage
             availableTenants={availableTenants}
@@ -1501,7 +1494,7 @@ export default function App() {
 
       {/* 2. SUPERADMIN CONTROL PANEL (`/admin`) */}
       {saasMode === 'SUPERADMIN' && (
-        isInitializing ? (
+        isInitializing && hasStoredAuthToken && Boolean(currentUser) ? (
           <LoadingWindow
             isAdmin={true}
             storeName="POS SaaS C-Panel"
