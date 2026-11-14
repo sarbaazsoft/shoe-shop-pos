@@ -56,19 +56,19 @@ test('pwaBranding: Store Owner, Cashier, and Public users strictly resolve to Sa
   // Document titles follow clean "{StoreName} | [Page Name]", "{platformName} | Login", and Landing convention
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'LANDING' }),
-    'SarbaazSoft Shoe Shop POS'
+    'SarbaazSoft Shoe POS'
   );
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'login' }),
-    'SarbaazSoft Shoe Shop POS | Login'
+    'SarbaazSoft Shoe POS | Login'
   );
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'register' }),
-    'SarbaazSoft Shoe Shop POS | Register'
+    'SarbaazSoft Shoe POS | Register'
   );
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'AUTH', isAuthModalOpen: true, authSubTab: 'forgot' }),
-    'SarbaazSoft Shoe Shop POS | Reset Password'
+    'SarbaazSoft Shoe POS | Reset Password'
   );
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'TENANT_ACTIVE', role: 'ADMIN', storeName: 'Acme Shoes', currentTab: 'dashboard' }),
@@ -123,7 +123,7 @@ test('pwaBranding: SuperAdmin Control Panel strictly resolves to SarbaazSoft Adm
   );
   assert.equal(
     getStandardDocumentTitle({ saasMode: 'SUPERADMIN', isAuthModalOpen: true, authSubTab: 'login' }),
-    'SarbaazSoft Shoe Shop POS | Login'
+    'SarbaazSoft Shoe POS | Login'
   );
 });
 
@@ -230,7 +230,7 @@ test('syncPwaMetadataToDocument: dynamically updates title, meta tags, manifest 
 
 test('static manifests and index.html use Landing Page document title while keeping PWA shortcut branding intact', () => {
   const indexHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
-  assert.ok(indexHtml.includes('<title>SarbaazSoft Shoe Shop POS</title>'));
+  assert.ok(indexHtml.includes('<title>SarbaazSoft Shoe POS</title>'));
   assert.ok(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="SarbaazSoft ShoePOS" />'));
   assert.ok(indexHtml.includes('<meta name="application-name" content="SarbaazSoft ShoePOS" />'));
 

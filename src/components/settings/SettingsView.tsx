@@ -3936,7 +3936,7 @@ setFormErrors(errors);
               <div className="flex items-center gap-2">
                 <Store className="w-4 h-4 text-blue-600 dark:text-purple-400" />
                 <span className="font-bold text-slate-900 dark:text-white text-xs truncate">
-                  {installStatus?.storeName || companySettings?.name || 'Shoe Shop POS'}
+                  {installStatus?.storeName || companySettings?.name || 'SarbaazSoft Shoe POS'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-purple-200/70">

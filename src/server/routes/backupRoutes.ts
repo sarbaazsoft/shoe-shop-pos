@@ -71,7 +71,7 @@ router.get('/stats', requireAuth, requireSuperAdmin, async (_req: AuthenticatedR
     }
 
     // Get current shop name from tenants (single source of truth)
-    let storeName = 'Shoe Shop POS';
+    let storeName = 'SarbaazSoft Shoe POS';
     try {
       const shopRes = await pgClient.query<any>('SELECT name FROM tenants ORDER BY id ASC LIMIT 1');
       if (shopRes.rows.length > 0 && shopRes.rows[0].name) {
@@ -116,7 +116,7 @@ router.get('/export', requireAuth, requireSuperAdmin, async (req: AuthenticatedR
     }
 
     // Store metadata from tenants
-    let storeName = 'Shoe Shop POS';
+    let storeName = 'SarbaazSoft Shoe POS';
     try {
       const shopRes = await pgClient.query<any>('SELECT name FROM tenants ORDER BY id ASC LIMIT 1');
       if (shopRes.rows.length > 0 && shopRes.rows[0].name) {

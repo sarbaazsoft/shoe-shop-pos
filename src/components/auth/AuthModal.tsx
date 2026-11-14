@@ -87,7 +87,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const initialStoreTitle = (() => {
     const raw = companySettings?.name || companySettings?.company_name || companySettings?.companyName || '';
-    if (raw && raw !== 'SarbaazSoft Shoe POS' && raw !== 'Shoe Shop POS & Inventory') {
+    if (raw && raw !== 'SarbaazSoft Shoe POS' && raw !== 'Shoe POS & Inventory') {
       return raw;
     }
     return '';
@@ -99,7 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     let isMounted = true;
     const provided = companySettings?.name || companySettings?.company_name || companySettings?.companyName;
-    if (provided && provided !== 'SarbaazSoft Shoe POS' && provided !== 'Shoe Shop POS & Inventory') {
+    if (provided && provided !== 'SarbaazSoft Shoe POS' && provided !== 'Shoe POS & Inventory') {
       setStoreTitle(provided);
       return;
     }
@@ -126,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const effectiveStoreName =
     storeTitle ||
-    (companySettings?.name && companySettings.name !== 'SarbaazSoft Shoe POS' && companySettings.name !== 'Shoe Shop POS & Inventory' ? companySettings.name : '') ||
+    (companySettings?.name && companySettings.name !== 'SarbaazSoft Shoe POS' && companySettings.name !== 'Shoe POS & Inventory' ? companySettings.name : '') ||
     (activeTenantId ? `Store #${activeTenantId}` : 'SarbaazSoft Shoe POS');
 
   const isStoreSpecific = Boolean(activeTenantId || storeTitle);

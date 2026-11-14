@@ -747,7 +747,7 @@ export const DataBackupRestore: React.FC<DataBackupRestoreProps> = ({
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-900 dark:text-emerald-200">
                   <div>
                     <span className="text-emerald-700 dark:text-emerald-400 block">Store Name:</span>
-                    <span className="font-medium">{inspectedBackup.meta.storeName || 'Shoe Shop POS'}</span>
+                    <span className="font-medium">{inspectedBackup.meta.storeName || 'SarbaazSoft Shoe POS'}</span>
                   </div>
                   <div>
                     <span className="text-emerald-700 dark:text-emerald-400 block">Backup Date:</span>

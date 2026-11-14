@@ -35,7 +35,7 @@ export function extractRequestOrigin(req: Request): string {
 /**
  * 1. STORE PWA MANIFEST (`/api/tenants/manifest?tenantId=...`)
  * Serves a store-scoped start_url while strictly enforcing role-based
- * SarbaazSoft Shoe Shop POS branding without dynamic tenant names.
+ * SarbaazSoft Shoe POS branding without dynamic tenant names.
  */
 router.get(['/tenants/manifest', '/tenants/manifest.json', '/tenants/manifest.webmanifest'], async (req: Request, res: Response) => {
   try {

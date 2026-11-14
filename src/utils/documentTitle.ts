@@ -2,7 +2,7 @@
  * Standardized document/browser title & favicon helper.
  *
  * Title convention (HTML <title> / document.title only — does NOT affect PWA manifests or shortcuts):
- * - Landing Page: "SarbaazSoft Shoe Shop POS"
+ * - Landing Page: "SarbaazSoft Shoe POS"
  * - Auth Pages (Login/Register/Reset): "{platformName} | Login" (or respective auth action)
  * - Dashboard: "{StoreName} | Dashboard"
  * - POS Terminal: "{StoreName} | POS Terminal"
@@ -11,7 +11,7 @@
  * - Browser Tab Favicon: Multi-resolution /admin/favicon.ico across all routes and roles.
  */
 
-export const PLATFORM_DOCUMENT_NAME = 'SarbaazSoft Shoe Shop POS';
+export const PLATFORM_DOCUMENT_NAME = 'SarbaazSoft Shoe POS';
 export const BROWSER_FAVICON_PATH = '/admin/favicon.ico';
 
 export const APP_ROUTE_TITLES: Record<string, string> = {
