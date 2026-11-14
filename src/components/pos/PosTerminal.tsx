@@ -3114,7 +3114,16 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                     <QuickReceiveChips
                       totalAmount={netTotalPayable}
                       customerLedgerBalance={customerOutstandingBalance}
-                      isWholesale={isWholesaleTransaction}
+                      isWholesale={
+                        isWholesaleTransaction &&
+                        (customerOutstandingBalance > 0 ||
+                          Boolean(
+                            selectedCustomer &&
+                              (!rawCustomerType.includes('RETAIL') ||
+                                rawCustomerType.includes('WHOLESALE') ||
+                                customerShopName.length > 0)
+                          ))
+                      }
                       cashReceived={cashReceived}
                       currencySymbol={currencySymbol}
                       onSelectAmount={(amount) => setCashReceived(amount)}

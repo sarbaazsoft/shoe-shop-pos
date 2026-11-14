@@ -9,18 +9,20 @@ export interface QuickReceiveChip {
 
 /**
  * Calculates dynamic quick-receive cash denominations in Pakistani Rupees (PKR)
- * based on the invoice amount and the highest Pakistani banknote denomination (Rs. 5,000).
+ * based on standard circulated banknotes (Rs. 50, 100, 500, 1,000, 5,000) and
+ * the invoice amount. Intentionally excludes the rare commemorative Rs. 75 note.
  *
- * Real-world retail cash payment rules:
- * 1. If invoice is an exact multiple of Rs. 5,000 (e.g. Rs. 5,000, 10,000, 15,000, 20,000, 50,000):
+ * Real-world retail cash payment rules (up to 5 chips):
+ * 1. If invoice is an exact multiple of Rs. 5,000 (e.g. Rs. 5,000, 10,000, 15,000, 50,000):
  *    Exactly (total / 5000) notes of Rs. 5,000 pay the bill in full with zero change.
  *    -> Returns [total] (Exact only).
  * 2. If invoice is below Rs. 5,000:
- *    Offers exact amount, intermediate notes (next 500 / 1,000), and a single Rs. 5,000 note.
+ *    Offers exact amount, next Rs. 100, next Rs. 500, next Rs. 1,000, and Rs. 5,000 note
+ *    (plus next Rs. 50 if fewer than 5 chips exist, e.g., 3,250 -> [3,250, 3,300, 3,500, 4,000, 5,000]).
  * 3. If invoice is between Rs. 5,000 and Rs. 10,000:
- *    Offers exact amount, intermediate notes (next 500 / 1,000), and two Rs. 5,000 notes = Rs. 10,000.
+ *    Offers exact amount, next Rs. 100, next Rs. 500, next Rs. 1,000, and Rs. 10,000 (two Rs. 5,000 notes).
  * 4. If invoice exceeds Rs. 10,000 (and is not an exact multiple of 5,000):
- *    Offers exact amount, next Rs. 5,000 multiple, next Rs. 10,000 multiple, and Rs. 50,000 milestone packet.
+ *    Offers exact amount, next Rs. 500, next Rs. 1,000, next Rs. 5,000, next Rs. 10,000, and Rs. 50k/100k milestones.
  */
 export function generateRetailQuickReceiveChips(totalAmount: number): QuickReceiveChip[] {
   const total = Math.max(0, Math.round(totalAmount));
@@ -41,6 +43,18 @@ export function generateRetailQuickReceiveChips(totalAmount: number): QuickRecei
   candidates.add(total);
 
   if (total < 5000) {
+    if (total < 500) {
+      const next50 = Math.ceil(total / 50) * 50;
+      if (next50 > total && next50 < 5000) {
+        candidates.add(next50);
+      }
+    }
+
+    const next100 = Math.ceil(total / 100) * 100;
+    if (next100 > total && next100 < 5000) {
+      candidates.add(next100);
+    }
+
     const next500 = Math.ceil(total / 500) * 500;
     if (next500 > total && next500 < 5000) {
       candidates.add(next500);
@@ -52,7 +66,20 @@ export function generateRetailQuickReceiveChips(totalAmount: number): QuickRecei
     }
 
     candidates.add(5000);
+
+    // Fill 5th slot with next Rs. 50 increment when applicable (ignoring rare Rs. 75 note)
+    if (candidates.size < 5) {
+      const next50 = Math.ceil(total / 50) * 50;
+      if (next50 > total && next50 < 5000) {
+        candidates.add(next50);
+      }
+    }
   } else if (total < 10000) {
+    const next100 = Math.ceil(total / 100) * 100;
+    if (next100 > total && next100 < 10000) {
+      candidates.add(next100);
+    }
+
     const next500 = Math.ceil(total / 500) * 500;
     if (next500 > total && next500 < 10000) {
       candidates.add(next500);
@@ -64,34 +91,58 @@ export function generateRetailQuickReceiveChips(totalAmount: number): QuickRecei
     }
 
     candidates.add(10000);
+
+    if (candidates.size < 5) {
+      const next50 = Math.ceil(total / 50) * 50;
+      if (next50 > total && next50 < 10000) {
+        candidates.add(next50);
+      }
+    }
   } else {
+    const next500 = Math.ceil(total / 500) * 500;
+    if (next500 > total) {
+      candidates.add(next500);
+    }
+
+    const next1000 = Math.ceil(total / 1000) * 1000;
+    if (next1000 > total) {
+      candidates.add(next1000);
+    }
+
     const next5000 = Math.ceil(total / 5000) * 5000;
     if (next5000 > total) {
       candidates.add(next5000);
     }
 
     const next10000 = Math.ceil(total / 10000) * 10000;
-    if (next10000 > total) {
+    if (next10000 > total && candidates.size < 5) {
       candidates.add(next10000);
     }
 
-    if (total > 20000 && total < 50000 && candidates.size < 4) {
+    if (total > 20000 && total < 50000 && candidates.size < 5) {
       candidates.add(50000);
     }
 
     if (total > 50000) {
       const next50000 = Math.ceil(total / 50000) * 50000;
-      if (next50000 > total && candidates.size < 4) {
+      if (next50000 > total && candidates.size < 5) {
         candidates.add(next50000);
       }
       const next100000 = Math.ceil(total / 100000) * 100000;
-      if (next100000 > total && candidates.size < 4) {
+      if (next100000 > total && candidates.size < 5) {
         candidates.add(next100000);
+      }
+    }
+
+    if (candidates.size < 5) {
+      const next100 = Math.ceil(total / 100) * 100;
+      if (next100 > total) {
+        candidates.add(next100);
       }
     }
   }
 
-  const sorted = Array.from(candidates).sort((a, b) => a - b).slice(0, 4);
+  const sorted = Array.from(candidates).sort((a, b) => a - b).slice(0, 5);
 
   return sorted.map((amt) => ({
     amount: amt,
@@ -206,6 +257,33 @@ export function generateWholesaleQuickReceiveChips(
   return selected.filter((c) => c.amount <= totalCombined);
 }
 
+/**
+ * Conditionally hides the Exact bill chip from the rendered UI when enough
+ * higher/milestone tender chips already exist (>= 4 non-exact chips), because
+ * the Amount Received input already provides an inline "Exact" button and
+ * defaults empty input to the exact bill total.
+ * If fewer than 4 non-exact chips exist (< 4), the Exact chip is rendered.
+ * Never hides "Pay All" when collecting an existing Khata ledger balance.
+ */
+export function filterDisplayQuickReceiveChips(
+  chips: QuickReceiveChip[],
+  options?: { isWholesale?: boolean; customerLedgerBalance?: number }
+): QuickReceiveChip[] {
+  if (chips.length === 0) return chips;
+
+  const isWholesale = Boolean(options?.isWholesale);
+  const hasLedgerBalance = Number(options?.customerLedgerBalance || 0) > 0;
+
+  const isExactBillChip = (chip: QuickReceiveChip) =>
+    chip.isExact && (!isWholesale || !hasLedgerBalance);
+
+  const nonExactChips = chips.filter((chip) => !isExactBillChip(chip));
+  if (nonExactChips.length > 3) {
+    return nonExactChips;
+  }
+  return chips;
+}
+
 interface QuickReceiveChipsProps {
   totalAmount: number;
   customerLedgerBalance?: number;
@@ -225,14 +303,17 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
   onSelectAmount,
   formatPrice = (val) => val.toLocaleString('en-PK', { maximumFractionDigits: 0 }),
 }) => {
-  const chips = React.useMemo(() => {
-    if (isWholesale) {
-      return generateWholesaleQuickReceiveChips(totalAmount, customerLedgerBalance);
-    }
-    return generateRetailQuickReceiveChips(totalAmount);
+  const visibleChips = React.useMemo(() => {
+    const generated = isWholesale
+      ? generateWholesaleQuickReceiveChips(totalAmount, customerLedgerBalance)
+      : generateRetailQuickReceiveChips(totalAmount);
+    return filterDisplayQuickReceiveChips(generated, {
+      isWholesale,
+      customerLedgerBalance,
+    });
   }, [isWholesale, totalAmount, customerLedgerBalance]);
 
-  if (chips.length === 0) return null;
+  if (visibleChips.length === 0) return null;
 
   const totalCombined = Math.max(0, Math.round(totalAmount + Math.max(0, customerLedgerBalance || 0)));
 
@@ -249,7 +330,7 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
             ? customerLedgerBalance && customerLedgerBalance > 0
               ? `Max Balance: ${currencySymbol} ${formatPrice(totalCombined)}`
               : `Capped at Invoice: ${currencySymbol} ${formatPrice(totalAmount)}`
-            : chips.length === 1
+            : visibleChips.length === 1
             ? 'Tap for exact cash'
             : 'Tap note for instant change'}
         </span>
@@ -257,12 +338,12 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
 
       {/* Grid of Dynamic Quick-Receive Amount Chips */}
       <div
-        className="grid gap-1.5"
+        className="grid gap-1 sm:gap-1.5"
         style={{
-          gridTemplateColumns: `repeat(${chips.length}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${visibleChips.length}, minmax(0, 1fr))`,
         }}
       >
-        {chips.map((chip) => {
+        {visibleChips.map((chip) => {
           const isSelected =
             typeof cashReceived === 'number'
               ? cashReceived === chip.amount
@@ -273,7 +354,7 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
               key={chip.amount}
               type="button"
               onClick={() => onSelectAmount(chip.amount)}
-              className={`relative py-1.5 px-1 rounded-xl border text-center transition-all duration-150 cursor-pointer select-none active:scale-[0.97] flex flex-col items-center justify-center min-h-[42px] ${
+              className={`relative py-1.5 px-0.5 sm:px-1 rounded-xl border text-center transition-all duration-150 cursor-pointer select-none active:scale-[0.97] flex flex-col items-center justify-center min-h-[42px] min-w-0 ${
                 isSelected
                   ? 'bg-purple-600 dark:bg-purple-600 border-purple-500 text-white shadow-sm shadow-purple-600/30 font-bold ring-2 ring-purple-500/20'
                   : 'bg-white dark:bg-[#0A0E1A] hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-700 dark:text-slate-200 hover:text-purple-700 dark:hover:text-purple-300 border-purple-200/80 dark:border-purple-800/60 hover:border-purple-400 dark:hover:border-purple-600 font-semibold'
@@ -285,7 +366,7 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
               }
             >
               <span
-                className={`text-[9px] font-black tracking-wider uppercase leading-none mb-0.5 ${
+                className={`text-[9px] font-black tracking-wider uppercase leading-none mb-0.5 truncate max-w-full ${
                   isSelected
                     ? 'text-purple-100'
                     : chip.isExact
@@ -295,7 +376,7 @@ export const QuickReceiveChips: React.FC<QuickReceiveChipsProps> = ({
               >
                 {chip.label || (chip.isExact ? 'Exact' : 'Cash')}
               </span>
-              <span className="font-mono font-bold text-xs tracking-tight leading-none">
+              <span className="font-mono font-bold text-[11px] sm:text-xs tracking-tight leading-none tabular-nums truncate max-w-full">
                 {formatPrice(chip.amount)}
               </span>
             </button>
